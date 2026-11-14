@@ -433,13 +433,19 @@ public sealed partial class OperateViewModel : ObservableObject
     // The row the last single click in Next in line went to (null: a details strip), for the double-click that follows.
     private StationRowViewModel? _firstClick;
 
-    // The row whose single click waits for the double-click time before its strip opens or folds.
-    private StationRowViewModel? _pendingClick;
+    // The row (Next in line or Repeats) whose single click waits for the double-click time before its strip opens or folds.
+    private object? _pendingClick;
 
-    // Opens the strip under the selected row only, and only while its details are loaded.
+    // The Repeats station whose details are open, or null when they belong to the selected line row. One strip is open
+    // at a time, in one list or the other.
+    private string? _repeatDetails;
+
+    // Opens the strip under the selected line row or the clicked Repeats row only, and only while its details are loaded.
     private void MarkDetails()
     {
-        foreach (var r in Line) r.DetailsOpen = r.IsSelected && Details is { } d && Callsign.EqualsCall(d.Call, r.Call);
+        foreach (var r in Line) r.DetailsOpen = _repeatDetails is null && r.IsSelected && Details is { } d && Callsign.EqualsCall(d.Call, r.Call);
+        foreach (var r in Repeats)
+            r.DetailsOpen = _repeatDetails is { } c && Callsign.EqualsCall(r.Call, c) && Details is { } d && Callsign.EqualsCall(d.Call, r.Call);
     }
 
     /// <summary>"Who you're calling": what is known about the station in the current contact; null outside a contact.</summary>
@@ -638,9 +644,30 @@ public sealed partial class OperateViewModel : ObservableObject
         if (Keyboard.Visible) _commands.KeyboardListen(row.Source.Station.OffsetHz);
         if (ReferenceEquals(row, Selected)) return;
         // Selected now, so Enter and the outline follow the click; the strip waits.
+        _repeatDetails = null;
         foreach (var r in Line) r.IsSelected = ReferenceEquals(r, row);
         Selected = row;
         Details = null;
+    }
+
+    /// <summary>
+    /// A Repeats row was clicked. Once <see cref="CompleteClick"/> confirms a single click, its details open under it
+    /// (Next in line then has no row selected), or fold when they were open. A double-click never opens them.
+    /// </summary>
+    public void RepeatClicked(RepeatRowViewModel row, int clickCount = 1)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        if (clickCount != 1)
+        {
+            var first = _pendingClick as RepeatRowViewModel;
+            _pendingClick = null;
+            if (clickCount == 2 && first is not null) DoubleClickedRepeat(first);
+            return;
+        }
+        _firstClick = null;
+        _pendingClick = row;
+        _repeats.Clicked();
+        if (Keyboard.Visible) _commands.KeyboardListen(row.Source.Station.OffsetHz);
     }
 
     /// <summary>
@@ -651,15 +678,30 @@ public sealed partial class OperateViewModel : ObservableObject
     {
         var pending = _pendingClick;
         _pendingClick = null;
-        // Matched by call: the line may have been rebuilt since the click.
-        if (pending is not { } clicked || Selected is not { } row || !Callsign.EqualsCall(row.Call, clicked.Call)) return;
-        if (row.DetailsOpen) Details = null;
-        else Select(row);
+        switch (pending)
+        {
+            // Matched by call: the line may have been rebuilt since the click.
+            case StationRowViewModel clicked when Selected is { } row && Callsign.EqualsCall(row.Call, clicked.Call):
+                if (row.DetailsOpen) Details = null;
+                else Select(row);
+                break;
+            case RepeatRowViewModel clicked when Repeats.FirstOrDefault(r => Callsign.EqualsCall(r.Call, clicked.Call)) is { } row:
+                if (row.DetailsOpen)
+                {
+                    Details = null;
+                    break;
+                }
+                Select(null);
+                _repeatDetails = row.Call;
+                Details = LoadDetails(row.Call, row.Source.Station);
+                break;
+        }
     }
 
     /// <summary>Selects a row and loads its details.</summary>
     public void Select(StationRowViewModel? row)
     {
+        _repeatDetails = null;
         foreach (var r in Line) r.IsSelected = ReferenceEquals(r, row);
         Selected = row;
         Details = row is null ? null : LoadDetails(row.Call, row.Source.Station);
@@ -891,6 +933,13 @@ public sealed partial class OperateViewModel : ObservableObject
         foreach (var r in list.Take(MaxRepeats))
             Repeats.Add(new RepeatRowViewModel(r, log?.LastContactWith(r.Station.Call), log?.ContactsWith(r.Station.Call).Count ?? 0, Units, now, i++,
                 _snap is not null && (log?.CallConfirmed(r.Station.Call, _snap.Band, ModeInfo.Name(_snap.Mode)) ?? false)));
+        // The station left Repeats: its strip closes, as it does in Next in line.
+        if (_repeatDetails is { } open && !Repeats.Any(r => Callsign.EqualsCall(r.Call, open)))
+        {
+            _repeatDetails = null;
+            Details = null;
+        }
+        MarkDetails();
         MarkInContact();
         MarkCallers();
         RepeatsMoreText = list.Count > MaxRepeats ? $"and {list.Count - MaxRepeats} more" : string.Empty;

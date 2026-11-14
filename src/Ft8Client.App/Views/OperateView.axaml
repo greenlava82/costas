@@ -644,6 +644,10 @@
                           BorderBrush="{DynamicResource RowDividerBrush}" BorderThickness="0,1,0,0">
                     <Panel>
                       <Border Width="3" HorizontalAlignment="Left" Background="{Binding IsInContact, Converter={x:Static v:Converters.SelectedBar}}" />
+                      <!-- The row with its details open gets the same outline as the picked row in Next in line. -->
+                      <Border BorderThickness="1" CornerRadius="3" Margin="1" IsHitTestVisible="False"
+                              BorderBrush="{Binding DetailsOpen, Converter={x:Static v:Converters.CursorOutline}}" />
+                      <StackPanel>
                       <Grid ColumnDefinitions="36,100,190,160,*,100,46,64,230,120,74" v:ResizableColumns.Layout="Calls" MinHeight="36" Margin="14,0">
                         <TextBlock Grid.Column="0" Text="{Binding Rank}" Classes="num secondary" VerticalAlignment="Center" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
@@ -675,6 +679,11 @@
                                 Command="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).CallRepeatCommand}" CommandParameter="{Binding}"
                                 AutomationProperties.Name="{Binding Call, StringFormat='Call or answer {0} again'}" />
                       </Grid>
+                      <!-- The clicked station's details, as in Next in line. Clicking the row again or Esc closes them. -->
+                      <Border IsVisible="{Binding DetailsOpen}" Margin="14,2,14,12" AutomationProperties.Name="Station details">
+                        <v:StationDetailsStrip DataContext="{Binding $parent[v:OperateView].((vm:OperateViewModel)DataContext).Details}" />
+                      </Border>
+                      </StackPanel>
                     </Panel>
                   </Border>
                 </DataTemplate>

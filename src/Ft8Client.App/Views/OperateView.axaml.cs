@@ -33,14 +33,9 @@ public partial class OperateView : UserControl
         LineList.PointerEntered += (_, _) => Vm?.PointerEnteredLine();
         LineList.PointerExited += (_, _) => Vm?.PointerExitedLine();
         LineList.AddHandler(PointerPressedEvent, OnRowPressed, RoutingStrategies.Tunnel);
+        RepeatList.AddHandler(PointerPressedEvent, OnRepeatPressed, RoutingStrategies.Tunnel);
         RepeatList.PointerEntered += (_, _) => Vm?.PointerEnteredRepeats();
         RepeatList.PointerExited += (_, _) => Vm?.PointerExitedRepeats();
-        // A double-click on the Call button is two clicks of the button, not a double-click on the row.
-        RepeatList.DoubleTapped += (_, e) =>
-        {
-            if ((e.Source as Visual)?.FindAncestorOfType<Button>(includeSelf: true) is null
-                && (e.Source as Control)?.DataContext is RepeatRowViewModel row) Vm?.DoubleClickedRepeat(row);
-        };
         SizeChanged += (_, e) => Relayout(e.NewSize.Width);
         LeftPane.SizeChanged += (_, _) => FitPinned();
         CallingYou.SizeChanged += (_, _) => FitPinned();
@@ -238,6 +233,17 @@ public partial class OperateView : UserControl
     // A double-click on a button in a row (Call, a link in the strip) is the button's: it must not call the station as well.
     private static bool OnButton(PointerPressedEventArgs e) =>
         e.Source is Visual v && v.FindAncestorOfType<Button>(includeSelf: true) is not null;
+
+    // A press in a Repeats row; one in the strip under it has the details as its data and is ignored.
+    private void OnRepeatPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (Vm is not { } vm || !e.GetCurrentPoint(RepeatList).Properties.IsLeftButtonPressed) return;
+        if ((e.Source as Control)?.DataContext is not RepeatRowViewModel row) return;
+        AfterPress(e.ClickCount);
+        if (e.ClickCount >= 2 && OnButton(e)) return;
+        vm.RepeatClicked(row, e.ClickCount);
+        if (e.ClickCount >= 2) e.Handled = true;
+    }
 
     private DispatcherTimer? _clickTimer;
 

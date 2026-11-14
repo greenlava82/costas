@@ -17,8 +17,8 @@ using Ft8Client.Core.Stations;
 namespace Ft8Client.App.Tests;
 
 /// <summary>
-/// The station details open in a strip under the selected row of Next in line, instead of a floating card (owner
-/// request 2026-11-14). Clicking the row again or Esc closes them; a double-click never opens them.
+/// The station details open in a strip under the clicked row of Next in line or Repeats, instead of a floating card
+/// (owner request 2026-11-14). Clicking the row again or Esc closes them; a double-click never opens them.
 /// </summary>
 public class DetailsStripTests
 {
@@ -240,6 +240,102 @@ public class DetailsStripTests
         vm.MoveSelection(1);
 
         Open(vm).Should().Equal("B");
+    }
+
+    private static RepeatRowViewModel Repeat(OperateViewModel vm, string call) => vm.Repeats.Single(r => r.Call == call);
+
+    private static IEnumerable<string> OpenRepeats(OperateViewModel vm) => vm.Repeats.Where(r => r.DetailsOpen).Select(r => r.Call);
+
+    private static void Click(OperateViewModel vm, RepeatRowViewModel row)
+    {
+        vm.RepeatClicked(row);
+        vm.CompleteClick();
+    }
+
+    [Fact]
+    public void RepeatClicked_Row_OpensDetailsUnderItOnly()
+    {
+        var vm = Build("A", "r:K1ABC", "r:K2DEF");
+
+        Click(vm, Repeat(vm, "K2DEF"));
+
+        OpenRepeats(vm).Should().Equal("K2DEF");
+        Open(vm).Should().BeEmpty();
+        vm.Details!.Call.Should().Be("K2DEF");
+    }
+
+    [Fact]
+    public void RepeatClicked_LineRowSelected_LineRowDeselectedAndItsStripCloses()
+    {
+        var vm = Build("A", "r:K1ABC");
+        Click(vm, Row(vm, "A"));
+
+        Click(vm, Repeat(vm, "K1ABC"));
+
+        Open(vm).Should().BeEmpty();
+        vm.Selected.Should().BeNull("Enter must not call a line row the operator has moved away from");
+        OpenRepeats(vm).Should().Equal("K1ABC");
+    }
+
+    [Fact]
+    public void RowClicked_RepeatOpen_DetailsMoveToTheLine()
+    {
+        var vm = Build("A", "r:K1ABC");
+        Click(vm, Repeat(vm, "K1ABC"));
+
+        Click(vm, Row(vm, "A"));
+
+        OpenRepeats(vm).Should().BeEmpty();
+        Open(vm).Should().Equal("A");
+    }
+
+    [Fact]
+    public void RepeatClicked_OpenRowAgain_DetailsClose()
+    {
+        var vm = Build("r:K1ABC");
+        Click(vm, Repeat(vm, "K1ABC"));
+
+        Click(vm, Repeat(vm, "K1ABC"));
+
+        OpenRepeats(vm).Should().BeEmpty();
+        vm.Details.Should().BeNull();
+    }
+
+    [Fact]
+    public void RepeatClicked_DoubleClick_StripNeverOpens()
+    {
+        var vm = Build("r:K1ABC");
+
+        vm.RepeatClicked(Repeat(vm, "K1ABC"), clickCount: 1);
+        vm.RepeatClicked(Repeat(vm, "K1ABC"), clickCount: 2);
+        vm.CompleteClick();
+
+        OpenRepeats(vm).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Apply_RepeatStillHere_DetailsStayOpenUnderItsNewRow()
+    {
+        var vm = Build("r:K1ABC", "r:K2DEF");
+        Click(vm, Repeat(vm, "K2DEF"));
+
+        NextSlot(vm, 1, "r:K2DEF", "r:K1ABC");
+
+        OpenRepeats(vm).Should().Equal("K2DEF");
+    }
+
+    [Fact]
+    public void Apply_RepeatLeaves_DetailsClose()
+    {
+        var vm = Build("A", "r:K1ABC");
+        Click(vm, Repeat(vm, "K1ABC"));
+
+        NextSlot(vm, 1, "A");
+        NextSlot(vm, 2, "A", "r:K1ABC");
+
+        OpenRepeats(vm).Should().BeEmpty();
+        Open(vm).Should().BeEmpty();
+        vm.Details.Should().BeNull();
     }
 
     [Fact]

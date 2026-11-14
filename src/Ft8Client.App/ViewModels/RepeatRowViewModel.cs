@@ -139,6 +139,10 @@ public sealed partial class RepeatRowViewModel : ObservableObject
     [ObservableProperty]
     public partial string LastHeard { get; private set; } = string.Empty;
 
+    /// <summary>The station's details strip is open under this row.</summary>
+    [ObservableProperty]
+    public partial bool DetailsOpen { get; set; }
+
     /// <summary>The station I am in a contact with right now.</summary>
     [ObservableProperty]
     public partial bool IsInContact { get; set; }
