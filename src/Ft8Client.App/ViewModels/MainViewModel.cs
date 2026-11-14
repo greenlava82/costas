@@ -99,6 +99,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         _host.Settings.Changed += _ => Dispatch(ApplySettings);
         _host.Remote.Changed += () => Dispatch(UpdateRemote);
         _host.RadioPower.Changed += () => Dispatch(UpdatePower);
+        // The first reading can arrive before this subscribes, and Changed only fires when the value changes.
+        UpdatePower();
         UpdateRemote();
         _host.Udp.Inbound += m => Dispatch(() => OnUdp(m));
     }
