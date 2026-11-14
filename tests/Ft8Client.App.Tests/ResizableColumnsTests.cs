@@ -60,6 +60,62 @@ public class ResizableColumnsTests
     }
 
     [Fact]
+    public void MoveEdge_BetweenTwoFixedColumns_OneGrowsByWhatTheOtherGivesUp()
+    {
+        var layout = new ColumnLayout([100, 80, double.NaN, 50]);
+
+        layout.MoveEdge(0, 30, tableWidth: 200);
+
+        layout.Widths[0].Should().Be(130, "growing needs no spare room: the neighbour pays for it");
+        layout.Widths[1].Should().Be(50);
+        layout.Widths[3].Should().Be(50, "no other column moves");
+    }
+
+    [Fact]
+    public void MoveEdge_NeighbourAtMinimum_StopsThere()
+    {
+        var layout = new ColumnLayout([100, 80, double.NaN, 50]);
+
+        layout.MoveEdge(0, 500);
+
+        layout.Widths[0].Should().Be(100 + 80 - ColumnLayout.MinWidth);
+        layout.Widths[1].Should().Be(ColumnLayout.MinWidth);
+    }
+
+    [Fact]
+    public void MoveEdge_Left_ShrinksLeftColumnAndGrowsRight()
+    {
+        var layout = new ColumnLayout([100, 80, double.NaN, 50]);
+
+        layout.MoveEdge(0, -40);
+
+        layout.Widths[0].Should().Be(60);
+        layout.Widths[1].Should().Be(120);
+    }
+
+    [Fact]
+    public void MoveEdge_LeftOfStarColumn_StarColumnPays()
+    {
+        var layout = new ColumnLayout([100, double.NaN, 50]);
+
+        layout.MoveEdge(0, 30, tableWidth: 400);
+
+        layout.Widths[0].Should().Be(130);
+        layout.Widths[2].Should().Be(50);
+    }
+
+    [Fact]
+    public void MoveEdge_RightOfStarColumn_FixedColumnOnTheRightChanges()
+    {
+        var layout = new ColumnLayout([100, double.NaN, 50, 40]);
+
+        layout.MoveEdge(1, -20, tableWidth: 400);
+
+        layout.Widths[2].Should().Be(70, "moving the edge left widens the column on its right");
+        layout.Widths[0].Should().Be(100);
+    }
+
+    [Fact]
     public void Reset_ChangedColumn_RestoresDefault()
     {
         var layout = new ColumnLayout([100, double.NaN, 50]);
@@ -124,10 +180,13 @@ public class ResizableColumnsTests
                 window.UpdateLayout();
 
                 header.ColumnDefinitions[2].Width.Value.Should().Be(250);
+                header.ColumnDefinitions[3].Width.Value.Should().Be(100, "Why, on the other side of the edge, gives up the room");
                 repeatsHeader.ColumnDefinitions[2].Width.Value.Should().Be(250, "Repeats keeps lining up with Next in line");
+                repeatsHeader.ColumnDefinitions[3].Width.Value.Should().Be(100);
                 saved.Should().NotBeNull();
                 saved!.Value.Name.Should().Be("Calls");
                 saved.Value.Widths[2].Should().Be(250);
+                saved.Value.Widths[3].Should().Be(100);
 
                 // Widths remembered from an earlier session are applied.
                 view.LoadColumns(new Dictionary<string, List<double>> { ["Calls"] = [36, 100, 300, 160, 100, 46, 64, 230, 120, 74] });

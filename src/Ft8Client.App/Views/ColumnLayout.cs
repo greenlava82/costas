@@ -106,6 +106,36 @@ public sealed class ColumnLayout
         return w;
     }
 
+    /// <summary>
+    /// Moves the edge between <paramref name="left"/> and the column after it by <paramref name="delta"/> (positive is
+    /// right). Between two fixed columns one grows by what the other gives up, so the table keeps its width and no other
+    /// column moves; neither goes below <see cref="MinWidth"/>. Beside the star column only the fixed column changes,
+    /// and the star column takes up the difference (as <see cref="SetWidth"/>).
+    /// </summary>
+    public void MoveEdge(int left, double delta, double tableWidth = double.PositiveInfinity)
+    {
+        var right = left + 1;
+        if (right >= _widths.Length) return;
+        var leftFixed = IsFixed(left);
+        var rightFixed = IsFixed(right);
+        if (leftFixed && rightFixed)
+        {
+            var d = Math.Round(Math.Clamp(delta, Math.Min(0, MinWidth - _widths[left]), Math.Max(0, _widths[right] - MinWidth)));
+            if (d == 0) return;
+            _widths[left] += d;
+            _widths[right] -= d;
+            Changed?.Invoke();
+        }
+        else if (leftFixed)
+        {
+            SetWidth(left, _widths[left] + delta, tableWidth);
+        }
+        else if (rightFixed)
+        {
+            SetWidth(right, _widths[right] - delta, tableWidth);
+        }
+    }
+
     /// <summary>Puts one column back to its default width.</summary>
     public void Reset(int column)
     {

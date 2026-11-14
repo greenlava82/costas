@@ -103,18 +103,18 @@ public static class ResizableColumns
         grid.SetValue(UnhookProperty, null);
     }
 
-    // One grip on each edge between two columns. Left of the star column (Doing now) an edge resizes the column on
-    // its left; from the star column on it resizes the column on its right, so the edge always follows the pointer.
-    // The last column (the Call buttons) is not resized.
+    // One grip on each edge between two columns. Dragging it moves that edge only: the column on one side grows by what
+    // the other gives up, so the rest of the table stays put (owner request 2026-11-14; before, every drag took its room
+    // from Doing now, and with Doing now already squeezed to nothing on a narrow window no column could grow). Beside
+    // the star column (Doing now) the star column gives or takes the room. The last column (the Call buttons) is not
+    // resized, so the edge before it has no grip.
     private static List<Thumb> AddGrips(Grid grid, ColumnLayout layout, Action save)
     {
         var grips = new List<Thumb>();
-        var star = Enumerable.Range(0, layout.Count).FirstOrDefault(c => !layout.IsFixed(c), layout.Count);
-        for (var i = 0; i < layout.Count - 1; i++)
+        for (var i = 0; i < layout.Count - 2; i++)
         {
-            var target = i < star ? i : i + 1;
-            if (!layout.IsFixed(target) || target == layout.Count - 1) continue;
-            var sign = target == i ? 1 : -1;
+            var left = i;
+            if (!layout.IsFixed(left) && !layout.IsFixed(left + 1)) continue;
             var grip = new Thumb
             {
                 Classes = { "column-grip" },
@@ -124,16 +124,17 @@ public static class ResizableColumns
                 Cursor = new Cursor(StandardCursorType.SizeWestEast),
                 Focusable = false,
                 ZIndex = 1,
-                Tag = target,
+                Tag = left,
             };
-            ToolTip.SetTip(grip, "Drag to resize this column. Double-click to put it back.");
+            ToolTip.SetTip(grip, "Drag to move this edge: the column on one side grows, the other shrinks. Double-click to put both back.");
             Grid.SetColumn(grip, i);
             Grid.SetRowSpan(grip, Math.Max(1, grid.RowDefinitions.Count));
-            grip.DragDelta += (_, e) => layout.SetWidth(target, layout.Widths[target] + sign * e.Vector.X, grid.Bounds.Width);
+            grip.DragDelta += (_, e) => layout.MoveEdge(left, e.Vector.X, grid.Bounds.Width);
             grip.DragCompleted += (_, _) => save();
             grip.DoubleTapped += (_, e) =>
             {
-                layout.Reset(target);
+                layout.Reset(left);
+                layout.Reset(left + 1);
                 save();
                 e.Handled = true;
             };
