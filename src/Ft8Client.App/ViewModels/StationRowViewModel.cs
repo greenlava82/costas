@@ -195,9 +195,13 @@ public sealed partial class StationRowViewModel : ObservableObject
     /// <summary>Good is bold.</summary>
     public bool ChanceBold { get; }
 
-    /// <summary>The keyboard and click cursor (Enter calls it, the details flyout shows it). Not the station in contact.</summary>
+    /// <summary>The keyboard and click cursor (Enter calls it, its details open under it). Not the station in contact.</summary>
     [ObservableProperty]
     public partial bool IsSelected { get; set; }
+
+    /// <summary>The station's details strip is open under this row.</summary>
+    [ObservableProperty]
+    public partial bool DetailsOpen { get; set; }
 
     /// <summary>The station I am in a contact with right now.</summary>
     [ObservableProperty]

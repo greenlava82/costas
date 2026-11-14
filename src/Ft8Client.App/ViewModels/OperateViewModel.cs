@@ -424,9 +424,23 @@ public sealed partial class OperateViewModel : ObservableObject
     /// <summary>ARRL's list of LoTW users; <see cref="LotwUsers.None"/> until loaded.</summary>
     public LotwUsers Lotw { get; set; } = LotwUsers.None;
 
-    /// <summary>Details flyout: the station shown.</summary>
+    /// <summary>The details strip under the selected row: the station shown, or null when it is closed.</summary>
     [ObservableProperty]
     public partial StationDetailsViewModel? Details { get; set; }
+
+    partial void OnDetailsChanged(StationDetailsViewModel? value) => MarkDetails();
+
+    // The row the last single click in Next in line went to (null: a details strip), for the double-click that follows.
+    private StationRowViewModel? _firstClick;
+
+    // The row whose single click waits for the double-click time before its strip opens or folds.
+    private StationRowViewModel? _pendingClick;
+
+    // Opens the strip under the selected row only, and only while its details are loaded.
+    private void MarkDetails()
+    {
+        foreach (var r in Line) r.DetailsOpen = r.IsSelected && Details is { } d && Callsign.EqualsCall(d.Call, r.Call);
+    }
 
     /// <summary>"Who you're calling": what is known about the station in the current contact; null outside a contact.</summary>
     [ObservableProperty]
@@ -509,7 +523,7 @@ public sealed partial class OperateViewModel : ObservableObject
         RailBand = s.Summary is null ? "Band" : $"{BandPlan.Display(s.Summary.Band)} · {s.Summary.YouNeed} you need";
         OnPropertyChanged(nameof(Panel));
         Calling = s.Contact is null ? null : DetailsFor(s.Contact.DxCall, s, now);
-        // A lookup may have arrived since the flyout opened.
+        // A lookup may have arrived since the details strip opened.
         if (Details is not null) Details = DetailsFor(Details.Call, s, now);
 
         WaitingRows.Clear();
@@ -601,11 +615,46 @@ public sealed partial class OperateViewModel : ObservableObject
     }
 
     /// <summary>A row was clicked: select it and show details. In PSK and RTTY the conversation box reads its signal.</summary>
-    public void RowClicked(StationRowViewModel row)
+    /// <remarks>
+    /// A press in Next in line: <paramref name="row"/> is the row under the pointer, or null when the press was in a
+    /// details strip. A single click selects the row at once; its details strip opens (or, on the row already showing it,
+    /// folds) only in <see cref="CompleteClick"/>, which the view calls once the double-click time has passed with no
+    /// second click. So a double-click never opens the strip: its second click cancels that and calls the row the first
+    /// click picked, wherever it lands (a strip closing elsewhere can move the rows under a pointer that has not moved).
+    /// A double-click that starts in a strip calls nobody.
+    /// </remarks>
+    public void RowClicked(StationRowViewModel? row, int clickCount = 1)
     {
+        if (clickCount != 1)
+        {
+            _pendingClick = null;
+            if (clickCount == 2 && _firstClick is { } first && ReferenceEquals(first, Selected)) DoubleClickedRow(first);
+            return;
+        }
+        _firstClick = row;
+        _pendingClick = row;
+        if (row is null) return;
         _line.Clicked();
         if (Keyboard.Visible) _commands.KeyboardListen(row.Source.Station.OffsetHz);
-        Select(row);
+        if (ReferenceEquals(row, Selected)) return;
+        // Selected now, so Enter and the outline follow the click; the strip waits.
+        foreach (var r in Line) r.IsSelected = ReferenceEquals(r, row);
+        Selected = row;
+        Details = null;
+    }
+
+    /// <summary>
+    /// The double-click time has passed since a single click with no second click: the clicked row's details strip
+    /// opens, or folds when it was already open. The row stays selected either way, so Enter still calls it.
+    /// </summary>
+    public void CompleteClick()
+    {
+        var pending = _pendingClick;
+        _pendingClick = null;
+        // Matched by call: the line may have been rebuilt since the click.
+        if (pending is not { } clicked || Selected is not { } row || !Callsign.EqualsCall(row.Call, clicked.Call)) return;
+        if (row.DetailsOpen) Details = null;
+        else Select(row);
     }
 
     /// <summary>Selects a row and loads its details.</summary>
@@ -613,17 +662,17 @@ public sealed partial class OperateViewModel : ObservableObject
     {
         foreach (var r in Line) r.IsSelected = ReferenceEquals(r, row);
         Selected = row;
-        if (row is null)
-        {
-            Details = null;
-            return;
-        }
-        _commands.Lookup(row.Call);
-        Details = _snap is null
-            ? StationDetailsViewModel.From(row.Call, row.Source.Station, QrzLookup?.Invoke(row.Call), Log?.Invoke(), Units, _now(),
-                mostWantedRank: MostWanted.RankOf(row.Source.Station.EntityKey), lotwUpload: Lotw.LastUpload(row.Call), park: ParkOf(row.Source.Station),
-                dxpedition: DxpeditionOf(row.Call))
-            : DetailsFor(row.Call, _snap, _now(), row.Source.Station);
+        Details = row is null ? null : LoadDetails(row.Call, row.Source.Station);
+    }
+
+    private StationDetailsViewModel LoadDetails(string call, Station station)
+    {
+        _commands.Lookup(call);
+        return _snap is null
+            ? StationDetailsViewModel.From(call, station, QrzLookup?.Invoke(call), Log?.Invoke(), Units, _now(),
+                mostWantedRank: MostWanted.RankOf(station.EntityKey), lotwUpload: Lotw.LastUpload(call), park: ParkOf(station),
+                dxpedition: DxpeditionOf(call))
+            : DetailsFor(call, _snap, _now(), station);
     }
 
     private StationDetailsViewModel DetailsFor(string call, SessionSnapshot s, DateTime now, Station? fallback = null)
@@ -791,9 +840,8 @@ public sealed partial class OperateViewModel : ObservableObject
     [RelayCommand]
     private void RetryUpload(TonightRowViewModel row) => _commands.RetryUpload(row.QsoId);
 
-    /// <summary>Closes the details flyout.</summary>
-    [RelayCommand]
-    private void CloseDetails() => Details = null;
+    /// <summary>Closes the details strip (Esc). The row stays selected.</summary>
+    public void CloseDetails() => Details = null;
 
     private void ApplyLine(IReadOnlyList<RankedStation> list)
     {
@@ -812,6 +860,9 @@ public sealed partial class OperateViewModel : ObservableObject
         var sel = Line.FirstOrDefault(r => r.Call == keep);
         foreach (var r in Line) r.IsSelected = ReferenceEquals(r, sel);
         Selected = sel;
+        // The station left the line: its strip has no row to open under, so it closes rather than coming back later.
+        if (sel is null && keep is not null) Details = null;
+        MarkDetails();
         MarkInContact();
         MarkCallers();
     }

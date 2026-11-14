@@ -10,9 +10,9 @@ using Avalonia.Controls;
 
 namespace Ft8Client.App.Views;
 
-/// <summary>What is known about a station (name, place, local time, licence, QSL, QRZ link).</summary>
-public partial class StationFacts : UserControl
+/// <summary>A station's details across the row, opened under the selected row in Next in line.</summary>
+public partial class StationDetailsStrip : UserControl
 {
     /// <summary>Creates the control.</summary>
-    public StationFacts() => InitializeComponent();
+    public StationDetailsStrip() => InitializeComponent();
 }

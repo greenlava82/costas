@@ -1114,10 +1114,12 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
 
     /// <summary>
     /// Esc: once both reports are exchanged, the first press stops transmitting but keeps the contact (the DX's RR73 is
-    /// still logged) and a second press abandons it; otherwise it abandons at once.
+    /// still logged) and a second press abandons it; otherwise it abandons at once. It also closes the station details
+    /// strip; that never changes what it does to the radio.
     /// </summary>
     public void Escape()
     {
+        Operate.CloseDetails();
         var s = _host.Session.Snapshot;
         if (!ModeInfo.IsSlotted(s.Mode))
         {

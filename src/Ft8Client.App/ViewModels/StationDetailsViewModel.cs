@@ -19,7 +19,7 @@ using Ft8Client.Data.Log;
 namespace Ft8Client.App.ViewModels;
 
 /// <summary>
-/// What is known about one station: the details flyout for the selected station, and the "Who you're calling" card in a
+/// What is known about one station: the details strip under the selected station, and the "Who you're calling" card in a
 /// contact. Location and grid come from its messages and the country file; the rest from a QRZ lookup when there is one.
 /// </summary>
 public sealed class StationDetailsViewModel
@@ -85,6 +85,9 @@ public sealed class StationDetailsViewModel
     /// <summary>The DXpedition line is shown.</summary>
     public bool HasDxpedition => Dxpedition.Length > 0;
 
+    /// <summary>The details strip's QSL and awards column has something to show.</summary>
+    public bool HasFactsColumn => HasQsl || HasZones || HasRarity || HasPark || HasDxpedition || HasHeard;
+
     /// <summary>The confirmation and awards group has at least one known fact.</summary>
     public bool HasConfirmationDetails => HasQsl || HasRarity || HasPark || HasDxpedition;
 
@@ -135,6 +138,18 @@ public sealed class StationDetailsViewModel
 
     /// <summary>"No contacts with this call yet" when empty.</summary>
     public bool NoPast => Past.Count == 0;
+
+    /// <summary>How many past contacts the details strip lists; the rest are counted in <see cref="PastMoreText"/>.</summary>
+    public const int PastShownMax = 3;
+
+    /// <summary>The latest past contacts, for the details strip.</summary>
+    public IReadOnlyList<PastContactViewModel> PastShown => Past.Count <= PastShownMax ? Past : [.. Past.Take(PastShownMax)];
+
+    /// <summary>"+2 more" when the strip leaves contacts out, blank otherwise.</summary>
+    public string PastMoreText => Past.Count > PastShownMax ? $"+{Past.Count - PastShownMax} more" : string.Empty;
+
+    /// <summary>The "+N more" line is shown.</summary>
+    public bool HasPastMore => Past.Count > PastShownMax;
 
     /// <summary>Pileup: "3 stations called JA6VQA at 20:29:30.", blank with no current callers.</summary>
     public string PileupHeadline { get; private init; } = string.Empty;
