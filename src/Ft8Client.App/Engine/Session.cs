@@ -91,6 +91,8 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     private (DateTime Slot, HashSet<string> Texts) _rawShown = (DateTime.MinValue, new HashSet<string>(StringComparer.Ordinal));
     private DateTime? _recordingSlot;
     private DateTime? _quickSlot;
+    // When the band or mode last changed. A slot that started earlier was recorded, at least in part, on the old band.
+    private DateTime _bandSinceUtc = DateTime.MinValue;
     private readonly Dictionary<DateTime, HashSet<string>> _fedToEngine = [];
     private DateTime? _finishedShownAt;
     private LoggedContact? _lastLogged;
@@ -300,7 +302,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         if (!result.Succeeded || result.Decodes.Count == 0) return;
         lock (_gate)
         {
-            if (audio.Mode != _config.Mode) return;
+            if (FromOldBand(audio.SlotStartUtc, audio.Mode)) return;
             var heard = result.Decodes.Select(HeardMessage.From).ToList();
             AddRaw(audio.SlotStartUtc, heard);
             FeedEngine(audio.SlotStartUtc, audio.Mode, heard, _clock.UtcNow);
@@ -408,7 +410,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             if (!result.Succeeded || result.Decodes.Count == 0) return;
             lock (_gate)
             {
-                if (audio.Mode != _config.Mode) return;
+                if (FromOldBand(audio.SlotStartUtc, audio.Mode)) return;
                 ApplySuperFox(audio.SlotStartUtc, audio.Mode, result);
             }
             PlanFor(SlotMath.SlotStart(_clock.UtcNow, audio.Mode), audio.Mode, late: true);
@@ -456,7 +458,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         lock (_gate)
         {
             if (_quickSlot == audio.SlotStartUtc) _quickSlot = null;
-            if (audio.Mode != _config.Mode) return;
+            if (FromOldBand(audio.SlotStartUtc, audio.Mode)) return;
             if (ctx.SuperFox) ApplySuperFox(audio.SlotStartUtc, audio.Mode, result);
             else FeedEngine(audio.SlotStartUtc, audio.Mode, result.Decodes.Select(HeardMessage.From).ToList(), _clock.UtcNow);
         }
@@ -520,6 +522,12 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         SlotAudioDecoded?.Invoke(audio, result.Decodes.Count);
     }
 
+    /// <summary>
+    /// True for a slot recorded in another mode, or started before the last band change: its audio is, at least in part,
+    /// from the old band, and its stations would refill the list the change cleared. Call under the lock.
+    /// </summary>
+    private bool FromOldBand(DateTime slot, Mode mode) => mode != _config.Mode || slot < _bandSinceUtc;
+
     private void ApplyDecodes(DateTime slot, Mode mode, DecodeResult result)
     {
         lock (_gate)
@@ -528,7 +536,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             _services[ServiceNames.Decoder] = result.Succeeded
                 ? new ServiceStatus(ServiceHealth.Ok, $"{result.Decodes.Count} decodes in {result.Elapsed.TotalSeconds:0.0} s", _clock.UtcNow)
                 : new ServiceStatus(ServiceHealth.Degraded, result.Message, _clock.UtcNow);
-            if (mode != _config.Mode) return;
+            if (FromOldBand(slot, mode)) return;
             var now = _clock.UtcNow;
             var heard = result.Decodes.Select(HeardMessage.From).ToList();
             AddRaw(slot, heard);
@@ -1176,6 +1184,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             _callWhenFree.Clear();
             StopAutoCall(null);
             _pileups = new PileupTracker(mode);
+            // The slot being recorded, and any decode still running, hold old-band audio: they are not applied.
+            _bandSinceUtc = _clock.UtcNow;
+            _recordingSlot = null;
             foreach (var (call, e) in _lookups) _tracker.SetLookup(call, e.Grid, e.State, e.City);
             _engine.Abandon(_clock.UtcNow);
             _engine.StopCq(_clock.UtcNow);
@@ -1245,7 +1256,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         lock (_gate)
         {
             var stationChanged = config.MyCall != _config.MyCall || config.MyGrid != _config.MyGrid;
-            _config = config;
+            // Band and mode change only through SetBand, which clears the old band's stations. The saved band is
+            // written just before SetBand runs: taken from here, it published the new band with the old band's list.
+            _config = config with { Band = _config.Band, Mode = _config.Mode };
             _engine.Configure(config.MyCall, config.MyGrid, CappedContact());
             ReloadContestLog();
             _kbd.Configure(config.MyCall);

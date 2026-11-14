@@ -479,7 +479,8 @@ public sealed partial class OperateViewModel : ObservableObject
         var listKey = RankedKey(s);
         if (_lastRanked != listKey || _line.Applied is null || _lastRankedBand != bandMode || keyboardDue)
         {
-            var secondUpdate = _lastRankedBand == bandMode && _lastRanked is { Early: true } before && !listKey.Early && before.Slot == listKey.Slot;
+            var newBand = _lastRankedBand != bandMode;
+            var secondUpdate = !newBand && _lastRanked is { Early: true } before && !listKey.Early && before.Slot == listKey.Slot;
             _lastRanked = listKey;
             _lastKeyboardRank = now;
             _lastRankedBand = bandMode;
@@ -494,6 +495,12 @@ public sealed partial class OperateViewModel : ObservableObject
             }
             _line.Offer(line);
             _repeats.Offer(repeats);
+            // The old band's stations go at once, even with the pointer over the list: their Call buttons no longer work.
+            if (newBand)
+            {
+                _line.ApplyPending();
+                _repeats.ApplyPending();
+            }
         }
         ListUpdated = _line.HasPending;
         MarkInContact();
