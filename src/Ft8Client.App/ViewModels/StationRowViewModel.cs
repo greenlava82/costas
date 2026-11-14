@@ -32,8 +32,10 @@ public sealed partial class StationRowViewModel : ObservableObject
     /// <param name="whyTip">Tooltip for Why: for a new band, the bands the country is already in the log on.</param>
     /// <param name="park">The park the station is activating (POTA), shown under Why; display only.</param>
     /// <param name="dxpedition">The announced DXpedition the station is (NG3K), shown under Why; display only.</param>
+    /// <param name="band">The band heard on ("20m"), so a new band reads "New DXCC 20 m".</param>
     public StationRowViewModel(RankedStation r, int rank, DistanceUnit units, DateTime nowUtc, LogContact? last = null, int contacts = 0,
-                               int? mostWantedRank = null, string whyTip = "", ParkInfo? park = null, Core.Dxpeditions.Dxpedition? dxpedition = null)
+                               int? mostWantedRank = null, string whyTip = "", ParkInfo? park = null, Core.Dxpeditions.Dxpedition? dxpedition = null,
+                               string? band = null)
     {
         Dxpedition = Core.Dxpeditions.DxpeditionText.Why(dxpedition);
         DxpeditionTip = Core.Dxpeditions.DxpeditionText.Details(dxpedition, nowUtc);
@@ -52,7 +54,7 @@ public sealed partial class StationRowViewModel : ObservableObject
         Call = r.Station.Call;
         Where = StationText.Where(r.Station, units);
         // In a contest the Why column says what the contact is worth to the score: a new multiplier, or a dupe.
-        Why = r.ContestTag ?? StationText.Why(r.Need.Tag, r.Station.Grid);
+        Why = r.ContestTag ?? StationText.Why(r.Need.Tag, r.Station.Grid, band);
         WhyTip = r.ContestDupe ? "Already worked in this contest on this band: it would not score again"
             : string.IsNullOrEmpty(whyTip) ? null : whyTip;
         WhyKind = r.ContestDupe ? TextKind.Secondary : r.ContestTag is not null ? TextKind.Success : KindOf(r.Need.Tag);

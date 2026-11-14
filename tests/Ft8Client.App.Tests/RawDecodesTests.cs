@@ -224,9 +224,17 @@ public class RawDecodesTests
         var vm = new RawDecodesViewModel(_ => { });
         vm.Apply(Mixed(), Rank(Ranked("JA1XYZ", NeedTag.NewCountry, 8000)));
         var line = vm.Lines.First(l => l.Message == "CQ JA1XYZ PM95");
-        line.Need.Should().Be("New country");
+        line.Need.Should().Be("New DXCC");
         line.NeedKind.Should().Be(TextKind.Caution);
         line.Distance.Should().Be("4,971 mi");
+    }
+
+    [Fact]
+    public void Apply_NewBandSender_NamesTheBand()
+    {
+        var vm = new RawDecodesViewModel(_ => { });
+        vm.Apply(Mixed(), Rank(Ranked("JA1XYZ", NeedTag.NewBand, 8000)), band: "20m");
+        vm.Lines.First(l => l.Message == "CQ JA1XYZ PM95").Need.Should().Be("New DXCC 20 m");
     }
 
     [Fact]

@@ -32,8 +32,8 @@ public sealed partial class RawDecodesViewModel(Action<string> call) : Observabl
     /// <summary>Show choice: lines to me and my own transmissions.</summary>
     public const string ShowMine = "To or from me";
 
-    /// <summary>Show choice: senders that would be a new country, band or grid.</summary>
-    public const string ShowNeeded = "New country, band or grid";
+    /// <summary>Show choice: senders that would be a new DXCC, band DXCC or grid.</summary>
+    public const string ShowNeeded = "New DXCC, band DXCC or grid";
 
     private readonly Dictionary<string, WsjtxHighlight> _highlights = new(StringComparer.Ordinal);
     private IReadOnlyList<RawDecodeLine> _all = [];
@@ -96,15 +96,18 @@ public sealed partial class RawDecodesViewModel(Action<string> call) : Observabl
     public event Action? ScrollToNewest;
 
     private bool _keyboard;
+    private string? _band;
 
     /// <summary>Applies new decodes.</summary>
     /// <param name="lines">Every raw line, oldest first.</param>
     /// <param name="rank">The station list, for each sender's need and distance.</param>
     /// <param name="partner">The station I am in a contact with, if any.</param>
     /// <param name="keyboard">True for PSK and RTTY lines, which have no DT.</param>
-    public void Apply(IReadOnlyList<RawDecodeLine> lines, RankResult? rank = null, string? partner = null, bool keyboard = false)
+    /// <param name="band">The band on ("20m"), so a new band reads "New DXCC 20 m".</param>
+    public void Apply(IReadOnlyList<RawDecodeLine> lines, RankResult? rank = null, string? partner = null, bool keyboard = false, string? band = null)
     {
         var partnerChanged = !string.Equals(partner, _partner, StringComparison.Ordinal);
+        _band = band;
         if (!partnerChanged && keyboard == _keyboard && lines.Count == _all.Count && (lines.Count == 0 || ReferenceEquals(lines[^1], _all[^1]))) return;
         _keyboard = keyboard;
         _all = lines;
@@ -250,7 +253,7 @@ public sealed partial class RawDecodesViewModel(Action<string> call) : Observabl
                     && !(l.Country?.Contains(f, StringComparison.OrdinalIgnoreCase) ?? false)) continue;
                 for (var i = 0; i < ShowChoices.Count; i++) if (Shows(ShowChoices[i], l, sender)) counts[i]++;
                 if (!Shows(Show, l, sender)) continue;
-                rows.Add(new RawLineViewModel(l, highlight: HighlightOf(l, newest), sender: sender, units: Units, partner: IsPartner(l), keyboard: _keyboard));
+                rows.Add(new RawLineViewModel(l, highlight: HighlightOf(l, newest), sender: sender, units: Units, partner: IsPartner(l), keyboard: _keyboard, band: _band));
             }
             if (rows.Count == 0) continue;
             Lines.Add(RawLineViewModel.SlotHeading(group.Key, slotLines, _keyboard));

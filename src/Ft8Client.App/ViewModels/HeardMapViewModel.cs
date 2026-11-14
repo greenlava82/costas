@@ -159,7 +159,7 @@ public sealed partial class HeardMapViewModel : ObservableObject
         Notice = Centre is null ? "Set your grid in Settings to centre the map on you." : string.Empty;
 
         var all = s.Rank.Line.Concat(s.Rank.Watching).Concat(s.Rank.Worked);
-        var heard = BuildHeard(all, _now, Show, Colour, Units);
+        var heard = BuildHeard(all, _now, Show, Colour, Units, s.Band);
         var hears = HearsMe ? BuildHearsMe(s.Reports, Countries, _now) : [];
         // Rings underneath, so a station that hears me and that I hear shows as a dot inside a ring.
         Points = [.. hears, .. heard];
@@ -178,7 +178,8 @@ public sealed partial class HeardMapViewModel : ObservableObject
     }
 
     /// <summary>Dots for stations I heard in the window, filtered and coloured by the choices.</summary>
-    public static IReadOnlyList<MapPoint> BuildHeard(IEnumerable<RankedStation> stations, DateTime nowUtc, string show, string colour, DistanceUnit units)
+    public static IReadOnlyList<MapPoint> BuildHeard(IEnumerable<RankedStation> stations, DateTime nowUtc, string show, string colour, DistanceUnit units,
+                                                     string? band = null)
     {
         var list = new List<MapPoint>();
         foreach (var r in stations)
@@ -197,7 +198,7 @@ public sealed partial class HeardMapViewModel : ObservableObject
                 "Last heard" => (TextKind.Accent, 4.5, age <= TimeSpan.FromMinutes(1) ? 1.0 : age <= TimeSpan.FromMinutes(5) ? 0.6 : 0.3),
                 _ => (needed ? StationRowViewModel.KindOf(r.Need.Tag) : TextKind.Secondary, needed ? 5.0 : 3.5, needed ? 1.0 : 0.55),
             };
-            var tip = $"{st.Call} · {StationText.Where(st, units)} · {StationText.Need(r.Need.Tag)} · {Report.Format(st.LastSnr)} · heard {StationText.Ago(age)}";
+            var tip = $"{st.Call} · {StationText.Where(st, units)} · {StationText.Need(r.Need.Tag, band)} · {Report.Format(st.LastSnr)} · heard {StationText.Ago(age)}";
             list.Add(new MapPoint(pos, st.Call, tip, kind, size, opacity, Ring: false));
         }
         return list;
@@ -234,8 +235,8 @@ public sealed partial class HeardMapViewModel : ObservableObject
         ],
         _ =>
         [
-            new(TextKind.Caution, "New country"),
-            new(TextKind.Accent, "New band or new grid"),
+            new(TextKind.Caution, "New DXCC"),
+            new(TextKind.Accent, "New band DXCC or new grid"),
             new(TextKind.Normal, "New call"),
             new(TextKind.Secondary, "Already worked", Opacity: 0.55),
         ],

@@ -502,7 +502,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         ApplyBandOpenings(s);
         if (_callers.Update(s.Waiting) && _host.Settings.Current.Operating.ChimeOnCaller) _host.Chime.Play(_host.Clock.UtcNow);
         Raw.Units = Operate.Units;
-        Raw.Apply(s.RawDecodes, s.Rank, s.Contact?.DxCall, keyboard: !ModeInfo.IsSlotted(s.Mode));
+        Raw.Apply(s.RawDecodes, s.Rank, s.Contact?.DxCall, keyboard: !ModeInfo.IsSlotted(s.Mode), band: s.Band);
         Logged.Apply(s.LastLogged);
         if (!ReferenceEquals(s.LastLogged, _lastLogged))
         {
@@ -1289,7 +1289,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
                 _ => ("Logged locally", TextKind.Secondary),
             };
             var where = StationText.Place(_host.Countries.Lookup(q.Call), q.State);
-            return new TonightRowViewModel($"{q.Call} · {where}", upload, kind, StationText.Need(tag), StationRowViewModel.KindOf(tag),
+            return new TonightRowViewModel($"{q.Call} · {where}", upload, kind, StationText.Need(tag, string.IsNullOrEmpty(q.Band) ? null : q.Band), StationRowViewModel.KindOf(tag),
                 TonightTime(q), q.Id);
         }).ToList();
         return (list, rows.Count);

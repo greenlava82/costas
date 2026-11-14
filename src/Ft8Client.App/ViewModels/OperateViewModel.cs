@@ -513,7 +513,7 @@ public sealed partial class OperateViewModel : ObservableObject
         var marked = s.CallWhenFree.ToHashSet(StringComparer.Ordinal);
         // A station marked "call when free" stays listed past the row limit, so its mark can always be seen and cancelled.
         foreach (var w in s.Rank.Watching.Where((w, i) => i < MaxWatching || marked.Contains(w.Station.Call)))
-            Watching.Add(new WatchRowViewModel(w, now, Units, marked.Contains(w.Station.Call)));
+            Watching.Add(new WatchRowViewModel(w, now, Units, marked.Contains(w.Station.Call), s.Band));
         WatchingCanFold = WatchingSummary.CanFold(s.Rank.Watching) && !Watching.Any(w => w.CallWhenFree);
         WatchingSummaryText = WatchingSummary.Text(s.Rank.Watching);
         OnPropertyChanged(nameof(WatchingFolded));
@@ -540,7 +540,7 @@ public sealed partial class OperateViewModel : ObservableObject
             var need = ranked?.Need.Tag;
             var verb = w.AfterStop ? "Resume" : "Answer";
             WaitingRows.Add(new WaitingRowViewModel(w.Call, st is null ? string.Empty : StationText.Place(st.Entity, st.Region, st.City),
-                need is { } n ? StationText.Need(n) : string.Empty, need is { } n2 ? StationRowViewModel.KindOf(n2) : TextKind.Normal,
+                need is { } n ? StationText.Need(n, s.Band) : string.Empty, need is { } n2 ? StationRowViewModel.KindOf(n2) : TextKind.Normal,
                 w.AfterStop ? $"Last heard at {w.LastCalledUtc:HH:mm:ss} · {Report.Format(w.Snr)}" : $"Called you at {w.FirstCalledUtc:HH:mm:ss} · {Report.Format(w.Snr)}",
                 s.Contact?.Outcome == ContactOutcome.InProgress
                     ? (w.AnswerAfter ? $"Will {verb.ToLowerInvariant()} after this contact" : $"{verb} after this contact")
@@ -558,7 +558,7 @@ public sealed partial class OperateViewModel : ObservableObject
         TonightRows.Clear();
         foreach (var t in tonight.Take(3)) TonightRows.Add(t);
         TonightTitle = $"Worked this session · {s.Tonight.Count}";
-        TonightSubline = $"{s.Tonight.Count(t => t.Need == NeedTag.NewCountry)} new country · {s.Tonight.Count(t => t.Need == NeedTag.NewBand)} new bands";
+        TonightSubline = $"{s.Tonight.Count(t => t.Need == NeedTag.NewCountry)} new DXCC · {s.Tonight.Count(t => t.Need == NeedTag.NewBand)} new band DXCC";
         TonightLink = $"Show all {tonightTotal} in the log";
 
         OrderText = OrderSentence(Ranking);
@@ -894,7 +894,7 @@ public sealed partial class OperateViewModel : ObservableObject
         var i = 1;
         foreach (var r in list.Take(MaxLine))
             Line.Add(new StationRowViewModel(r, i++, Units, now, log?.LastContactWith(r.Station.Call), log?.ContactsWith(r.Station.Call).Count ?? 0,
-                MostWanted.RankOf(r.Station.EntityKey), WhyTip(r, log), ParkOf(r.Station), DxpeditionOf(r.Station.Call)));
+                MostWanted.RankOf(r.Station.EntityKey), WhyTip(r, log), ParkOf(r.Station), DxpeditionOf(r.Station.Call), _snap?.Band));
         MoreText = list.Count > MaxLine ? $"and {list.Count - MaxLine} more" : string.Empty;
         LineEmpty = Line.Count == 0;
         // Only a row the operator picked stays selected; nothing is selected for them, so the highlight never
@@ -992,8 +992,8 @@ public sealed partial class OperateViewModel : ObservableObject
     {
         static string Plural(NeedTag t) => t switch
         {
-            NeedTag.NewCountry => "countries",
-            NeedTag.NewBand => "bands",
+            NeedTag.NewCountry => "DXCC",
+            NeedTag.NewBand => "band DXCC",
             NeedTag.NewGrid => "grids",
             _ => "calls",
         };

@@ -13,8 +13,8 @@ Native Windows 11. Use Avalonia's Fluent theme and stock controls. Classic, the 
 | Control | height 32, radius 4, border `#D1D1D1` | Buttons, dropdowns |
 | Text | `#1A1A1A` | Primary |
 | Secondary text | `#5F5F5F` | Labels, captions |
-| Accent | system accent (`#005FB8`) | Selected state, primary button, "new band", "new grid" |
-| Caution | `#8A4B00` | "New country", upload waiting |
+| Accent | system accent (`#005FB8`) | Selected state, primary button, "New DXCC 20 m", "new grid" |
+| Caution | `#8A4B00` | "New DXCC", upload waiting |
 | Critical | `#C42B1C` | Transmitting, Abandon, Halt while transmitting |
 | Success | `#0F7B0F` | Connected indicators |
 | Selected row | `#E5F1FB` with a 3 px accent bar on the left | Top of the line, selected station |
@@ -80,7 +80,7 @@ Mockup: `main-idle`. Three groups, shown on the **Band** tab of the right column
 | Countries | Entities worked on this band · entities confirmed on this band |
 | US states | States worked on this band out of 50, then up to three missing ones, then "and N more" |
 | Grid squares | Distinct 4-character grids worked on this band |
-| This session | Contacts this session · new countries · new bands. A session starts at app launch or after 2 hours with no contact |
+| This session | Contacts this session · new DXCC · new band DXCC. A session starts at app launch or after 2 hours with no contact |
 
 ### Top slot, contact card
 
@@ -135,7 +135,7 @@ A grid with a header row. One row per station that is needed (tiers 1 to 4), cal
 | # | Rank, starting at 1 |
 | Call | Callsign, semibold. While other stations are calling it (current callers in the pileup tracker, `04-domain-logic.md` section 12), a small amber tag under the call: "3 calling", in the attention colours of the Who else is calling box. Tooltip and screen reader text name the callers, strongest first, with their dB at my station: "Calling VK3XYZ at 18:30:00: W6ABC -06, K7XYZ -11." (at most 6 named, then "and N more"). Updated on every snapshot, also while the list is held still. Picks alone do not tag a row. Repeats rows get the same tag (owner request 2026-11-01) |
 | Where | Country, or "State, USA" / "Province, Canada" when known, then distance. With a city from QRZ: "Springfield, IL, USA", "Ottawa, ON, Canada", "Wellington, New Zealand". City and state come from QRZ: stations in the list are looked up once (see `05-integrations.md` §4) and the answer is kept in the local cache, so it shows again at once after a refresh or restart. A row updates as soon as its lookup arrives, without waiting for the next re-rank |
-| Why | Need tag: New country (caution, bold), New band (accent, bold), New grid with the station's 4-character grid, "New grid DO62" (accent, bold), New call (plain). A new band has the tooltip "Canada is in your log on 40 m and 15 m, not on 20 m yet" (owner request 2026-10-12). A new country on Club Log's most-wanted list also gets a rarity meter after the tag: five small cells, filled in caution colour up to its level, with the tooltip and screen reader text "Rare: #61 on Club Log's most-wanted list" (`04-domain-logic.md` section 15). The column is 160 px wide in Next in line and Repeats |
+| Why | Need tag: New DXCC (caution, bold), New DXCC with the band for a DXCC entity in the log but not on this band, "New DXCC 20 m" (accent, bold; "New band DXCC" where no band is known; owner request 2026-11-14), New grid with the station's 4-character grid, "New grid DO62" (accent, bold), New call (plain). A new band has the tooltip "Canada is in your log on 40 m and 15 m, not on 20 m yet" (owner request 2026-10-12). A new country on Club Log's most-wanted list also gets a rarity meter after the tag: five small cells, filled in caution colour up to its level, with the tooltip and screen reader text "Rare: #61 on Club Log's most-wanted list" (`04-domain-logic.md` section 15). The column is 160 px wide in Next in line and Repeats |
 | Doing now | "Calling CQ, 6 slots" · "Calling CQ DX, 2 slots" · "Calling CQ, 4 slots, fading" · "Calling you" · "Calling CQ, missed last slot" / "Calling CQ, missed 3 slots" for a CQ caller kept listed after a miss |
 | Last heard | Time since the end of the station's last decoded transmission: "45 seconds ago", "2 minutes ago". Counts up between slots, also while the list is held, secondary text |
 | dB | Their latest SNR at my station |
@@ -183,7 +183,7 @@ Below the map, **Band activity, last hour**: one bar per minute with the average
 
 **Your signal on 20 m**: see Reach, below. Compact form, with no map (owner request 2026-10-12: Heard here's "Who heard you" rings already map these stations): headline counts, the countries line under it ("USA 12 · Canada 3 · Japan 1", most stations first, at most six then "+4 more"; tooltip lists every country with best report and farthest station; owner request 2026-10-26), farthest, best report, the neighbour summary line when there is one ("7 dB weaker than stations near you into Europe."), the three newest reports (call, where, dB, age), link "Open reach view". Caption "PSK Reporter · live", or "· updated 6 min ago" on the query fallback, or "· unavailable".
 
-**Worked this session**: title with count, subline "N new country · N new bands". The three newest contacts: call · where, upload status ("Uploaded to QRZ", "Waiting to upload · retrying", "Upload failed · Retry"), need tag at the time of the contact, time. Link "Show all N in the log".
+**Worked this session**: title with count, subline "N new DXCC · N new band DXCC". The three newest contacts: call · where, upload status ("Uploaded to QRZ", "Waiting to upload · retrying", "Upload failed · Retry"), need tag at the time of the contact, time. Link "Show all N in the log".
 
 **How the line is ordered**: one sentence and a "Change" link that opens the ranking settings flyout: tier order (drag to reorder), and checkboxes Prefer stations that hear me (on), Only stations calling CQ (on), Hide stations worked on this band (on), Skip long shots (off).
 
@@ -209,7 +209,7 @@ The classic list for operators who want it. Columns: UTC, local time, dB, DT, Hz
 Owner request 2026-10-26 ("more feature rich"):
 
 - **Distance** and **Why** come from the station list (the same text and colours as its Why column); blank for my own transmissions and for senders the list does not know.
-- **Show** dropdown beside the filter, as in the Log view: All lines (default), CQs, To or from me (messages to me and my own transmissions), New country, band or grid. While the filter or Show hides lines, "5 of 212 lines" and a "Clear filters" link appear.
+- **Show** dropdown beside the filter, as in the Log view: All lines (default), CQs, To or from me (messages to me and my own transmissions), New DXCC, band DXCC or grid. While the filter or Show hides lines, "5 of 212 lines" and a "Clear filters" link appear.
 - Lines from the contact partner, and my transmissions to them, get the in-contact tint and left bar used on Operate.
 - Right-click a line: Call <call>, Show only <call> (sets the filter), Copy line (`HHMMSS  dB  DT  Hz ~  message`, as WSJT-X prints it).
 

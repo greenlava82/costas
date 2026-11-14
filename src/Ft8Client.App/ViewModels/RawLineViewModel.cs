@@ -82,7 +82,8 @@ public sealed class RawLineViewModel
     /// <param name="partner">True when the line is from or to the station I am in a contact with.</param>
     /// <param name="keyboard">A PSK or RTTY line, which has no time offset (DT is left empty).</param>
     public RawLineViewModel(RawDecodeLine l, TimeZoneInfo? localZone = null, WsjtxHighlight? highlight = null,
-                            RankedStation? sender = null, DistanceUnit units = DistanceUnit.Miles, bool partner = false, bool keyboard = false)
+                            RankedStation? sender = null, DistanceUnit units = DistanceUnit.Miles, bool partner = false, bool keyboard = false,
+                            string? band = null)
     {
         Background = highlight?.Background;
         Foreground = highlight?.Foreground;
@@ -102,7 +103,7 @@ public sealed class RawLineViewModel
         IsPartner = partner;
         if (sender is not null && !l.Transmitted)
         {
-            Need = StationText.Why(sender.Need.Tag, sender.Station.Grid);
+            Need = StationText.Why(sender.Need.Tag, sender.Station.Grid, band);
             NeedKind = StationRowViewModel.KindOf(sender.Need.Tag);
             Distance = sender.Station.DistanceKm is { } km ? StationText.Distance(km, units) : string.Empty;
         }

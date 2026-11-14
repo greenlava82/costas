@@ -12,7 +12,7 @@ using Ft8Client.Core.Ranking;
 namespace Ft8Client.App.ViewModels;
 
 /// <summary>One row of Watching.</summary>
-public sealed class WatchRowViewModel(RankedStation r, DateTime nowUtc, DistanceUnit units, bool callWhenFree = false)
+public sealed class WatchRowViewModel(RankedStation r, DateTime nowUtc, DistanceUnit units, bool callWhenFree = false, string? band = null)
 {
     /// <summary>Call.</summary>
     public string Call { get; } = r.Station.Call;
@@ -21,7 +21,7 @@ public sealed class WatchRowViewModel(RankedStation r, DateTime nowUtc, Distance
     public string Where { get; } = StationText.Where(r.Station, units);
 
     /// <summary>Need tag, with the grid for a new grid.</summary>
-    public string Why { get; } = StationText.Why(r.Need.Tag, r.Station.Grid);
+    public string Why { get; } = StationText.Why(r.Need.Tag, r.Station.Grid, band);
 
     /// <summary>Need tag colour.</summary>
     public TextKind WhyKind { get; } = StationRowViewModel.KindOf(r.Need.Tag);

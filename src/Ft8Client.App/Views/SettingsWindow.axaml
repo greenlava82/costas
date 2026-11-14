@@ -365,7 +365,7 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <TextBlock Classes="help" Text="A station that is a new country for you outranks one that is only a new band, and so on down the list." />
+                <TextBlock Classes="help" Text="A station that is a new DXCC for you outranks one that is only a new band DXCC (in your log, but not on this band), and so on down the list." />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">

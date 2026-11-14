@@ -185,7 +185,7 @@ public sealed class ContactPanelViewModel
         {
             Caption = c.Caption,
             Call = c.DxCall,
-            Need = need is { } n ? StationText.Need(n.Tag) : string.Empty,
+            Need = need is { } n ? StationText.Need(n.Tag, s.Band) : string.Empty,
             NeedKind = need is { } n2 ? StationRowViewModel.KindOf(n2.Tag) : TextKind.Normal,
             Subline = string.Join(" · ", parts),
             Sent = c.ExchangeSent ?? (c.ReportSent is { } rs ? Report.Format(rs) : NotYet),
@@ -275,7 +275,7 @@ public sealed class ContactPanelViewModel
         {
             Caption = $"{ModeInfo.Name(c.Mode ?? s.Mode)} · {c.Caption}",
             Call = c.DxCall,
-            Need = need is { } n ? StationText.Need(n.Tag) : string.Empty,
+            Need = need is { } n ? StationText.Need(n.Tag, s.Band) : string.Empty,
             NeedKind = need is { } n2 ? StationRowViewModel.KindOf(n2.Tag) : TextKind.Normal,
             Subline = string.Join(" · ", parts),
             Sent = c.ReportSent is { } rs ? rs.ToString(CultureInfo.InvariantCulture) : NotYet,
