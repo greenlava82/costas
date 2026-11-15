@@ -229,7 +229,9 @@ public partial class OperateView : UserControl
 
     private void OnRowPressed(object? sender, PointerPressedEventArgs e)
     {
-        if ((e.Source as Control)?.DataContext is StationRowViewModel row) Vm?.RowClicked(row);
+        // A click on the call opens the details card; anywhere else on the row only picks it.
+        if ((e.Source as Control)?.DataContext is StationRowViewModel row)
+            Vm?.RowClicked(row, showDetails: e.Source is Control { Name: "RowCall" });
     }
 
     /// <summary>Width of the folded side column's rail.</summary>

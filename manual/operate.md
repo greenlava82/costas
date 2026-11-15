@@ -153,8 +153,9 @@ pill appears; it applies when you click it or move the pointer away.
 The station you are in a contact with is tinted, with a bar down its left edge, the same in Repeats. That tint
 only ever marks the station you are working.
 
-Selecting a row (click, or ++up++ / ++down++) outlines it and shows a details card with the station's name (from QRZ lookups),
-location, grid, bearing and your past contacts with that call. For a station at a park it adds the park, such as
+Selecting a row (click, or ++up++ / ++down++) outlines it. To see a details card, click the station's **call** in the
+row or press ++i++. The card shows the station's name (from QRZ lookups), location, grid, bearing and your past contacts
+with that call. While the card is open it follows the row you select; close it with **✕** or ++i++. For a station at a park it adds the park, such as
 *New park US-1234 · Example Lake State Park, US-WI*:
 
 ![Station details](images/station-details.png)
