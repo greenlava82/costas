@@ -16,6 +16,11 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
   radio and audio in **Station setup** while it is the active one. Worked-before and log totals count the contacts
   logged under that profile's callsign.
 - **Callsign** and **Grid square** (4 or 6 characters). Used in every message you send and to work out distances.
+  A `/P` or `/R` call is sent like any other. A compound call such as `VE3/W7LIT` or `W7LIT/7` does not fit a
+  normal FT8 message, so Costas sends it the way WSJT-X does: your CQ is just `CQ VE3/W7LIT` (no grid, and no CQ
+  modifier or contest), your answer is `<K1ABC> VE3/W7LIT`, reports go as `K1ABC <VE3/W7LIT> R-10` (your call as
+  a short code the other station's program recognises) and the sign-off as `<K1ABC> VE3/W7LIT RR73`. The message
+  preview under **Transmitting** shows exactly what will go out.
 - **Power (watts)**: recorded in the log when the radio cannot report its own power setting. It does not change the
   radio's power.
 

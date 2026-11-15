@@ -70,7 +70,35 @@ public class OutgoingMessagesTests
     [Fact]
     public void Problem_ModifierWithNonstandardCall_Refused()
     {
-        OutgoingMessages.Problem(new ContactSettings { CqModifier = "DX" }, "PJ4/K1ABC", "FN42").Should().Contain("cannot be sent");
+        OutgoingMessages.Problem(new ContactSettings { CqModifier = "DX" }, "PJ4/K1ABC", "FN42").Should().Contain("no room for a CQ modifier");
+    }
+
+    [Fact]
+    public void Problem_CompoundCallWithDefaults_NoProblem()
+    {
+        OutgoingMessages.Problem(new ContactSettings(), "VE3/W7LIT", "DN40").Should().BeNull();
+        OutgoingMessages.Problem(new ContactSettings { AnswerSignoff = "RR73" }, "W7LIT/P", "DN40").Should().BeNull();
+    }
+
+    [Fact]
+    public void CompoundOwnCall_FollowsWsjtxForms()
+    {
+        var s = new ContactSettings();
+        OutgoingMessages.Cq("VE3/W7LIT", "DN40", s).Should().Be("CQ VE3/W7LIT");
+        OutgoingMessages.Reply("K1ABC", "VE3/W7LIT", "DN40", s).Should().Be("<K1ABC> VE3/W7LIT");
+        OutgoingMessages.Report("K1ABC", "VE3/W7LIT", "R-10").Should().Be("K1ABC <VE3/W7LIT> R-10");
+        OutgoingMessages.Signoff("K1ABC", "VE3/W7LIT", "RR73").Should().Be("<K1ABC> VE3/W7LIT RR73");
+        OutgoingMessages.FromDx("K1ABC", "VE3/W7LIT", "-05").Should().Be("<VE3/W7LIT> K1ABC -05");
+    }
+
+    [Fact]
+    public void PortableAndRoverCalls_AreStandard()
+    {
+        OutgoingMessages.IsCompound("W7LIT/P").Should().BeFalse();
+        OutgoingMessages.IsCompound("W7LIT/R").Should().BeFalse();
+        OutgoingMessages.IsCompound("VE3/W7LIT").Should().BeTrue();
+        OutgoingMessages.IsCompound("W7LIT/7").Should().BeTrue();
+        OutgoingMessages.Cq("W7LIT/P", "DN40", new ContactSettings()).Should().Be("CQ W7LIT/P DN40");
     }
 
     [Theory]

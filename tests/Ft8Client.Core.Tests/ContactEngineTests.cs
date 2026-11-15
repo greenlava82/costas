@@ -25,9 +25,9 @@ public class ContactEngineTests
         public readonly List<ContactLogEntry> Logs = [];
         public int Slot;
 
-        public Sim(ContactSettings? settings = null)
+        public Sim(ContactSettings? settings = null, string myCall = "W7LIT")
         {
-            E = new ContactEngine("W7LIT", "DN40", settings ?? new ContactSettings(), T0);
+            E = new ContactEngine(myCall, "DN40", settings ?? new ContactSettings(), T0);
             E.Logged += Logs.Add;
         }
 
@@ -1010,5 +1010,73 @@ public class ContactEngineTests
         s.Step("W7LIT ZL2RPA RRR");
         s.Step().Should().Be("ZL2RPA W7LIT RR73", "a repeated RRR still gets one more");
         s.Logs.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void CompoundOwnCall_AnswerCq_UsesWsjtxFormsAndLogs()
+    {
+        var s = new Sim(myCall: "VE3/W7LIT");
+        s.E.CallStation("K1ABC", "FN42", -10, SlotParity.Odd, 1500, Sim.T0);
+
+        s.Step().Should().Be("<K1ABC> VE3/W7LIT");
+        s.Step("<VE3/W7LIT> K1ABC -05").Should().BeNull();
+        s.Step().Should().Be("K1ABC <VE3/W7LIT> R-10");
+        s.Step("<VE3/W7LIT> K1ABC RR73");
+        s.Logs.Should().ContainSingle().Which.Call.Should().Be("K1ABC");
+        s.Step().Should().Be("<K1ABC> VE3/W7LIT 73");
+        s.Sent.Should().OnlyContain(x => FtxEncoder.Encode(x.Message, Mode.Ft8).Ok);
+    }
+
+    [Fact]
+    public void CompoundOwnCall_CallCq_SendsCqWithoutGridAndReportsWithHashedCall()
+    {
+        var s = new Sim(myCall: "VE3/W7LIT");
+        s.E.CallCq(SlotParity.Even, Sim.T0);
+
+        s.Step().Should().Be("CQ VE3/W7LIT");
+        s.Step("<VE3/W7LIT> K1ABC FN42");
+        s.Step().Should().Be("K1ABC <VE3/W7LIT> -12");
+        s.Step("<VE3/W7LIT> K1ABC R-08");
+        s.Step().Should().Be("<K1ABC> VE3/W7LIT RR73");
+        s.Sent.Should().OnlyContain(x => FtxEncoder.Encode(x.Message, Mode.Ft8).Ok);
+    }
+
+    [Fact]
+    public void PortableOwnCall_StaysStandardWithGrid()
+    {
+        var s = new Sim(myCall: "W7LIT/P");
+        s.E.CallStation("K1ABC", "FN42", -10, SlotParity.Odd, 1500, Sim.T0);
+
+        s.Step().Should().Be("K1ABC W7LIT/P DN40");
+        FtxEncoder.Encode(s.Sent[0].Message, Mode.Ft8).Ok.Should().BeTrue();
+    }
+
+    [Fact]
+    public void NonstandardDx_WholeContact_LogsAndEveryMessageEncodes()
+    {
+        var s = new Sim();
+        s.E.CallStation("PJ4/K1ABC", null, -10, SlotParity.Odd, 1500, Sim.T0);
+
+        s.Step().Should().Be("<PJ4/K1ABC> W7LIT DN40");
+        s.Step("W7LIT <PJ4/K1ABC> -05");
+        s.Step().Should().Be("<PJ4/K1ABC> W7LIT R-10");
+        s.Step("<W7LIT> PJ4/K1ABC RR73");
+        s.Logs.Should().ContainSingle().Which.Call.Should().Be("PJ4/K1ABC");
+        s.Step().Should().Be("<PJ4/K1ABC> W7LIT 73");
+        s.Sent.Should().OnlyContain(x => FtxEncoder.Encode(x.Message, Mode.Ft8).Ok);
+    }
+
+    [Fact]
+    public void NonstandardDx_CallsMyCq_AnsweredAndLogged()
+    {
+        var s = new Sim();
+        s.E.CallCq(SlotParity.Even, Sim.T0);
+
+        s.Step();
+        s.Step("<W7LIT> PJ4/K1ABC");
+        s.Step().Should().Be("<PJ4/K1ABC> W7LIT -12");
+        s.Step("<W7LIT> PJ4/K1ABC R-08");
+        s.Step().Should().Be("<PJ4/K1ABC> W7LIT RR73");
+        s.Sent.Should().OnlyContain(x => FtxEncoder.Encode(x.Message, Mode.Ft8).Ok);
     }
 }

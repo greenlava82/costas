@@ -421,11 +421,11 @@ public sealed partial class SettingsViewModel : ObservableObject
             var lines = new List<string>
             {
                 $"Calling CQ:        {OutgoingMessages.Cq(me, grid, s)}",
-                $"Report:            {dx} {me} -10",
-                $"Sign-off:          {dx} {me} {s.Signoff}",
+                $"Report:            {OutgoingMessages.Report(dx, me, "-10")}",
+                $"Sign-off:          {OutgoingMessages.Signoff(dx, me, s.Signoff)}",
                 string.Empty,
                 $"Answering a CQ:    {OutgoingMessages.Reply(dx, me, grid, s)}",
-                $"Roger and report:  {dx} {me} R-10",
+                $"Roger and report:  {OutgoingMessages.Report(dx, me, "R-10")}",
                 $"Last message:      {OutgoingMessages.Final(dx, me, s)}",
             };
             if (OutgoingMessages.FreeTextAfter(s) is { } free) lines.Add($"Then:              {free}");
