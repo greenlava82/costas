@@ -278,7 +278,10 @@ public sealed class AppHost : IAsyncDisposable
     /// <summary>Measured SNTP result.</summary>
     public SntpResult? Sntp { get; private set; }
 
-    /// <summary>Builds everything and starts receiving.</summary>
+    /// <summary>This copy's hold on the data folder; released last on shutdown.</summary>
+    public SingleInstance? Instance { get; private init; }
+
+    /// <summary>Builds everything and starts receiving. Throws <see cref="AlreadyRunningException"/> if another copy has the data folder.</summary>
     public static async Task<AppHost> StartAsync(CommandLine args)
     {
         var paths = args.Home is null ? AppPaths.Default() : new AppPaths(args.Home);
@@ -297,6 +300,8 @@ public sealed class AppHost : IAsyncDisposable
             }
         }
         paths.EnsureCreated();
+        // Before the log file and the database are opened: a second copy must not touch either.
+        var instance = SingleInstance.TryAcquire(paths.Root) ?? throw new AlreadyRunningException(paths.Root);
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.File(Path.Combine(paths.Logs, "app-.log"), rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14)
@@ -312,7 +317,7 @@ public sealed class AppHost : IAsyncDisposable
         // once the host has read its plan; until then the command line says.
         AppHost? started = null;
         var crashes = StartCrashReports(paths, settings, () => started?.Simulating ?? args.SimulateFolder is not null);
-        var host = new AppHost(args, paths, settings) { Crashes = crashes };
+        var host = new AppHost(args, paths, settings) { Crashes = crashes, Instance = instance };
         started = host;
         await host.InitializeAsync().ConfigureAwait(false);
         return host;
@@ -1418,6 +1423,8 @@ public sealed class AppHost : IAsyncDisposable
         if (Rbn is not null) await Rbn.DisposeAsync().ConfigureAwait(false);
         await _rig.DisposeAsync().ConfigureAwait(false);
         foreach (var d in _disposables) d.Dispose();
+        // Last: an update starts the new version as soon as this returns, and it must be able to take the lock.
+        Instance?.Dispose();
         _decoder?.Dispose();
         Guard.Dispose();
         Crashes?.Dispose();
