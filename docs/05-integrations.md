@@ -331,16 +331,29 @@ Unexpected errors, warning and error log lines, and the usage events go to Sentr
 request 2026-11-07 (logs and metrics added the same day; Aptabase stays for now, owner may drop it if Sentry covers
 it on the free plan); same rules as the usage statistics.
 
-- The DSN is baked into release builds only: CI sets `SENTRY_DSN` (the `costas` project in the `ember-ridge-development` Sentry org; a `SENTRY_DSN` repository
+- The DSN is baked into release and development builds: CI sets `SENTRY_DSN` (the `costas` project in the `ember-ridge-development` Sentry org; a `SENTRY_DSN` repository
   variable overrides it) for the
-  publish steps of a manual run on `main` (`AssemblyMetadata` `SentryDsn`). Not a secret: it ships inside the app and
-  only accepts reports. Other builds send nothing, nor when `CI` is `true`.
+  publish steps of a manual run on `main` and of a push to `main` (`AssemblyMetadata` `SentryDsn`). Not a secret: it ships inside the app and
+  only accepts reports. Releases report under environment `production`, development builds (`UpdateChannel` `dev`)
+  under `development` (since 2026-11-15, so a dev build can check reports work). Pull-request and local builds send
+  nothing, nor when `CI` is `true`.
 - Same switch as the statistics (Settings, Privacy, `Usage.Enabled`), read for every report; off at start means the
   SDK is not started and the offline cache (`<data>/crash-reports`, at most 30 envelopes) is deleted. Never in
   simulation.
 - Captured: unhandled exceptions (AppDomain, unobserved tasks), UI-thread errors the app survives
   (`App.WatchForUnexpectedErrors`) and the fatal catch in `Program.Main`. No breadcrumbs (they would carry log lines),
   no tracing, no sessions, no client reports, no automatic logging or metrics integrations, `SendDefaultPii` off.
+- Issues from the log (2026-11-15): most faults are caught and logged, and log lines never become Sentry issues, so
+  the Issues page stayed empty while Logs filled up. `SentryLogSink` also calls `CrashReporter.CaptureLogged` for
+  Error and up, and for warnings that carry an exception: an event with the exception (stack) and the scrubbed
+  rendered line, fingerprinted by Sentry's default for exceptions and by the message template otherwise. Each
+  template + exception type goes once per run, at most 25 per run (quota). Sentry's duplicate detection drops the
+  second capture of the same exception object (`Log.Error(ex)` and then `CrashReporter.Capture(ex)`).
+- Unhandled exceptions: `Program.LastChance` flushes for up to 3 s after capturing, because the process ends next.
+- Test report: Settings, Privacy, **Send a test report** calls `CrashReporter.SendTestAsync`, which captures a
+  `CrashReportTestException` (level info, tag `source=test`) under the same switch, scrubbing and offline rules.
+- Line numbers: `DebugType` `embedded` (Directory.Build.props), so stack frames carry file and line on Windows and
+  Linux (the Linux build deletes loose PDBs) without uploading symbols.
 - Logs: `SentryLogSink` (Serilog, Warning and up) hands the rendered line plus exception type and message to
   `CrashReporter.Log`, which scrubs it and sends it as the parameter of a `{0}` template (no Serilog properties).
 - Metrics: `UsageReporter` passes every allowed event to `CrashReporter.Count` (`mirror`), a Sentry counter with the

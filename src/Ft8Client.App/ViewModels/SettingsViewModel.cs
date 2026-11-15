@@ -17,6 +17,7 @@ using Ft8Client.Core.Logbook;
 using Ft8Client.Core.Ranking;
 using Ft8Client.Data.Secrets;
 using Ft8Client.Data.Settings;
+using Ft8Client.Integrations.Crash;
 using Ft8Client.Modems.Rtty;
 
 namespace Ft8Client.App.ViewModels;
@@ -1023,8 +1024,52 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool UsageEnabled { get; set; }
 
-    /// <summary>Says when this build sends nothing at all (a build made without the statistics key, such as a local one).</summary>
-    public string UsageBuildNote => _host.Usage.Available ? string.Empty : "This build was made without statistics, so it sends nothing whatever this is set to.";
+    /// <summary>Says when this build sends less than the text above says (a build made without the statistics key or the crash report address, such as a local one).</summary>
+    public string UsageBuildNote => (_host.Usage.Available, AppHost.CrashDsn is not null) switch
+    {
+        (true, true) => string.Empty,
+        (true, false) => "This build was made without crash reports, so it sends usage statistics only.",
+        (false, true) => "This build was made without usage statistics, so it sends crash reports only.",
+        _ => "This build was made without statistics or crash reports, so it sends nothing whatever this is set to.",
+    };
+
+    /// <summary>Result of "Send a test report".</summary>
+    [ObservableProperty]
+    public partial string TestReportStatus { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Sends a test error report to Sentry, so anyone can check that crash reports get through. Follows the switch above
+    /// (as shown, before Save) and the same scrubbing and offline rules as a real report.
+    /// </summary>
+    [RelayCommand]
+    private async Task SendTestReport()
+    {
+        if (AppHost.CrashDsn is null)
+        {
+            TestReportStatus = "This build has no crash reports (only releases and development builds made by GitHub do), so there is nothing to test.";
+            return;
+        }
+        if (!UsageEnabled)
+        {
+            TestReportStatus = "Tick the box above first: with it off, nothing is sent.";
+            return;
+        }
+        if (_host.Simulating)
+        {
+            TestReportStatus = "Nothing is sent while Costas replays recordings.";
+            return;
+        }
+        TestReportStatus = "Sending…";
+        var (outcome, id) = await CrashReporter.SendTestAsync(TimeSpan.FromSeconds(10));
+        var shortId = id is { Length: >= 8 } ? id[..8] : id;
+        TestReportStatus = outcome switch
+        {
+            CrashReportTestOutcome.Sent => $"Sent (report {shortId}). In Sentry it shows under Issues as CrashReportTestException.",
+            CrashReportTestOutcome.Waiting => $"This computer is offline: the test report ({shortId}) waits and goes out when it is back online.",
+            CrashReportTestOutcome.Off => "Not sent: crash reports are switched off.",
+            _ => "Crash reports start when Costas opens with the box ticked. Save, restart Costas, then try again.",
+        };
+    }
 
     /// <summary>Result of "Check now".</summary>
     [ObservableProperty]

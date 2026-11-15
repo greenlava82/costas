@@ -240,7 +240,9 @@ sends a crash report to Sentry. A report holds:
 
 Costas also sends Sentry the **warnings and errors** it writes to its own log (for example "the radio did not
 answer" or "QRZ could not be reached"), scrubbed the same way, and the **same usage counts** that go to Aptabase.
-Information lines from the log, such as decodes and logged contacts, are never sent.
+Information lines from the log, such as decodes and logged contacts, are never sent. An error in the log, or a
+warning caused by an error inside Costas, also goes in as a crash report (at most once per kind of error each time
+Costas runs, and at most 25 in a run), so problems Costas recovers from still get seen and fixed.
 
 Nothing sent to Sentry holds your callsign, grid, name, frequencies, the stations you hear or work, anything from your
 logbook, your computer's name or your network address. There is no account and no tracking id: each run of Costas gets
@@ -250,6 +252,10 @@ Nothing is sent while your computer is offline: a report waits in the `crash-rep
 30 of them) and goes out when the network is back. Unticking the box stops reports at once, and anything still waiting
 is deleted the next time Costas starts. Ticking it again starts reports the next time Costas opens. Reports are never
 sent in simulation, and builds you make yourself from the source send nothing at all.
+
+**Send a test report** (Settings › Privacy) sends a made-up error, named `CrashReportTestException`, so you can
+see that crash reports get through. It follows the box above: with the box unticked, or in a build without crash
+reports, nothing is sent and the button says why. If you have just ticked the box, save and restart Costas first.
 
 Problem reports are separate: they are only sent when you press **Send** in **☰ › Report a problem…**, and contain
 only what you see there. See [Report a problem](troubleshooting.md#report-a-problem-or-send-feedback).
