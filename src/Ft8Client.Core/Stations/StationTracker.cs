@@ -132,10 +132,17 @@ public sealed class StationTracker
     /// </summary>
     public void ApplySuperFox(DateTime slotStartUtc, IEnumerable<HeardMessage> heard)
     {
-        foreach (var call in ApplyHeard(slotStartUtc, heard))
+        // The signature line is not a message; its call is checked separately (SuperFoxSignature).
+        foreach (var call in ApplyHeard(slotStartUtc, heard.Where(h => SuperFoxSignature.Parse(h.Decode.Text) is null)))
         {
             if (_stations.TryGetValue(call, out var s)) _stations[call] = s with { RunsFox = true, RunsSuperFox = true };
         }
+    }
+
+    /// <summary>Records what the check of a SuperFox signature said; ignored for a station no longer listed.</summary>
+    public void SetFoxCheck(string call, FoxCheck check)
+    {
+        if (_stations.TryGetValue(Callsign.Normalize(call), out var s)) _stations[s.Call] = s with { FoxCheck = check };
     }
 
     // Adds or updates every station heard in the slot; returns their calls.

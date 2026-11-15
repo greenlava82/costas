@@ -428,6 +428,46 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         _tracker.ApplySuperFox(slot, heard);
         AddRaw(slot, heard);
         FeedEngine(slot, mode, heard, _clock.UtcNow);
+        foreach (var h in heard)
+        {
+            if (SuperFoxSignature.Parse(h.Decode.Text) is { Checkable: true } sig) CheckSignature(sig, slot);
+        }
+    }
+
+    /// <summary>
+    /// Checks a SuperFox signature online (WSJT-X's service), or null to leave signatures unchecked. Set by the host;
+    /// returns <see cref="FoxCheck.None"/> when the check is off or the service does not answer.
+    /// </summary>
+    public Func<SuperFoxSignature, DateTime, Task<FoxCheck>>? VerifyFox { get; set; }
+
+    /// <summary>A Fox whose signature checked out (or failed) is checked again after this long; each slot's code differs.</summary>
+    public static readonly TimeSpan FoxRecheck = TimeSpan.FromMinutes(10);
+
+    // Under _gate: when each Fox's signature was last sent for checking, so one check is in flight at a time per Fox.
+    private readonly Dictionary<string, DateTime> _foxChecked = new(StringComparer.Ordinal);
+
+    // Under _gate. Display only: the result changes the Fox's tag and tooltip, never who is called or what is sent.
+    private void CheckSignature(SuperFoxSignature sig, DateTime slot)
+    {
+        if (VerifyFox is not { } verify) return;
+        var known = _tracker.Find(sig.FoxCall)?.FoxCheck ?? FoxCheck.None;
+        if (_foxChecked.TryGetValue(sig.FoxCall, out var last) && (known == FoxCheck.None ? slot - last < TimeSpan.FromMinutes(1) : slot - last < FoxRecheck)) return;
+        _foxChecked[sig.FoxCall] = slot;
+        _ = Task.Run(async () =>
+        {
+            FoxCheck check;
+            try
+            {
+                check = await verify(sig, slot).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return;
+            }
+            if (check == FoxCheck.None) return;
+            lock (_gate) _tracker.SetFoxCheck(sig.FoxCall, check);
+            Publish();
+        });
     }
 
     private async Task QuickDecodeAsync(SlotAudio audio, DecodeContext ctx)

@@ -393,6 +393,8 @@
               <StackPanel Grid.Column="1">
                 <CheckBox Content="Show announced DXpeditions (NG3K)" IsChecked="{Binding DxpeditionList}" />
                 <TextBlock Classes="help" Text="Reads NG3K's list of announced DX operations twice a day. A station that is one of them shows DXpedition and the country under Why, and the Awards view lists the ones on the air now and starting soon. It never changes the order or who is called." TextWrapping="Wrap" />
+                <CheckBox Content="Check SuperFox signatures online (9dx.cc)" IsChecked="{Binding VerifySuperFox}" Margin="0,8,0,0" />
+                <TextBlock Classes="help" Text="A SuperFox signal carries a code that proves it is the real DXpedition. Costas checks it with the same service WSJT-X uses, sending only the DXpedition's call, the time and the code, and marks the station verified or not verified. It never changes who is called." TextWrapping="Wrap" />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">

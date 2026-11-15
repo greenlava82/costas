@@ -488,6 +488,13 @@ public sealed class AppHost : IAsyncDisposable
         Dxpeditions = new DxpeditionService(() => Settings.Current.Dxpeditions.Enabled, () => Settings.Current.Profile.Callsign, Clock,
             st => Session.SetService(ServiceNames.Dxpeditions, st), Path.Combine(Paths.Cache, "adxo.xml"));
         Dxpeditions.Start();
+        // SuperFox signatures are checked online with WSJT-X's service (display only), unless switched off.
+        var foxHttp = Ft8Client.Integrations.Net.HttpFactory.Create(Settings.Current.Profile.Callsign, timeout: Ft8Client.Integrations.SuperFox.FoxVerifyClient.Timeout);
+        _disposables.Add(foxHttp);
+        var foxVerify = new Ft8Client.Integrations.SuperFox.FoxVerifyClient(foxHttp);
+        Session.VerifyFox = (sig, slot) => Settings.Current.Dxpeditions.VerifySuperFox && !Simulating
+            ? foxVerify.CheckAsync(sig, slot, _cts.Token)
+            : Task.FromResult(Core.Stations.FoxCheck.None);
 
         Updates = new UpdateService(Settings, Path.Combine(Paths.Temp, "updates"), Paths.Logs);
         Updates.Start();

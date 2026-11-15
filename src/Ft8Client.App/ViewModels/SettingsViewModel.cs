@@ -121,6 +121,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         FeedEnabled = s.PskReporter.FeedEnabled;
         PotaSpots = s.Pota.SpotsEnabled;
         DxpeditionList = s.Dxpeditions.Enabled;
+        VerifySuperFox = s.Dxpeditions.VerifySuperFox;
         PreferNewParks = s.Ranking.PreferNewParks;
         CompareNeighbours = s.PskReporter.CompareNeighbours;
         BandActivity = s.PskReporter.BandActivity;
@@ -911,6 +912,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool DxpeditionList { get; set; }
 
+    /// <summary>Check SuperFox signatures online.</summary>
+    [ObservableProperty]
+    public partial bool VerifySuperFox { get; set; }
+
     /// <summary>Rank activators at parks not in the log higher.</summary>
     [ObservableProperty]
     public partial bool PreferNewParks { get; set; }
@@ -1271,6 +1276,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.PskReporter.FeedEnabled = FeedEnabled;
             s.Pota.SpotsEnabled = PotaSpots;
             s.Dxpeditions.Enabled = DxpeditionList;
+            s.Dxpeditions.VerifySuperFox = VerifySuperFox;
             s.Ranking.PreferNewParks = PreferNewParks;
             s.PskReporter.CompareNeighbours = CompareNeighbours;
             s.PskReporter.BandActivity = BandActivity;

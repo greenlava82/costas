@@ -103,6 +103,19 @@ They can also drive Costas back, the same way they drive WSJT-X:
 
 With the address left at `127.0.0.1`, only programs on this computer can do this.
 
+## Backups {#backups}
+
+Once a day Costas copies the log and your settings into the `backups` folder in its data folder
+(`%LOCALAPPDATA%\Costas\backups` on Windows), as `costas-2026-11-15.db` and `settings-2026-11-15.json`. It keeps the
+last 14 days. The copy is taken while Costas runs, so there is nothing to do.
+
+To go back to a copy: close Costas, rename `costas.db` in the data folder to keep it, copy the backup you want in as
+`costas.db`, and start Costas again. Contacts made after that backup are in your QRZ logbook, LoTW or your other
+logger if uploads were on, and an ADIF import brings them back.
+
+Settings are protected too: each save keeps the previous file as `settings.json.bak`, and if the settings file is
+ever damaged Costas starts from that copy and says so on the status bar.
+
 ## Decode journal and saved audio
 
 Every decode and transmission is written to a monthly text file in the data folder's `journal` folder. Costas reads

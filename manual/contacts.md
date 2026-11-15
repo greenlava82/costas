@@ -201,10 +201,12 @@ CQ. There is nothing to switch on.
 - The banner reads *SuperFox at 750 Hz · You call at 1700 Hz, every slot · 1:24 left*, then *SuperFox answered ·
   Your report goes at 1700 Hz · Its RR73 logs it*.
 - Tune to the frequency the DXpedition announced. SuperFox runs away from the usual FT8 frequencies.
-- **Costas does not check the SuperFox signature.** WSJT-X checks a code in the signal against an online service
-  to show the Fox is the real DXpedition and not a pirate; Costas shows the `$VERIFY$` line in Raw decodes but does
-  not look it up. If that matters for a contact, compare the callsign and frequency with the DXpedition's own
-  announcement.
+- **The signature.** A SuperFox signal carries a code that proves it is the real DXpedition and not a pirate using
+  its call. Costas checks it with the same online service WSJT-X uses (9dx.cc), sending only the DXpedition's call,
+  the time and the code. The tag then reads **SuperFox ✓ · Hound** when it checks out, or **SuperFox ✗ not
+  verified** when it doesn't; in that case compare the frequency with the DXpedition's own announcement before you
+  call. Until a check comes back (or with no internet) the tag stays **SuperFox · Hound**. The check never changes
+  who is called. Turn it off under Settings › Who to call › DXpeditions.
 - It needs the `jt9` that comes with Costas, kept running between slots (the normal case; see **jt9 runs** in
   [Troubleshooting](troubleshooting.md)).
 - This has been checked against a SuperFox signal made with WSJT-X's own test tool, not yet against a DXpedition on
