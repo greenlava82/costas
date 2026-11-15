@@ -524,6 +524,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         // A line set by an operator action ("Added to your Hunt list", "not in the station list") stays for a few seconds;
         // the snapshot that the action itself publishes used to replace it before it could be read. A fault still shows.
         var (statusText, statusKind) = Status(s, SettingsMapper.Rtty(_host.Settings.Current));
+        // Lost or unsaved settings outrank everything but a fault or a transmission.
+        if (statusKind != TextKind.Critical && _host.Settings.Problem is { } settingsProblem) (statusText, statusKind) = (settingsProblem, TextKind.Caution);
         // After a first Esc in PSK or RTTY the bar keeps saying that the next Esc abandons, until the contact ends.
         if (s.Contact is not { Outcome: ContactOutcome.InProgress }) _escArmed = false;
         else if (_escArmed && s.Fault is null && !s.Transmitting) (statusText, statusKind) = (EscapeText(s.Contact, true), TextKind.Critical);

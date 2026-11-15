@@ -307,6 +307,7 @@ public sealed class AppHost : IAsyncDisposable
         if (migrationError is not null) Log.Warning(migrationError, "Could not bring data across from {Legacy}", AppPaths.LegacyRoot());
         var store = new SettingsStore(paths.Settings);
         var settings = new AppSettingsAccessor(store, store.Load());
+        if (store.LoadProblem is { } settingsProblem) Log.Warning("{Problem}", settingsProblem);
         // Before anything else can fail, so a crash while starting is reported too. Simulation is known for sure only
         // once the host has read its plan; until then the command line says.
         AppHost? started = null;

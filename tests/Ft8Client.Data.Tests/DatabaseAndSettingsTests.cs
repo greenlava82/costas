@@ -142,6 +142,60 @@ public class DatabaseAndSettingsTests
     }
 
     [Fact]
+    public void SettingsStore_Corrupt_UsesBackupFromPreviousSave()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");
+        var store = new SettingsStore(path);
+        var s = new AppSettings();
+        s.Operating.Band = "40m";
+        store.Save(s);
+        s.Operating.Band = "15m";
+        store.Save(s); // the 40 m file becomes the backup
+        File.WriteAllText(path, "{ not json");
+
+        var loaded = store.Load();
+
+        loaded.Operating.Band.Should().Be("40m");
+        store.LoadProblem.Should().Contain("previous save");
+        File.ReadAllText(path + ".bad").Should().Be("{ not json");
+    }
+
+    [Fact]
+    public void SettingsStore_WrongValueType_ReturnsDefaultsInsteadOfThrowing()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");
+        File.WriteAllText(path, """{ "schema": "two", "operating": { "band": 20 } }""");
+        var store = new SettingsStore(path);
+
+        store.Load().Operating.Band.Should().Be("20m");
+        store.LoadProblem.Should().Contain("defaults");
+    }
+
+    [Fact]
+    public void SettingsStore_CorruptTwice_KeepsEarlierBadCopy()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");
+        File.WriteAllText(path, "{ first");
+        new SettingsStore(path).Load();
+        File.WriteAllText(path, "{ second");
+        new SettingsStore(path).Load();
+
+        File.ReadAllText(path + ".bad").Should().Be("{ second");
+        File.ReadAllText(path + ".bad.1").Should().Be("{ first");
+    }
+
+    [Fact]
+    public void SettingsStore_GoodFile_NoLoadProblem()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");
+        var store = new SettingsStore(path);
+        store.Save(new AppSettings());
+        store.Load();
+        store.LoadProblem.Should().BeNull();
+        File.Exists(path + ".tmp").Should().BeFalse();
+    }
+
+    [Fact]
     public void InMemorySecretStore_SetGetDelete()
     {
         var s = new InMemorySecretStore();
