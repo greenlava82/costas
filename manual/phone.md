@@ -18,6 +18,23 @@ you turn it on.
 Any phone or tablet on your home network can open the page and operate the station, so turn it off when you are not
 using it if others share your Wi-Fi.
 
+### If the phone cannot connect
+
+Press **Check why a phone can't connect** in **Settings › Mobile connection**. Costas checks, from the station
+computer, that the page is served and answers on the address shown, whether Windows treats the network as *Public*,
+and which Windows Firewall rules apply to Costas. Each finding starts with ✓ or ✗ and says what to change. It changes
+nothing itself. The usual causes:
+
+- **The network is Public.** Choosing Allow for private networks does not cover a network Windows calls Public. If it
+  is your home network, make it Private: Windows **Settings › Network & internet ›** your Wi-Fi or Ethernet **›
+  Properties › Private network**.
+- **A Block rule.** Closing or cancelling the Windows question leaves a rule that blocks Costas. Open **Windows
+  Security › Firewall & network protection › Allow an app through firewall › Change settings**, find Costas and tick
+  **Private**.
+- **Another firewall** (Norton, McAfee, Bitdefender and the like) needs Costas allowed too.
+- **On the phone:** use the same Wi-Fi as the computer (a guest network usually keeps devices apart), turn off any VPN,
+  and type the address exactly as shown, starting `http://`, not `https://`.
+
 ## Adding it to your home screen
 
 The page can sit on your home screen with the Costas icon, like an app.

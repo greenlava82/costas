@@ -967,6 +967,35 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial string RemoteStatus { get; set; } = string.Empty;
 
+    /// <summary>What "Check why a phone can't connect" found, one finding per line; empty before a check.</summary>
+    [ObservableProperty]
+    public partial string PhoneCheck { get; set; } = string.Empty;
+
+    /// <summary>True while the phone connection check runs.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CheckPhoneCommand))]
+    public partial bool PhoneChecking { get; set; }
+
+    /// <summary>Looks for why a phone cannot reach the page (saved settings, this computer's firewall). Changes nothing.</summary>
+    [RelayCommand(CanExecute = nameof(CanCheckPhone))]
+    private async Task CheckPhoneAsync()
+    {
+        PhoneChecking = true;
+        PhoneCheck = "Checking…";
+        try
+        {
+            var r = _host.Settings.Current.Remote;
+            var lines = await Ft8Client.App.Remote.RemoteDiagnostics.RunAsync(_host.Remote, r.Enabled, r.Port, CancellationToken.None);
+            PhoneCheck = string.Join(Environment.NewLine + Environment.NewLine, lines);
+        }
+        finally
+        {
+            PhoneChecking = false;
+        }
+    }
+
+    private bool CanCheckPhone() => !PhoneChecking;
+
     /// <summary>The address to open on the phone, shown large.</summary>
     [ObservableProperty]
     public partial string PhoneUrl { get; set; } = string.Empty;
