@@ -124,6 +124,7 @@ public sealed partial class LogViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
     [NotifyCanExecuteChangedFor(nameof(EditCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ResendToLoggersCommand))]
     public partial LogRowViewModel? Selected { get; set; }
 
     /// <summary>What the list shows: day headings (<see cref="LogDayViewModel"/>) and rows, newest first.</summary>
@@ -305,6 +306,20 @@ public sealed partial class LogViewModel : ObservableObject
         ConfirmingDelete = false;
         Refresh();
         _changed();
+    }
+
+    /// <summary>
+    /// Sends a logged contact to other programs again over UDP (WSJT-X QSO Logged and Logged ADIF), for a logger that
+    /// was not running when it was logged. Returns the line to show.
+    /// </summary>
+    public Func<QsoRecord, string>? SendToLoggers { get; init; }
+
+    /// <summary>Sends the selected contact to the loggers listening on UDP again.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void ResendToLoggers()
+    {
+        if (Selected is null) return;
+        Message = SendToLoggers is { } send ? send(Selected.Record) : "Sending to other programs is not available.";
     }
 
     /// <summary>Opens the editor.</summary>
