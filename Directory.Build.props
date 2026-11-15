@@ -10,5 +10,8 @@
     <Copyright>Copyright (C) 2026 the Costas contributors. Licensed under the GNU GPL v3 or later.</Copyright>
     <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Symbols inside each DLL, so crash reports carry file names and line numbers on Windows and Linux alike (the Linux
+         build deletes loose .pdb files, and a report without them only names the method). -->
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 </Project>

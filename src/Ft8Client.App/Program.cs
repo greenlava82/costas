@@ -70,6 +70,8 @@ internal static class Program
             if (App.Host?.Transmitter is { } tx && !tx.HaltAsync().Wait(TimeSpan.FromSeconds(3)))
                 Log.Error("PTT release after crash did not finish in 3 s");
             if (ex is not null) Ft8Client.Integrations.Crash.CrashReporter.Capture(ex);
+            // The process ends right after this handler: send the report now (only when online; the cache keeps it otherwise).
+            Ft8Client.Integrations.Crash.CrashReporter.Flush(TimeSpan.FromSeconds(3));
         }
         catch (Exception haltEx)
         {

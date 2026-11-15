@@ -787,6 +787,14 @@
                 <TextBlock Classes="help" Text="{Binding UsageBuildNote}" IsVisible="{Binding UsageBuildNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
             </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Check crash reports" />
+              <StackPanel Grid.Column="1" Spacing="6">
+                <Button Content="Send a test report" Command="{Binding SendTestReportCommand}" HorizontalAlignment="Left"
+                        ToolTip.Tip="Sends a made-up error to Sentry so you can see crash reports get through. It carries nothing about you or your station." />
+                <TextBlock Classes="help" Text="{Binding TestReportStatus}" IsVisible="{Binding TestReportStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              </StackPanel>
+            </Grid>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

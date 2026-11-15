@@ -13,8 +13,9 @@ namespace Ft8Client.App.Services;
 
 /// <summary>
 /// Hands the app's warnings and errors to Sentry Logs: the rendered line and, when there is one, the exception's type
-/// and text, all scrubbed by <see cref="CrashReporter"/>. Nothing goes out until crash reports have started, nor when
-/// they are switched off. Information and below stay in the local log only.
+/// and text, all scrubbed by <see cref="CrashReporter"/>. Errors, and warnings that carry an exception, also become
+/// error reports (Sentry issues, with the stack), because log lines alone never show up as issues. Nothing goes out
+/// until crash reports have started, nor when they are switched off. Information and below stay in the local log only.
 /// </summary>
 internal sealed class SentryLogSink : ILogEventSink
 {
@@ -23,9 +24,12 @@ internal sealed class SentryLogSink : ILogEventSink
         if (logEvent.Level < LogEventLevel.Warning) return;
         try
         {
-            var text = logEvent.RenderMessage(System.Globalization.CultureInfo.InvariantCulture);
+            var rendered = logEvent.RenderMessage(System.Globalization.CultureInfo.InvariantCulture);
+            var text = rendered;
             if (logEvent.Exception is { } ex) text += $" ({ex.GetType().FullName}: {ex.Message})";
-            CrashReporter.Log(logEvent.Level >= LogEventLevel.Error, text);
+            var error = logEvent.Level >= LogEventLevel.Error;
+            CrashReporter.Log(error, text);
+            CrashReporter.CaptureLogged(error, logEvent.MessageTemplate.Text, rendered, logEvent.Exception);
         }
         catch (Exception)
         {

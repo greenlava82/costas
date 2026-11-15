@@ -186,4 +186,114 @@ public class CrashReportTests
         // Sentry's own installation id would be the same on every run, a tracking id; each run gets its own instead.
         RunOnce().Should().NotBe(RunOnce());
     }
+
+    private static CrashReporter? StartTo(CapturingTransport transport, Func<bool> allowed, Func<bool>? online = null, string? environment = null) =>
+        CrashReporter.Start(Dsn, Path.GetTempPath(), allowed, () => ["W7LIT", "DN40"], online ?? (() => true), o =>
+        {
+            o.CacheDirectoryPath = null;
+            o.Transport = transport;
+        }, environment);
+
+    [Fact]
+    public void CaptureLogged_ErrorWithException_SendsOneScrubbedIssuePerRun()
+    {
+        var transport = new CapturingTransport();
+        using (StartTo(transport, () => true))
+        {
+            var ex = Thrown("Port COM3 busy");
+            CrashReporter.CaptureLogged(true, "Could not open {Port}", "Could not open COM3 for W7LIT", ex).Should().BeTrue();
+            // The same fault again in this run: already reported.
+            CrashReporter.CaptureLogged(true, "Could not open {Port}", "Could not open COM4 for W7LIT", Thrown("again")).Should().BeFalse();
+            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(5));
+        }
+
+        var events = transport.Sent.Where(b => b.Contains("\"type\":\"event\"")).ToList();
+        events.Should().ContainSingle();
+        events[0].Should().Contain("InvalidOperationException").And.Contain("Could not open [x] for [x]").And.Contain("\"level\":\"error\"");
+        events[0].Should().NotContain("W7LIT").And.NotContain("COM3");
+    }
+
+    [Fact]
+    public void CaptureLogged_WarningWithoutException_SendsNoIssue()
+    {
+        var transport = new CapturingTransport();
+        using (StartTo(transport, () => true))
+        {
+            CrashReporter.CaptureLogged(false, "LoTW download failed: {Reason}", "LoTW download failed: timeout", null).Should().BeFalse();
+            CrashReporter.CaptureLogged(false, "Audio input could not be opened", "Audio input could not be opened", Thrown("gone")).Should().BeTrue();
+            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(5));
+        }
+
+        var events = transport.Sent.Where(b => b.Contains("\"type\":\"event\"")).ToList();
+        events.Should().ContainSingle().Which.Should().Contain("\"level\":\"warning\"");
+    }
+
+    [Fact]
+    public void CaptureLogged_TurnedOff_SendsNothing()
+    {
+        var transport = new CapturingTransport();
+        var on = true;
+        using (StartTo(transport, () => on))
+        {
+            on = false;
+            CrashReporter.CaptureLogged(true, "Boom", "Boom", Thrown("boom")).Should().BeFalse();
+            on = true;
+            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(5));
+        }
+        transport.Sent.Should().NotContain(b => b.Contains("\"type\":\"event\""));
+    }
+
+    [Fact]
+    public void CaptureLogged_ManyFaults_StopsAtTheLimit()
+    {
+        var transport = new CapturingTransport();
+        using (StartTo(transport, () => true))
+        {
+            var made = Enumerable.Range(0, CrashReporter.MaxLoggedPerRun + 10)
+                .Count(i => CrashReporter.CaptureLogged(true, $"Fault {i}", $"Fault {i}", null));
+            made.Should().Be(CrashReporter.MaxLoggedPerRun);
+        }
+    }
+
+    [Fact]
+    public async Task SendTest_Running_SendsTestIssueWithEnvironment()
+    {
+        var transport = new CapturingTransport();
+        using (StartTo(transport, () => true, environment: CrashReporter.DevelopmentEnvironment))
+        {
+            var (outcome, id) = await CrashReporter.SendTestAsync(TimeSpan.FromSeconds(5));
+            outcome.Should().Be(CrashReportTestOutcome.Sent);
+            id.Should().NotBeNullOrEmpty();
+        }
+
+        var body = string.Join("\n", transport.Sent);
+        body.Should().Contain(nameof(CrashReportTestException)).And.Contain("\"environment\":\"development\"");
+    }
+
+    [Fact]
+    public async Task SendTest_TurnedOff_SendsNothing()
+    {
+        var transport = new CapturingTransport();
+        var on = true;
+        using (StartTo(transport, () => on))
+        {
+            on = false;
+            (await CrashReporter.SendTestAsync(TimeSpan.FromSeconds(5))).Outcome.Should().Be(CrashReportTestOutcome.Off);
+            on = true;
+            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(5));
+        }
+        transport.Sent.Should().NotContain(b => b.Contains(nameof(CrashReportTestException)));
+    }
+
+    [Fact]
+    public async Task SendTest_NotRunning_SaysSo() =>
+        (await CrashReporter.SendTestAsync(TimeSpan.FromSeconds(1))).Outcome.Should().Be(CrashReportTestOutcome.NotRunning);
+
+    [Fact]
+    public async Task SendTest_Offline_WaitsInsteadOfSending()
+    {
+        var transport = new CapturingTransport();
+        using (StartTo(transport, () => true, online: () => false))
+            (await CrashReporter.SendTestAsync(TimeSpan.FromSeconds(1))).Outcome.Should().Be(CrashReportTestOutcome.Waiting);
+    }
 }

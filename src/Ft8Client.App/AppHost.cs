@@ -560,7 +560,8 @@ public sealed class AppHost : IAsyncDisposable
         {
             return CrashReporter.Start(CrashDsn, Path.Combine(paths.Root, "crash-reports"),
                 () => !simulating() && settings.Current.Usage.Enabled,
-                () => settings.Current.Profiles.SelectMany(p => new[] { p.Callsign, p.Grid, p.OperatorName, p.Qth }));
+                () => settings.Current.Profiles.SelectMany(p => new[] { p.Callsign, p.Grid, p.OperatorName, p.Qth }),
+                environment: UpdateService.BuiltAsDevelopment ? CrashReporter.DevelopmentEnvironment : CrashReporter.ProductionEnvironment);
         }
         catch (Exception ex)
         {

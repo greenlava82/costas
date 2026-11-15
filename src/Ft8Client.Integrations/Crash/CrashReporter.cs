@@ -24,8 +24,21 @@ public sealed class CrashReporter : IDisposable
     /// <summary>How many reports wait at most in the offline cache.</summary>
     public const int MaxCached = 30;
 
+    /// <summary>How many error reports one run of Costas makes at most from its own log, so a fault that repeats cannot use up the project's quota.</summary>
+    public const int MaxLoggedPerRun = 25;
+
+    /// <summary>The environment releases report under.</summary>
+    public const string ProductionEnvironment = "production";
+
+    /// <summary>The environment development builds (CI pushes to main) report under, so they can be filtered out in Sentry.</summary>
+    public const string DevelopmentEnvironment = "development";
+
+    private static readonly Lock s_loggedLock = new();
+    private static readonly HashSet<string> s_logged = new(StringComparer.Ordinal);
+
     private static Func<bool> s_allowed = () => false;
     private static Func<IEnumerable<string?>> s_privateWords = () => [];
+    private static Func<bool> s_online = () => false;
 
     private readonly IDisposable _sdk;
 
@@ -41,11 +54,11 @@ public sealed class CrashReporter : IDisposable
     /// which can change while Costas runs).
     /// </summary>
     public static CrashReporter? Start(string? dsn, string cacheFolder, Func<bool> allowed, Func<IEnumerable<string?>> privateWords,
-        Func<bool>? online = null) => Start(dsn, cacheFolder, allowed, privateWords, online, adjust: null);
+        Func<bool>? online = null, string? environment = null) => Start(dsn, cacheFolder, allowed, privateWords, online, adjust: null, environment);
 
-    /// <summary>As <see cref="Start(string?, string, Func{bool}, Func{IEnumerable{string?}}, Func{bool}?)"/>; tests adjust the options (a fake transport).</summary>
+    /// <summary>As <see cref="Start(string?, string, Func{bool}, Func{IEnumerable{string?}}, Func{bool}?, string?)"/>; tests adjust the options (a fake transport).</summary>
     internal static CrashReporter? Start(string? dsn, string cacheFolder, Func<bool> allowed, Func<IEnumerable<string?>> privateWords,
-        Func<bool>? online, Action<SentryOptions>? adjust)
+        Func<bool>? online, Action<SentryOptions>? adjust, string? environment = null)
     {
         if (string.IsNullOrWhiteSpace(dsn)) return null;
         if (!allowed())
@@ -56,9 +69,11 @@ public sealed class CrashReporter : IDisposable
         if (Running) return null;
         s_allowed = allowed;
         s_privateWords = privateWords;
+        lock (s_loggedLock) s_logged.Clear();
+        s_online = online ?? NetworkInterface.GetIsNetworkAvailable;
         var sdk = SentrySdk.Init(o =>
         {
-            Configure(o, dsn.Trim(), cacheFolder, allowed, privateWords, online ?? NetworkInterface.GetIsNetworkAvailable);
+            Configure(o, dsn.Trim(), cacheFolder, allowed, privateWords, s_online, environment ?? ProductionEnvironment);
             adjust?.Invoke(o);
         });
         // Logs would otherwise carry Sentry's installation id, which stays the same across runs: a tracking id. A new
@@ -72,6 +87,78 @@ public sealed class CrashReporter : IDisposable
     public static void Capture(Exception ex)
     {
         if (Running) SentrySdk.CaptureException(ex);
+    }
+
+    /// <summary>
+    /// Sends what is waiting, for up to <paramref name="timeout"/>: called when the process is about to end on an error
+    /// nothing caught, so the report is not lost with it. Does nothing when no reporter is running.
+    /// </summary>
+    public static void Flush(TimeSpan timeout)
+    {
+        if (Running) SentrySdk.Flush(timeout);
+    }
+
+    /// <summary>
+    /// Turns an error from the app's own log into an error report (a Sentry issue), beside the log line that
+    /// <see cref="Log"/> sends: an error, or a warning that carries an exception. Most of what goes wrong in Costas is
+    /// caught and logged rather than thrown, and log lines alone never show up as issues. Reports are grouped by the
+    /// log's message template (which holds no values) and the exception's type, each group goes out once per run, and
+    /// at most <see cref="MaxLoggedPerRun"/> per run. The text is scrubbed like every report. Returns true when a report
+    /// was made.
+    /// </summary>
+    public static bool CaptureLogged(bool error, string template, string message, Exception? exception)
+    {
+        if (!Running || !s_allowed()) return false;
+        if (!error && exception is null) return false;
+        var key = template + "\n" + exception?.GetType().FullName;
+        lock (s_loggedLock)
+        {
+            if (s_logged.Count >= MaxLoggedPerRun || !s_logged.Add(key)) return false;
+        }
+        var text = Scrubber(s_privateWords()).Scrub(message) ?? string.Empty;
+        var e = exception is null ? new SentryEvent() : new SentryEvent(exception);
+        e.Message = new SentryMessage { Message = text, Formatted = text };
+        e.Level = error ? SentryLevel.Error : SentryLevel.Warning;
+        e.SetTag("source", "log");
+        // An exception groups by its type and where it was thrown (Sentry's default); a line without one by its template.
+        e.SetFingerprint(exception is null ? [template] : ["{{ default }}"]);
+        SentrySdk.CaptureEvent(e);
+        return true;
+    }
+
+    /// <summary>
+    /// Sends a test error report, so the operator (or the developer) can see that reports reach Sentry. It follows the
+    /// same switch, scrubbing and offline rules as a real report. Returns what happened and the report's id.
+    /// </summary>
+    public static async Task<(CrashReportTestOutcome Outcome, string? Id)> SendTestAsync(TimeSpan timeout)
+    {
+        if (!Running) return (CrashReportTestOutcome.NotRunning, null);
+        if (!s_allowed()) return (CrashReportTestOutcome.Off, null);
+        Exception ex;
+        try
+        {
+            throw new CrashReportTestException();
+        }
+        catch (CrashReportTestException thrown)
+        {
+            ex = thrown;
+        }
+        var e = new SentryEvent(ex) { Level = SentryLevel.Info };
+        e.SetTag("source", "test");
+        var id = SentrySdk.CaptureEvent(e);
+        if (id == SentryId.Empty) return (CrashReportTestOutcome.Off, null);
+        bool online;
+        try
+        {
+            online = s_online();
+        }
+        catch (NetworkInformationException)
+        {
+            online = false;
+        }
+        if (!online) return (CrashReportTestOutcome.Waiting, id.ToString());
+        await SentrySdk.FlushAsync(timeout).ConfigureAwait(false);
+        return (CrashReportTestOutcome.Sent, id.ToString());
     }
 
     /// <summary>
@@ -104,11 +191,11 @@ public sealed class CrashReporter : IDisposable
 
     /// <summary>The Sentry options Costas uses. Internal for tests.</summary>
     internal static void Configure(SentryOptions o, string dsn, string cacheFolder, Func<bool> allowed, Func<IEnumerable<string?>> privateWords,
-        Func<bool> online)
+        Func<bool> online, string environment = ProductionEnvironment)
     {
         o.Dsn = dsn;
         o.Release = $"costas@{AppInfo.Version}";
-        o.Environment = "production";
+        o.Environment = environment;
         o.IsGlobalModeEnabled = true;
         o.SendDefaultPii = false;
         o.IsEnvironmentUser = false;
