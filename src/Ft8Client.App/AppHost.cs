@@ -1148,8 +1148,10 @@ public sealed class AppHost : IAsyncDisposable
                 {
                     var port = RigctldRig.CleanSerialPort(r.Port, OperatingSystem.IsWindows());
                     var pttPort = RigctldRig.CleanSerialPort(r.PttPort, OperatingSystem.IsWindows());
-                    rig = await RigctldRig.StartAsync(new RigctldOptions(exe, r.Model.Value, port, r.Baud, r.Ptt, pttPort, r.Config), Guard, Clock, _cts.Token)
+                    var opened = await RigctldRig.StartAsync(new RigctldOptions(exe, r.Model.Value, port, r.Baud, r.Ptt, pttPort, r.Config), Guard, Clock, _cts.Token)
                         .ConfigureAwait(false);
+                    opened.MaxPowerOverride = () => Settings.Current.Profile.Rig.MaxPowerWatts;
+                    rig = opened;
                     status = new ServiceStatus(ServiceHealth.Ok, rig.Name, Clock.UtcNow);
                 }
                 catch (RigException ex)

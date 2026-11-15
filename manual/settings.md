@@ -18,6 +18,10 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
 - **Callsign** and **Grid square** (4 or 6 characters). Used in every message you send and to work out distances.
 - **Power (watts)**: recorded in the log when the radio cannot report its own power setting. It does not change the
   radio's power.
+- **Radio's top power (watts)**: empty (automatic) by default, which uses the range Hamlib reports for your radio. If
+  the power box at the top shows the wrong range, for example 1 to 200 W on a 100 W FTDX10 so that asking for 100 W
+  gives 50 W, type the radio's real top power here (100). Costas then reads and sets the power as a share of it. Each
+  profile keeps its own.
 
 ## Transmitting
 

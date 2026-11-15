@@ -41,6 +41,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Profiles.Add(new ProfileDraft
             {
                 Id = p.Id, Name = p.Name, Callsign = p.Callsign, Grid = p.Grid, Power = p.PowerWatts.ToString(CultureInfo.InvariantCulture),
+                MaxPower = p.Rig.MaxPowerWatts?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 LogbookKey = host.Secrets.Get(SecretNames.QrzLogbookKey(p.Id)) ?? string.Empty,
                 EqslUser = host.Secrets.Get(SecretNames.EqslUsername(p.Id)) ?? string.Empty,
                 EqslPassword = host.Secrets.Get(SecretNames.EqslPassword(p.Id)) ?? string.Empty,
@@ -51,7 +52,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
         _loadedProfile = s.Profile.Id;
         var active = Profiles.First(d => d.Id == s.Profile.Id);
-        (Callsign, Grid, Power, LogbookKey) = (active.Callsign, active.Grid, active.Power, active.LogbookKey);
+        (Callsign, Grid, Power, MaxPower, LogbookKey) = (active.Callsign, active.Grid, active.Power, active.MaxPower, active.LogbookKey);
         _shownProfile = active;
         SelectedProfile = active;
         TxGain = _loadedTxGain = TxLevelController.LevelFor(s.Profile.Audio, s.Operating.Band, s.Operating.Mode).ToString("0.0", CultureInfo.InvariantCulture);
@@ -224,7 +225,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         // The list can briefly clear its selection while items change; keep showing the last profile.
         if (value is null || ReferenceEquals(value, _shownProfile)) return;
         StoreFields();
-        (Callsign, Grid, Power, LogbookKey) = (value.Callsign, value.Grid, value.Power, value.LogbookKey);
+        (Callsign, Grid, Power, MaxPower, LogbookKey) = (value.Callsign, value.Grid, value.Power, value.MaxPower, value.LogbookKey);
         ShowEqsl(value);
         KeyStatus = string.Empty;
         _shownProfile = value;
@@ -239,7 +240,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         var draft = new ProfileDraft
         {
             Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, Name = NewProfileName(Profiles.Select(p => p.Name)),
-            Callsign = from.Callsign, Grid = from.Grid, Power = from.Power,
+            Callsign = from.Callsign, Grid = from.Grid, Power = from.Power, MaxPower = from.MaxPower,
         };
         Profiles.Add(draft);
         SelectedProfile = draft;
@@ -277,6 +278,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _shownProfile.Callsign = Callsign;
         _shownProfile.Grid = Grid;
         _shownProfile.Power = Power;
+        _shownProfile.MaxPower = MaxPower;
         _shownProfile.LogbookKey = LogbookKey;
         _shownProfile.EqslUser = EqslUser;
         _shownProfile.EqslPassword = EqslPassword;
@@ -320,6 +322,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             p.Callsign = d.Callsign.Trim().ToUpperInvariant();
             p.Grid = d.Grid.Trim().ToUpperInvariant();
             p.PowerWatts = Watts(d.Power, p.PowerWatts);
+            p.Rig.MaxPowerWatts = string.IsNullOrWhiteSpace(d.MaxPower) ? null : Watts(d.MaxPower, p.Rig.MaxPowerWatts ?? 100);
             p.Eqsl.SyncEnabled = d.EqslSync;
             p.Eqsl.UploadOnComplete = d.EqslUpload;
             p.Eqsl.QthNickname = d.EqslQth.Trim();
@@ -345,6 +348,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Power in watts.</summary>
     [ObservableProperty]
     public partial string Power { get; set; }
+
+    /// <summary>The radio's top power in watts; empty to use what Hamlib reports.</summary>
+    [ObservableProperty]
+    public partial string MaxPower { get; set; }
 
     /// <summary>Tx gain dBFS on the current band.</summary>
     [ObservableProperty]
