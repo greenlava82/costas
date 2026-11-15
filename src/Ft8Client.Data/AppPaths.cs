@@ -71,6 +71,9 @@ public sealed class AppPaths
     /// <summary>Per-run decoder scratch folders.</summary>
     public string Temp => Path.Combine(Root, "tmp");
 
+    /// <summary>Daily copies of the log database and settings (<see cref="Ft8Client.Data.Database.LogBackup"/>).</summary>
+    public string Backups => Path.Combine(Root, "backups");
+
     /// <summary>Creates every folder.</summary>
     public void EnsureCreated()
     {

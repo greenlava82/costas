@@ -518,10 +518,11 @@ public sealed class AppHost : IAsyncDisposable
             Recording.Start();
         }
 
-        _ = Task.Run(ClockCheckLoopAsync);
-        _ = Task.Run(RigPollLoopAsync);
-        _ = Task.Run(DeviceRecoveryLoopAsync);
-        _ = Task.Run(ReceiveLevelLoopAsync);
+        Supervise("Clock check", ClockCheckLoopAsync);
+        Supervise("Radio poll", RigPollLoopAsync);
+        Supervise("Audio device recovery", DeviceRecoveryLoopAsync);
+        Supervise("Receive level", ReceiveLevelLoopAsync);
+        if (!Simulating) Supervise("Log backup", BackupLoopAsync);
         var confirmedBy = SettingsMapper.ConfirmationSource(s);
         var rttyPower = s.Operating.RttyPowerPercent;
         var correctClock = s.Operating.CorrectClock;
@@ -1279,6 +1280,36 @@ public sealed class AppHost : IAsyncDisposable
         }
         catch (OperationCanceledException)
         {
+        }
+    }
+
+    // Runs a background loop under the supervisor, so an unexpected error restarts it instead of ending it for the session.
+    private void Supervise(string name, Func<Task> loop) => _ = Task.Run(() => LoopSupervisor.RunAsync(name, loop, _cts.Token));
+
+    /// <summary>Daily copies of the log and settings (<see cref="LogBackup"/>), in <see cref="AppPaths.Backups"/>.</summary>
+    public LogBackup? Backup { get; private set; }
+
+    // Takes a copy of the log and settings at start-up if the newest is a day old, then checks hourly. A copy that
+    // cannot be written is logged and tried again at the next check.
+    private async Task BackupLoopAsync()
+    {
+        var backup = Backup ??= new LogBackup(Database, Paths.Backups, Paths.Settings);
+        while (!_cts.IsCancellationRequested)
+        {
+            var now = DateTime.UtcNow;
+            if (backup.IsDue(now))
+            {
+                try
+                {
+                    var path = backup.Run(now);
+                    Log.Information("Backed up the log to {Path}", path);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+                {
+                    Log.Warning(ex, "Could not back up the log to {Folder}", backup.Folder);
+                }
+            }
+            await Task.Delay(TimeSpan.FromHours(1), _cts.Token).ConfigureAwait(false);
         }
     }
 

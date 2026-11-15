@@ -64,7 +64,7 @@ public sealed class DxpeditionService : IDisposable
     public event Action<DxpeditionCalendar>? Changed;
 
     /// <summary>Starts in the background.</summary>
-    public void Start() => _ = Task.Run(() => LoopAsync(_cts.Token));
+    public void Start() => _ = Task.Run(() => LoopSupervisor.RunAsync("DXpedition list", () => LoopAsync(_cts.Token), _cts.Token));
 
     /// <summary>Checks again soon (the setting was turned on).</summary>
     public void Wake()
