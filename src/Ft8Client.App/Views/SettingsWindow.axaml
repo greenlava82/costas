@@ -231,6 +231,13 @@
               <CheckBox Grid.Column="1" Content="Log each contact automatically when it completes" IsChecked="{Binding AutoLog}" />
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Station is busy" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <CheckBox Content="Keep calling a station that is working someone else" IsChecked="{Binding KeepCallingWhenBusy}" />
+                <TextBlock Classes="help" Text="Off: when the station you call answers another caller, or is already in a contact when you click Call, Costas stops and says so. On: it keeps calling, as WSJT-X does, until the station answers you, the retry limit is reached, or you stop." TextWrapping="Wrap" />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Calling you" />
               <StackPanel Grid.Column="1" Spacing="4">
                 <CheckBox Content="Chime when a new station calls me" IsChecked="{Binding ChimeOnCaller}" />

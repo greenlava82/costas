@@ -189,7 +189,8 @@ It has the same columns as Next in line, lined up under them (including the ambe
 - **Doing now** says why they cannot be called right now instead, in grey: *In a contact with EA5HVK*, *Went quiet
   2 minutes ago* (counting up, like Last heard). The **Call** button still works, so you can call a station that went quiet or is finishing a
   contact. A station *in a contact* with someone else is not called: the contact card says *In another contact* and
-  why (see [Making contacts](contacts.md)).
+  why (see [Making contacts](contacts.md)), unless you turned on **Keep calling a station that is working someone
+  else** in Settings › Transmitting.
 
 **Last worked** shows when and on which band you last worked them: *Today · 20 m*, *Yesterday · 40 m*,
 *2026-10-03 · 20 m*. Hover for the number of contacts, the exact time, the mode and whether it is confirmed.

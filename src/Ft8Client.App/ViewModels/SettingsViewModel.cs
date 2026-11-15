@@ -68,6 +68,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         AutoLog = s.Operating.AutoLog;
         ChimeOnCaller = s.Operating.ChimeOnCaller;
         AnswerAllInTurn = s.Operating.AnswerAllInTurn;
+        KeepCallingWhenBusy = s.Operating.KeepCallingWhenBusy;
         var rtty = SettingsMapper.Rtty(s);
         RttySpeed = rtty.Baud.ToString("0.##", CultureInfo.InvariantCulture);
         RttyShift = rtty.ShiftHz.ToString(CultureInfo.InvariantCulture);
@@ -449,6 +450,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Answer everyone waiting for me, one after another, after each logged contact.</summary>
     [ObservableProperty]
     public partial bool AnswerAllInTurn { get; set; }
+
+    /// <summary>Keep calling a station that is working someone else instead of stopping.</summary>
+    [ObservableProperty]
+    public partial bool KeepCallingWhenBusy { get; set; }
 
     /// <summary>RTTY speeds offered, in baud.</summary>
     public IReadOnlyList<string> RttySpeeds { get; } = [.. RttyFormat.Speeds.Select(b => b.ToString("0.##", CultureInfo.InvariantCulture))];
@@ -1247,6 +1252,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Operating.AutoLog = AutoLog;
             s.Operating.ChimeOnCaller = ChimeOnCaller;
             s.Operating.AnswerAllInTurn = AnswerAllInTurn;
+            s.Operating.KeepCallingWhenBusy = KeepCallingWhenBusy;
             s.Operating.RttyBaud = Dbl(RttySpeed, 45, 75, RttyFormat.Standard.Baud);
             s.Operating.RttyShiftHz = Int(RttyShift, 170, 850, RttyFormat.Standard.ShiftHz);
             s.Operating.RttyReverse = RttyReverse;
