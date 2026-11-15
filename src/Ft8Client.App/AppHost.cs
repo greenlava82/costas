@@ -690,8 +690,7 @@ public sealed class AppHost : IAsyncDisposable
             {
                 try
                 {
-                    await _rig.SetFrequencyAsync(e.DialHz, _cts.Token).ConfigureAwait(false);
-                    await _rig.SetModeAsync(RigMode.PktUsb, _cts.Token).ConfigureAwait(false);
+                    await RigTuning.TuneAsync(_rig, e.DialHz, RigMode.PktUsb, _cts.Token).ConfigureAwait(false);
                     Session.SetDial(e.DialHz);
                 }
                 catch (RigException ex)
@@ -749,8 +748,7 @@ public sealed class AppHost : IAsyncDisposable
         await StopTransmitterForRetuneAsync().ConfigureAwait(false);
         try
         {
-            await _rig.SetFrequencyAsync(hz, _cts.Token).ConfigureAwait(false);
-            await _rig.SetModeAsync(RigMode.PktUsb, _cts.Token).ConfigureAwait(false);
+            await RigTuning.TuneAsync(_rig, hz, RigMode.PktUsb, _cts.Token).ConfigureAwait(false);
             Session.SetDial(hz);
             return null;
         }
