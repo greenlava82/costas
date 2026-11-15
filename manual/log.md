@@ -103,6 +103,15 @@ They can also drive Costas back, the same way they drive WSJT-X:
 
 With the address left at `127.0.0.1`, only programs on this computer can do this.
 
+## Club Log
+
+To send each contact to [Club Log](https://clublog.org) as you make it, open [Settings › Club Log](settings.md),
+enter the email your Club Log account uses and an **Application Password** (make one in Club Log under Settings ›
+API; it is not your Club Log password), and tick **Upload each new contact**. The Club Log light in the bottom bar
+shows how uploads are going. If Club Log refuses the login, Costas stops sending until you change the email or
+password, because Club Log blocks programs that keep trying. Real-time upload is for new contacts only: to send an
+older log, upload an ADIF export on the Club Log site.
+
 ## Backups {#backups}
 
 Once a day Costas copies the log and your settings into the `backups` folder in its data folder

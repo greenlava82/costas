@@ -316,3 +316,19 @@ Contacts queue locally and retry when the site is down, even after restarting Co
 logbook is left alone and counts as sent. A wrong key or station id waits an hour before the next try; the
 **Wavelog/Cloudlog** indicator in the bottom bar (shown once this is set up) says what the logbook answered. Each
 station profile has its own settings. Off by default. Simulation never contacts the site.
+
+## Club Log {#club-log}
+
+Costas can send each contact to [Club Log](https://clublog.org) as soon as it is logged, so a DXpedition's online
+log shows it at once. In **Settings › Club Log**:
+
+1. Enter the **Account email** you sign in to Club Log with (not your callsign).
+2. In Club Log, open Settings › API and make an **Application Password**. It is shown once: paste it into
+   **Application Password**. It stays in the system credential store, not in the settings file.
+3. Tick **Upload each new contact as soon as it is logged** and save.
+
+The profile's callsign must be one of the callsigns on that Club Log account. Contacts queue locally and retry when
+Club Log is down. A contact Club Log already has counts as sent; one it rejects (a bad date, say) is dropped from the
+queue and the **Club Log** indicator says why. If Club Log refuses the login, uploads stop until you change the email
+or password, because Club Log blocks programs that keep trying. Each station profile has its own settings. Off by
+default. Simulation never contacts Club Log.

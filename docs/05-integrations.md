@@ -243,6 +243,16 @@ Test by decoding our own datagrams with a small reader in the test project and, 
 
 `GET https://clublog.org/mostwanted.php?api=1` (confirmed 2026-10-12, no account or key) returns a JSON object of rank to ADIF DXCC code, both as strings: `{"1":"344","2":"123",...}`, about 340 entries. A saved answer is in `samples/clublog/mostwanted.json`. The app downloads it at start when the cached copy (`cache/clublog-mostwanted.json`) is missing or a week old, with the app's User-Agent and the usual timeout, and keeps using the cached copy when Club Log cannot be reached. An answer with fewer than 300 entries is ignored.
 
+## 7a1. Club Log real-time upload
+
+Confirmed 2026-11-15 from clublog.org's developer pages ("How to upload QSOs in real time", updated 2025-12-17; "API keys", updated 2025-01-14; "Excessive API usage"; "App passwords", updated 2026-11-07).
+
+- `POST https://clublog.org/realtime.php`, `application/x-www-form-urlencoded`: `email` (the account's email, not a callsign), `password` (an Application Password, made under Settings › API, shown once), `callsign` (must belong to that email), `adif` (exactly one record ending `<EOR>`), `api` (the application's key).
+- 200 means stored: "QSO OK", "QSO Duplicate" (treat as success) or "QSO Modified". 400 "QSO Rejected": bad record, not logged. 403: credentials or prerequisites refused; the client "must STOP sending real time requests immediately" or the address is firewalled. 500: retry later.
+- Real time only: not for batches (over about 150 contacts use `putlogs.php`, not built). A throttle exists with no published number; Costas sends at most one every 2 s.
+- API key: requested at https://clublog.org/requestapikey.php. Club Log deletes keys found published in a Git repository, so Costas's key is the `CLUBLOG_API_KEY` repository secret, passed to release and development builds only. A build without it shows Club Log as unavailable.
+- **VERIFY** the exact 403 body for a wrong password and the live behaviour once the key exists; the delete endpoint is not used.
+
 ## 7b. LoTW (ARRL Logbook of the World)
 
 Optional, off until the operator enters a LoTW login. The password is in the credential store (`lotw-password`).

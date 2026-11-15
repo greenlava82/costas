@@ -189,6 +189,15 @@ public sealed class AppHost : IAsyncDisposable
     /// <summary>Optional Wavelog or Cloudlog uploads.</summary>
     public CloudlogService Cloudlog { get; private set; } = null!;
 
+    /// <summary>Optional Club Log real-time uploads.</summary>
+    public ClubLogService ClubLog { get; private set; } = null!;
+
+    /// <summary>
+    /// Costas's Club Log application key, from the build (CI's CLUBLOG_API_KEY secret; Club Log asks that keys stay out of
+    /// public repositories). Null in a build without it, where Club Log uploads cannot run.
+    /// </summary>
+    public static string? ClubLogApiKey { get; } = BuildValue("ClubLogApiKey")?.Trim() is { Length: > 0 } k ? k : null;
+
     /// <summary>Decode journal and WAV saving (null in simulation).</summary>
     public RecordingService? Recording { get; private set; }
 
@@ -398,7 +407,8 @@ public sealed class AppHost : IAsyncDisposable
         var log = new DatabaseSessionLog(Qsos, Uploads, () => Settings.Current.Profile.Id,
             () => !Simulating && Settings.Current.Qrz.LogbookEnabled && Settings.Current.Qrz.UploadOnComplete,
             () => TxMeters.PowerWatts, () => !Simulating && Settings.Current.Profile.Eqsl.UploadOnComplete, (call, band) => Pota?.ParkFor(call, band),
-            LogHold, () => !Simulating && Settings.Current.Profile.Cloudlog.UploadOnComplete);
+            LogHold, () => !Simulating && Settings.Current.Profile.Cloudlog.UploadOnComplete,
+            () => !Simulating && Settings.Current.Profile.ClubLog.UploadOnComplete);
         Session = new Session(config, decoder, source, Transmitter, Clock, Countries, Frequencies, log);
         // What follows the start of a transmission (the log write, the journal, the screen) runs on its own thread, in
         // order, so a slow disk or a locked database never holds up the slot thread, which also releases PTT.
@@ -456,6 +466,8 @@ public sealed class AppHost : IAsyncDisposable
         Eqsl.Start();
         Cloudlog = new CloudlogService(Session, Settings, Secrets, Qsos, Uploads, Clock, uploadsAllowed: !Simulating);
         Cloudlog.Start();
+        ClubLog = new ClubLogService(Session, Settings, Secrets, Qsos, Uploads, Clock, ClubLogApiKey, uploadsAllowed: !Simulating);
+        ClubLog.Start();
 
         Psk = new PskReporterService(Session, Settings, Spots, Countries, Frequencies, Clock, uploadsAllowed: !Simulating);
         Psk.Start();
@@ -1419,6 +1431,7 @@ public sealed class AppHost : IAsyncDisposable
         Lotw?.Dispose();
         if (Eqsl is not null) await Eqsl.DisposeAsync().ConfigureAwait(false);
         if (Cloudlog is not null) await Cloudlog.DisposeAsync().ConfigureAwait(false);
+        if (ClubLog is not null) await ClubLog.DisposeAsync().ConfigureAwait(false);
         Udp?.Dispose();
         Updates?.Dispose();
         if (Usage is not null) await Usage.DisposeAsync().ConfigureAwait(false);

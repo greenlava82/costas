@@ -63,6 +63,15 @@ public sealed partial class ProfileDraft : ObservableObject
     /// <summary>Upload each contact to Wavelog/Cloudlog when it is logged.</summary>
     public bool CloudlogUpload { get; set; }
 
+    /// <summary>Club Log account email as typed.</summary>
+    public string ClubLogEmail { get; set; } = string.Empty;
+
+    /// <summary>Club Log Application Password as typed (credential store, per profile).</summary>
+    public string ClubLogPassword { get; set; } = string.Empty;
+
+    /// <summary>Upload each contact to Club Log when it is logged.</summary>
+    public bool ClubLogUpload { get; set; }
+
     /// <inheritdoc />
     public override string ToString() => Name;
 }
