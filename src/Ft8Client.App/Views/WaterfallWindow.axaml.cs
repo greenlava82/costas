@@ -26,6 +26,9 @@ public partial class WaterfallWindow : Window
     /// <summary>The waterfall shown in this window.</summary>
     public WaterfallView View => Waterfall;
 
+    /// <summary>The colour scale sliders behind this window's Levels button.</summary>
+    public WaterfallLevelsPanel Levels => LevelsPanel;
+
     /// <summary>Esc does here what it does in the main window.</summary>
     public Action? Escape { get; init; }
 

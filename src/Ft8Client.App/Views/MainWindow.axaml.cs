@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private Audio.Timing.CapturePump? _waterfallPump;
     private long _waterfallSlot = -1;
     private WaterfallWindow? _waterfallWindow;
+    private readonly DispatcherTimer _levelsSave = new() { Interval = TimeSpan.FromMilliseconds(600) };
     private readonly Dictionary<int, PanelWindow> _panels = [];
     private const double CompactWaterfall = 52;
 
@@ -46,6 +47,8 @@ public partial class MainWindow : Window
         };
         WaterfallGrip.KeyDown += OnGripKey;
         PopOutButton.Click += (_, _) => PopOutWaterfall();
+        LevelsPanel.LevelsChanged += l => ApplyLevels(l, save: true);
+        _levelsSave.Tick += (_, _) => SaveLevels();
         AddHandler(Button.ClickEvent, (_, e) =>
         {
             if (e.Source is Button button && button.Classes.Contains("instrument-dial"))
@@ -80,6 +83,7 @@ public partial class MainWindow : Window
         Height = Math.Max(MinHeight, w.Height);
         if (w.X is { } x && w.Y is { } y) Position = new Avalonia.PixelPoint(x, y);
         SetWaterfallHeight(w.WaterfallHeight, save: false);
+        ApplyLevels(new Core.Spectrum.WaterfallLevels(w.WaterfallFloorDb, w.WaterfallRangeDb), save: false);
         OperatePage.LoadColumns(w.ColumnWidths);
         OperatePage.ColumnsSaved += (name, widths) => vm.Host.Settings.Update(s => s.Window.ColumnWidths[name] = [.. widths]);
         vm.Operate.SideTab = Math.Clamp(w.SideTab, OperateViewModel.BandTab, OperateViewModel.SessionTab);
@@ -163,6 +167,7 @@ public partial class MainWindow : Window
     {
         _closing = true;
         _timer.Stop();
+        if (_levelsSave.IsEnabled) SaveLevels();
         _mini?.Close();
         if (Vm is { } vm)
         {
@@ -225,6 +230,35 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    // The colour scale is shared by the strip and the popped-out window. Dragging a slider applies at once; the setting
+    // is saved once the slider has rested, not on every step.
+    private void ApplyLevels(Core.Spectrum.WaterfallLevels levels, bool save)
+    {
+        levels = levels.Clamped();
+        ReceiveWaterfall.SetLevels(levels);
+        LevelsPanel.Show(levels);
+        if (_waterfallWindow is { } ww)
+        {
+            ww.View.SetLevels(levels);
+            ww.Levels.Show(levels);
+        }
+        if (!save) return;
+        _levelsSave.Stop();
+        _levelsSave.Start();
+    }
+
+    private void SaveLevels()
+    {
+        _levelsSave.Stop();
+        if (Vm is not { } vm) return;
+        var levels = ReceiveWaterfall.Levels;
+        vm.Host.Settings.Update(s =>
+        {
+            s.Window.WaterfallFloorDb = levels.FloorDb;
+            s.Window.WaterfallRangeDb = levels.RangeDb;
+        });
+    }
+
     // The waterfall is shown in one place at a time: popping it out hides the strip and its grip, popping it in brings them back.
     private void PopOutWaterfall()
     {
@@ -240,6 +274,8 @@ public partial class MainWindow : Window
         if (w is { WaterfallX: { } x, WaterfallY: { } y } && OnSomeScreen(new PixelPoint(x, y))) window.Position = new PixelPoint(x, y);
         else window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         window.View.CopyFrom(ReceiveWaterfall);
+        window.Levels.Show(ReceiveWaterfall.Levels);
+        window.Levels.LevelsChanged += l => ApplyLevels(l, save: true);
         window.View.ChannelSelected += SelectChannel;
         window.Closing += (_, _) =>
         {

@@ -386,10 +386,20 @@
         </Thumb.Styles>
       </Thumb>
       <Grid x:Name="WaterfallStrip" Grid.Row="2">
-        <v:WaterfallView x:Name="ReceiveWaterfall" Cursor="Cross" LabelInset="64"
+        <v:WaterfallView x:Name="ReceiveWaterfall" Cursor="Cross" LabelInset="118"
                          AutomationProperties.Name="Receive waterfall; click to select transmit channel" />
-        <Button x:Name="PopOutButton" Classes="wfoverlay" Content="Pop out" HorizontalAlignment="Right" VerticalAlignment="Top"
-                ToolTip.Tip="Open the waterfall in its own window" AutomationProperties.Name="Pop out the waterfall" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+          <Button x:Name="LevelsButton" Classes="wfoverlay" Content="Levels"
+                  ToolTip.Tip="Waterfall contrast: the darkest level and the range" AutomationProperties.Name="Waterfall levels">
+            <Button.Flyout>
+              <Flyout Placement="TopEdgeAlignedRight">
+                <v:WaterfallLevelsPanel x:Name="LevelsPanel" />
+              </Flyout>
+            </Button.Flyout>
+          </Button>
+          <Button x:Name="PopOutButton" Classes="wfoverlay" Content="Pop out"
+                  ToolTip.Tip="Open the waterfall in its own window" AutomationProperties.Name="Pop out the waterfall" />
+        </StackPanel>
       </Grid>
       </Grid>
     </Border>

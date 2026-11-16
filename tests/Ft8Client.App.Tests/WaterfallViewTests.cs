@@ -42,4 +42,13 @@ public class WaterfallViewTests
     {
         WaterfallView.FilterEdge(passband).Should().Be(edge);
     }
+
+    [Theory]
+    [InlineData(null, 34, 493)]
+    [InlineData(2400, 34, 391)]
+    [InlineData(3600, 34, 493)]
+    public void NoiseRange_NarrowFilter_StopsShortOfItsEdge(int? passband, int first, int last)
+    {
+        WaterfallView.NoiseRange(512, passband).Should().Be((first, last));
+    }
 }
