@@ -83,7 +83,7 @@ line*.
 
 ![Settings: Who to call](images/settings-who-to-call.png)
 
-- **Priority**: the order of need tags. By default a new country outranks a new band, which outranks a new grid,
+- **Priority**: the order of need tags. By default a new DXCC outranks a new band DXCC (in your log, but not on this band), which outranks a new grid,
   which outranks a new call. Use ▲ ▼ to reorder.
 - **Rank stations that hear me higher (from PSK Reporter)**: on.
 - **Only list stations that are calling CQ**: on. Off also lists stations finishing a contact.
@@ -101,7 +101,7 @@ line*.
   (see [Log](log.md#what-costas-logs)). If pota.app cannot be reached, the **POTA** indicator says so and Costas tries
   again less often; nothing else is affected. Off makes no requests.
   - **Rank stations at a park I have not worked higher**: on. A spotted activator at a park that is not in your log
-    comes right after your first need (new countries by default) and ahead of everything else, and it is listed in
+    comes right after your first need (new DXCC by default) and ahead of everything else, and it is listed in
     **Next in line** even when you have worked that call on this band before. A station calling CQ POTA that nobody
     has spotted is not moved, since Costas cannot tell which park it is at.
 - **DXpeditions: Show announced DXpeditions (NG3K)**: on. Costas reads NG3K's list of announced DX operations

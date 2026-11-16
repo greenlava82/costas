@@ -26,8 +26,11 @@ outside the amateur bands, or to a band it has no transmit limits for.
 ### Changing band on the radio
 
 You can also change band with the radio's own band button or dial. Costas reads the radio's frequency every second and,
-when it lands on another band, follows it: the **Band** menu switches to the new band, the station list is cleared, your
-per-band transmit level is used, and the new band is remembered for next time. Costas does not move the radio back.
+when it lands on another band, follows it: the **Band** menu switches to the new band, Next in line and Repeats are
+cleared at once (even with the pointer over them), your
+per-band transmit level is used, and the new band is remembered for next time. Decodes from the slot that was running
+when the band changed are dropped, so a station from the old band can't come back or be answered on the new one. Costas
+does not move the radio back.
 Any contact or CQ in progress ends, and a transmission waiting for the next slot is cancelled. Tuning off the standard
 FT8/FT4 frequency within the same band only changes the frequency shown.
 
@@ -97,7 +100,7 @@ it is heard working someone else, and moves to Watching once the time is up.
 | **#** | Rank |
 | **Call** | Callsign. A small amber tag under it, such as *3 calling*, means you can hear other stations calling them right now, so you know it is a pileup before you click **Call**. Hover the tag to see who, with their signal at your station |
 | **Where** | Country (or state for the USA, province for Canada) and distance |
-| **Why** | Why you need them: **New country**, **New band** (hover to see which bands you already have that country on), **New grid** with the grid, such as **New grid DO62**, or **New call**. A new country also gets a small rarity meter, five cells from common to very rare, from Club Log's most-wanted list. Hover for its rank. A station activating a park for Parks on the Air gets a second line: **New park US-1234** when that park is not in your log yet, *Park US-1234* when it is, or *POTA* when it is calling CQ POTA but nobody has spotted it on this band yet. Hover for the park's name. A station at a new park moves up: it comes right after your first need (new countries, unless you changed the order), and it is listed even if you have already worked that call on this band, because a new park is a new contact for park hunters. You can turn this off in Settings › Who to call |
+| **Why** | Why you need them: **New DXCC** (a DXCC entity not in your log), **New DXCC 20 m** (in your log, but not on this band; hover to see which bands you already have it on), **New grid** with the grid, such as **New grid DO62**, or **New call**. A new DXCC also gets a small rarity meter, five cells from common to very rare, from Club Log's most-wanted list. Hover for its rank. A station activating a park for Parks on the Air gets a second line: **New park US-1234** when that park is not in your log yet, *Park US-1234* when it is, or *POTA* when it is calling CQ POTA but nobody has spotted it on this band yet. Hover for the park's name. A station at a new park moves up: it comes right after your first need (new DXCC, unless you changed the order), and it is listed even if you have already worked that call on this band, because a new park is a new contact for park hunters. You can turn this off in Settings › Who to call |
 | **Doing now** | *Calling CQ, 3 slots*, *Calling CQ DX*, *Calling you*, and *fading* when their signal is dropping |
 | **Last heard** | How long ago their last decoded transmission ended, counting up every second |
 | **dB** | Their signal at your station |
@@ -131,10 +134,12 @@ there for that reason.
 
 ### Resizing columns
 
-Drag the edge between two column headings to make a column wider or narrower; a faint line marks each edge and turns
-blue under the pointer. *Doing now* takes whatever room is left. Next in line and Repeats share their columns, so
-resizing one resizes the other and they stay lined up. Watching has its own headings and widths. Double-click an edge
-to put that column back to its usual width. Costas remembers your widths the next time it starts.
+Drag the edge between two column headings to move it; a faint line marks each edge and turns blue under the pointer.
+Only the two columns beside the edge change: one grows by what the other gives up, so the rest of the table stays put
+and a column can grow even when the window is narrow. Beside *Doing now*, *Doing now* gives or takes the room. Next in
+line and Repeats share their columns, so resizing one resizes the other and they stay lined up. Watching has its own
+headings and widths and works the same way. Double-click an edge to put both columns beside it back to their usual
+widths. Costas remembers your widths the next time it starts.
 
 A column can't grow past the point where *Doing now* would disappear.
 
@@ -143,7 +148,7 @@ narrows **Chance** and **Where** (long text ends in "…"; hover for the full re
 **Last worked**, **Signal** and the **#** rank, in that order. **Last heard** is the last to go. Widen the window and
 they come back at the widths you set.
 
-How the order works: stations are grouped by need (new country first), then by chance, then by how well they hear
+How the order works: stations are grouped by need (new DXCC first), then by chance, then by how well they hear
 you, then by their signal. The **ⓘ** beside the title shows the current rules in one sentence; click it to change
 them (the same options as [Settings › Who to call](settings.md#who-to-call)).
 
@@ -214,7 +219,7 @@ A station calling CQ in a contest (`CQ RU`, `CQ FD`, `CQ WW`, `CQ TEST` and the 
 
 When everyone in Watching is only a new call or a new grid, the list folds to one line, such as *12 needed stations
 busy: 11 new calls, 1 new grid*. **Show all** opens it and **Fold** closes it again; Costas remembers your choice until
-you change it. A new country or a new band is never folded away: as soon as one is in Watching, its rows show.
+you change it. A new DXCC or a new band DXCC is never folded away: as soon as one is in Watching, its rows show.
 
 Stations you have already worked on this band are not in Watching; they are in [Repeats](#repeats).
 
@@ -246,7 +251,7 @@ The column at the right has four tabs, one showing at a time. Costas remembers t
   are calling CQ and **You need**, with decodes in the last slot and the average per slot over the past hour.
   **Heard from** is a bar per continent (N. Am., Europe, Asia, Oceania, S. Am., Africa). **Your log on 20 m** has
   countries worked and confirmed on this band, US states worked (and the first few you still need), grid squares
-  worked, and **This session**: contacts, new countries and new bands this session. A session starts when you open
+  worked, and **This session**: contacts, new DXCC and new band DXCC this session. A session starts when you open
   Costas, or after 2 hours with no contact. This tab stays available during a contact.
 - **Heard**: **Heard here**, a map of the stations you have decoded in the last 15 minutes (see
   [Maps and who hears you](maps.md#heard-here)), and **Band activity, last hour**: a bar per minute of decodes per

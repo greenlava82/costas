@@ -17,7 +17,7 @@ a dot for its call, place, need, report and when it was heard. Your choices are 
 | --- | --- |
 | View | **Around me**: centred on you, north up, with distance rings. **World**: a globe, see below |
 | Show | **Everyone heard**, **Needed only**, **Calling CQ** |
-| Colour by | **Need** (new country amber, new band or grid blue, new call black, worked grey), **Signal** (strong, fair, weak), **Last heard** (last minute, 1 to 5 minutes, 5 to 15 minutes) |
+| Colour by | **Need** (new DXCC amber, new band DXCC or new grid blue, new call black, worked grey), **Signal** (strong, fair, weak), **Last heard** (last minute, 1 to 5 minutes, 5 to 15 minutes) |
 | **Who heard you** | Adds a hollow ring for each PSK Reporter receiver that heard you in the last 15 minutes. A station you hear that also hears you shows as a dot inside a ring |
 | **Day and night** | World view only: shades the night side of the earth, so you can see the greyline |
 

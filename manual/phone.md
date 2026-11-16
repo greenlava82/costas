@@ -149,7 +149,7 @@ right, and **HALT TX** sits in the bottom right corner. Turning the tablet switc
 
 ### Station details
 
-Tap a call anywhere (a row in a list, a line in Decodes, a report) to open what the desk's details flyout shows:
+Tap a call anywhere (a row in a list, a line in Decodes, a report) to open what the desk's details strip shows:
 name and location from QRZ, grid, bearing, local time, QSL methods, zones, what it is doing now, a pile-up summary
 and your past contacts with it. When the station can be called, the sheet has a **Call** (or **Answer**) button.
 
