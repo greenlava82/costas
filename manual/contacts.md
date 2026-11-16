@@ -75,6 +75,11 @@ calling.* If they come back to you within 5 minutes, they
 show in the Calling you bar with a **Resume** button, as below. A station that only signs off an earlier contact
 (RR73, 73) or calls CQ again does not end your call.
 
+To keep calling instead, as WSJT-X does, tick **Settings › Transmitting › Station is busy › Keep calling a station
+that is working someone else**. Costas then calls a station even when it is in another contact, and keeps calling one
+that answers someone else, until it answers you, **Give up after** is reached, or you stop. Raise **Give up after** if
+you want to wait out a whole contact.
+
 After logging, the panel shows *Logged* for one slot and then goes back to the idle card and band strip. The station drops out
 of Next in line (it is now worked on this band) and your tallies update:
 

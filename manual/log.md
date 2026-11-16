@@ -32,6 +32,7 @@ The search text is kept. The list shows the newest 5,000 matching contacts; the 
 | Button | What it does |
 | --- | --- |
 | Search box | Finds contacts by call, grid, country or name |
+| **Send to loggers again** | Sends the selected contact over UDP again, exactly as when it was logged (WSJT-X *QSO Logged* and *Logged ADIF*), for a logger such as Log4OM, WLGate or JTAlert that was not running then. The line under the list says where it went, or why nothing was sent (for example UDP is off in [Settings › Other programs](settings.md#other-programs)). Your logger decides whether a second copy becomes a duplicate |
 | **Edit** | Opens the selected contact to correct it (call, grid, reports, name, power, comment). Your corrections stay: a later QRZ sync adds confirmations but does not change what you edited. The change is not sent to QRZ; correct it there too if you want both to match |
 | **Delete** | Removes the selected contact from the local log. Press it twice to confirm. It is **not** deleted from QRZ, but QRZ syncs and LoTW downloads will not bring it back. Importing an ADIF file that holds it does |
 | **Import ADIF** | Reads an `.adi` file (from WSJT-X, another logger, or a QRZ export). Duplicates are merged, not added twice; Costas reports how many were imported, merged and skipped |
@@ -91,7 +92,8 @@ The Log view's **LoTW** column says *Confirmed* or *Uploaded*. Station details s
 Costas sends the WSJT-X UDP messages (decodes, status, logged contact as ADIF) to `127.0.0.1` port 2237 by default
 (in PSK and RTTY only the status, naming the mode, and logged contacts),
 so GridTracker, JTAlert, N1MM+ and loggers that understand WSJT-X see your activity. Change the address in
-[Settings › Other programs](settings.md#other-programs).
+[Settings › Other programs](settings.md#other-programs). If your logger was not running when a contact was logged,
+select the contact in the Log view and press **Send to loggers again**.
 
 They can also drive Costas back, the same way they drive WSJT-X:
 

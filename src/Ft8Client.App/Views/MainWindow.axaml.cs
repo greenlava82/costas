@@ -534,6 +534,11 @@ public partial class MainWindow : Window
                 vm.Operate.CallSelected();
                 e.Handled = true;
                 break;
+            // I opens or closes the details card of the picked station (a click on its call does too).
+            case Key.I when listKeys && e.KeyModifiers == KeyModifiers.None && !vm.Operate.Keyboard.Visible:
+                vm.Operate.ToggleDetails();
+                e.Handled = true;
+                break;
             case Key.Up when listKeys:
                 vm.Operate.MoveSelection(-1);
                 e.Handled = true;

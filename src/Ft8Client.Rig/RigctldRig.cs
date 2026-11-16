@@ -270,6 +270,15 @@ public sealed class RigctldRig : IRig
         }
     }
 
+    /// <summary>
+    /// The operator's figure for the most power the radio can send, or null to use Hamlib's power2mW table. Set when the
+    /// table is wrong for the radio (an FTDX10 shown as 0 to 200 W): the power setting is then read and set as a share
+    /// of this figure, and power2mW is not asked. Read on every power read or change, so a new figure takes effect at once.
+    /// </summary>
+    public Func<int?>? MaxPowerOverride { get; set; }
+
+    private int? OverrideWatts => MaxPowerOverride?.Invoke() is int w and > 0 ? w : null;
+
     /// <inheritdoc />
     public async Task<int?> ReadPowerWattsAsync(CancellationToken ct)
     {
@@ -281,6 +290,7 @@ public sealed class RigctldRig : IRig
         {
             var level = await m.GetLevelAsync("RFPOWER", ct).ConfigureAwait(false);
             if (level is not > 0) return null;
+            if (OverrideWatts is { } top) return (int)Math.Round(Math.Min(level.Value, 1) * top);
             var hz = await m.GetFrequencyAsync(ct).ConfigureAwait(false);
             var mode = (await m.SendAsync("m", ct).ConfigureAwait(false))["Mode"];
             if (string.IsNullOrEmpty(mode)) return null;
@@ -313,6 +323,7 @@ public sealed class RigctldRig : IRig
         {
             var level = await m.GetLevelAsync("RFPOWER", ct).ConfigureAwait(false);
             if (level is not (>= 0 and <= 1)) return null;
+            if (OverrideWatts is { } top) return new RigPower((int)Math.Round(level.Value * top), top);
             var (hz, mode) = await TuningAsync(m, ct).ConfigureAwait(false);
             if (mode is null) return null;
             var max = TxPower.Watts(await m.PowerToMilliwattsAsync(1.0, hz, mode, ct).ConfigureAwait(false));
@@ -336,11 +347,19 @@ public sealed class RigctldRig : IRig
         if (m is null || !ProcessRunning || watts < TxPower.MinWatts || !PowerScaleTrusted(_options.Model, HamlibVersion.Of(_options.ExecutablePath))) return null;
         try
         {
-            var (hz, mode) = await TuningAsync(m, ct).ConfigureAwait(false);
-            if (mode is null) return null;
-            var maxMw = await m.PowerToMilliwattsAsync(1.0, hz, mode, ct).ConfigureAwait(false);
-            if (maxMw is not > 0) return null;
-            var level = Math.Clamp(watts * 1000.0 / maxMw.Value, 0, 1);
+            double level;
+            if (OverrideWatts is { } top)
+            {
+                level = Math.Clamp((double)watts / top, 0, 1);
+            }
+            else
+            {
+                var (hz, mode) = await TuningAsync(m, ct).ConfigureAwait(false);
+                if (mode is null) return null;
+                var maxMw = await m.PowerToMilliwattsAsync(1.0, hz, mode, ct).ConfigureAwait(false);
+                if (maxMw is not > 0) return null;
+                level = Math.Clamp(watts * 1000.0 / maxMw.Value, 0, 1);
+            }
             var r = await m.SendAsync(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"L RFPOWER {level:0.####}"), ct).ConfigureAwait(false);
             if (!r.Ok) return null;
         }

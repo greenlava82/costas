@@ -74,6 +74,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         {
             LotwDownload = host.Lotw.DownloadNowAsync,
             LotwUpload = host.Lotw.UploadNowAsync,
+            SendToLoggers = q => host.Udp?.Resend(q) ?? "Sending to other programs is not available.",
         };
         var heard = new HeardHistoryService(host.Paths.Journal, host.Countries, host.Clock);
         Awards = new AwardsViewModel(() => host.Session.LogIndex, host.Countries, heard, () => host.Clock.UtcNow, a => Dispatch(a))

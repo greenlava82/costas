@@ -192,6 +192,45 @@ public class ContactEngineTests
     }
 
     [Fact]
+    public void FlowA_DxAnswersSomeoneElseWithKeepCalling_KeepsCallingAndTakesItsLaterReply()
+    {
+        var s = new Sim(new ContactSettings { KeepCallingWhenBusy = true });
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        s.Step().Should().Be("ZL2RPA W7LIT DN40");
+        s.Step("K1ABC ZL2RPA -10");
+
+        s.E.InContact.Should().BeTrue();
+        s.Step().Should().Be("ZL2RPA W7LIT DN40");
+        s.Step("W7LIT ZL2RPA -12");
+        s.Step().Should().Be("ZL2RPA W7LIT R-19");
+    }
+
+    [Fact]
+    public void FlowA_DxKeepsWorkingOthersWithKeepCalling_EndsAtRetryLimit()
+    {
+        var s = new Sim(new ContactSettings { KeepCallingWhenBusy = true, RetryLimit = 2 });
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        for (var i = 0; i < 5; i++)
+        {
+            s.Step();
+            s.Step("K1ABC ZL2RPA -10");
+        }
+
+        s.E.InContact.Should().BeFalse();
+        s.E.View!.Outcome.Should().Be(ContactOutcome.NoReply);
+    }
+
+    [Fact]
+    public void CallStation_DxBusyWithKeepCalling_CallsAnyway()
+    {
+        var s = new Sim(new ContactSettings { KeepCallingWhenBusy = true });
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0, busyWith: "K1ABC");
+
+        s.E.InContact.Should().BeTrue();
+        s.Step().Should().Be("ZL2RPA W7LIT DN40");
+    }
+
+    [Fact]
     public void FlowA_DxAnswersMeAndSomeoneElseInOneSlot_Continues()
     {
         var s = new Sim();

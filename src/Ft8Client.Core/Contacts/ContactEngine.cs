@@ -163,7 +163,8 @@ public sealed class ContactEngine
     /// <summary>
     /// Flow A: call a station (answering its CQ, or replying to its report if it called me first). When
     /// <paramref name="busyWith"/> names another station it is working right now, nothing is sent: the contact ends at
-    /// once as <see cref="ContactOutcome.AnsweredOther"/> so the operator sees why. With <paramref name="fox"/> the
+    /// once as <see cref="ContactOutcome.AnsweredOther"/> so the operator sees why, unless
+    /// <see cref="ContactSettings.KeepCallingWhenBusy"/> is on, which calls it anyway. With <paramref name="fox"/> the
     /// station runs Fox/Hound: it is called as a Hound (<see cref="ContactFlow.Hound"/>), and since a Fox is always working
     /// someone, <paramref name="busyWith"/> is ignored. A call Costas starts itself (<paramref name="byOperator"/> false,
     /// "call when free") does not count as operator input for the watchdog.
@@ -182,7 +183,7 @@ public sealed class ContactEngine
         RemoveWaiting(call);
         _dismissed.Remove(call);
         if (_stopped is { } s && Callsign.EqualsCall(s.Contact.DxCall, call)) ForgetStopped();
-        if (busyWith is not null && !fox)
+        if (busyWith is not null && !fox && !_settings.KeepCallingWhenBusy)
         {
             _c.OtherCall = Callsign.Normalize(busyWith);
             _c.BusyAtStart = true;
@@ -357,8 +358,9 @@ public sealed class ContactEngine
         }
 
         // I answered its CQ and it has not replied to me, but it was heard working someone else: it picked another
-        // caller, so stop calling it rather than keep sending into its contact.
-        if (_c is { Flow: ContactFlow.AnswerCq or ContactFlow.ContestAnswer, Phase: 0, ReportReceived: null, ExchangeReceived: null } a &&
+        // caller, so stop calling it rather than keep sending into its contact. The operator can choose to keep calling
+        // (KeepCallingWhenBusy), as WSJT-X does; the retry limit and the watchdog still end it.
+        if (!_settings.KeepCallingWhenBusy && _c is { Flow: ContactFlow.AnswerCq or ContactFlow.ContestAnswer, Phase: 0, ReportReceived: null, ExchangeReceived: null } a &&
             AnsweredOther(a, heard) is { } other)
         {
             a.OtherCall = other;
