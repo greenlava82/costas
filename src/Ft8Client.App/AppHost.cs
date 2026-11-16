@@ -189,6 +189,15 @@ public sealed class AppHost : IAsyncDisposable
     /// <summary>Optional Wavelog or Cloudlog uploads.</summary>
     public CloudlogService Cloudlog { get; private set; } = null!;
 
+    /// <summary>Optional Club Log real-time uploads.</summary>
+    public ClubLogService ClubLog { get; private set; } = null!;
+
+    /// <summary>
+    /// Costas's Club Log application key, from the build (CI's CLUBLOG_API_KEY secret; Club Log asks that keys stay out of
+    /// public repositories). Null in a build without it, where Club Log uploads cannot run.
+    /// </summary>
+    public static string? ClubLogApiKey { get; } = BuildValue("ClubLogApiKey")?.Trim() is { Length: > 0 } k ? k : null;
+
     /// <summary>Decode journal and WAV saving (null in simulation).</summary>
     public RecordingService? Recording { get; private set; }
 
@@ -278,7 +287,10 @@ public sealed class AppHost : IAsyncDisposable
     /// <summary>Measured SNTP result.</summary>
     public SntpResult? Sntp { get; private set; }
 
-    /// <summary>Builds everything and starts receiving.</summary>
+    /// <summary>This copy's hold on the data folder; released last on shutdown.</summary>
+    public SingleInstance? Instance { get; private init; }
+
+    /// <summary>Builds everything and starts receiving. Throws <see cref="AlreadyRunningException"/> if another copy has the data folder.</summary>
     public static async Task<AppHost> StartAsync(CommandLine args)
     {
         var paths = args.Home is null ? AppPaths.Default() : new AppPaths(args.Home);
@@ -297,6 +309,8 @@ public sealed class AppHost : IAsyncDisposable
             }
         }
         paths.EnsureCreated();
+        // Before the log file and the database are opened: a second copy must not touch either.
+        var instance = SingleInstance.TryAcquire(paths.Root) ?? throw new AlreadyRunningException(paths.Root);
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.File(Path.Combine(paths.Logs, "app-.log"), rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14)
@@ -307,11 +321,12 @@ public sealed class AppHost : IAsyncDisposable
         if (migrationError is not null) Log.Warning(migrationError, "Could not bring data across from {Legacy}", AppPaths.LegacyRoot());
         var store = new SettingsStore(paths.Settings);
         var settings = new AppSettingsAccessor(store, store.Load());
+        if (store.LoadProblem is { } settingsProblem) Log.Warning("{Problem}", settingsProblem);
         // Before anything else can fail, so a crash while starting is reported too. Simulation is known for sure only
         // once the host has read its plan; until then the command line says.
         AppHost? started = null;
         var crashes = StartCrashReports(paths, settings, () => started?.Simulating ?? args.SimulateFolder is not null);
-        var host = new AppHost(args, paths, settings) { Crashes = crashes };
+        var host = new AppHost(args, paths, settings) { Crashes = crashes, Instance = instance };
         started = host;
         await host.InitializeAsync().ConfigureAwait(false);
         return host;
@@ -392,7 +407,8 @@ public sealed class AppHost : IAsyncDisposable
         var log = new DatabaseSessionLog(Qsos, Uploads, () => Settings.Current.Profile.Id,
             () => !Simulating && Settings.Current.Qrz.LogbookEnabled && Settings.Current.Qrz.UploadOnComplete,
             () => TxMeters.PowerWatts, () => !Simulating && Settings.Current.Profile.Eqsl.UploadOnComplete, (call, band) => Pota?.ParkFor(call, band),
-            LogHold, () => !Simulating && Settings.Current.Profile.Cloudlog.UploadOnComplete);
+            LogHold, () => !Simulating && Settings.Current.Profile.Cloudlog.UploadOnComplete,
+            () => !Simulating && Settings.Current.Profile.ClubLog.UploadOnComplete);
         Session = new Session(config, decoder, source, Transmitter, Clock, Countries, Frequencies, log);
         // What follows the start of a transmission (the log write, the journal, the screen) runs on its own thread, in
         // order, so a slow disk or a locked database never holds up the slot thread, which also releases PTT.
@@ -450,6 +466,8 @@ public sealed class AppHost : IAsyncDisposable
         Eqsl.Start();
         Cloudlog = new CloudlogService(Session, Settings, Secrets, Qsos, Uploads, Clock, uploadsAllowed: !Simulating);
         Cloudlog.Start();
+        ClubLog = new ClubLogService(Session, Settings, Secrets, Qsos, Uploads, Clock, ClubLogApiKey, uploadsAllowed: !Simulating);
+        ClubLog.Start();
 
         Psk = new PskReporterService(Session, Settings, Spots, Countries, Frequencies, Clock, uploadsAllowed: !Simulating);
         Psk.Start();
@@ -482,6 +500,13 @@ public sealed class AppHost : IAsyncDisposable
         Dxpeditions = new DxpeditionService(() => Settings.Current.Dxpeditions.Enabled, () => Settings.Current.Profile.Callsign, Clock,
             st => Session.SetService(ServiceNames.Dxpeditions, st), Path.Combine(Paths.Cache, "adxo.xml"));
         Dxpeditions.Start();
+        // SuperFox signatures are checked online with WSJT-X's service (display only), unless switched off.
+        var foxHttp = Ft8Client.Integrations.Net.HttpFactory.Create(Settings.Current.Profile.Callsign, timeout: Ft8Client.Integrations.SuperFox.FoxVerifyClient.Timeout);
+        _disposables.Add(foxHttp);
+        var foxVerify = new Ft8Client.Integrations.SuperFox.FoxVerifyClient(foxHttp);
+        Session.VerifyFox = (sig, slot) => Settings.Current.Dxpeditions.VerifySuperFox && !Simulating
+            ? foxVerify.CheckAsync(sig, slot, _cts.Token)
+            : Task.FromResult(Core.Stations.FoxCheck.None);
 
         Updates = new UpdateService(Settings, Path.Combine(Paths.Temp, "updates"), Paths.Logs);
         Updates.Start();
@@ -517,10 +542,11 @@ public sealed class AppHost : IAsyncDisposable
             Recording.Start();
         }
 
-        _ = Task.Run(ClockCheckLoopAsync);
-        _ = Task.Run(RigPollLoopAsync);
-        _ = Task.Run(DeviceRecoveryLoopAsync);
-        _ = Task.Run(ReceiveLevelLoopAsync);
+        Supervise("Clock check", ClockCheckLoopAsync);
+        Supervise("Radio poll", RigPollLoopAsync);
+        Supervise("Audio device recovery", DeviceRecoveryLoopAsync);
+        Supervise("Receive level", ReceiveLevelLoopAsync);
+        if (!Simulating) Supervise("Log backup", BackupLoopAsync);
         var confirmedBy = SettingsMapper.ConfirmationSource(s);
         var rttyPower = s.Operating.RttyPowerPercent;
         var correctClock = s.Operating.CorrectClock;
@@ -1281,6 +1307,36 @@ public sealed class AppHost : IAsyncDisposable
         }
     }
 
+    // Runs a background loop under the supervisor, so an unexpected error restarts it instead of ending it for the session.
+    private void Supervise(string name, Func<Task> loop) => _ = Task.Run(() => LoopSupervisor.RunAsync(name, loop, _cts.Token));
+
+    /// <summary>Daily copies of the log and settings (<see cref="LogBackup"/>), in <see cref="AppPaths.Backups"/>.</summary>
+    public LogBackup? Backup { get; private set; }
+
+    // Takes a copy of the log and settings at start-up if the newest is a day old, then checks hourly. A copy that
+    // cannot be written is logged and tried again at the next check.
+    private async Task BackupLoopAsync()
+    {
+        var backup = Backup ??= new LogBackup(Database, Paths.Backups, Paths.Settings);
+        while (!_cts.IsCancellationRequested)
+        {
+            var now = DateTime.UtcNow;
+            if (backup.IsDue(now))
+            {
+                try
+                {
+                    var path = backup.Run(now);
+                    Log.Information("Backed up the log to {Path}", path);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+                {
+                    Log.Warning(ex, "Could not back up the log to {Folder}", backup.Folder);
+                }
+            }
+            await Task.Delay(TimeSpan.FromHours(1), _cts.Token).ConfigureAwait(false);
+        }
+    }
+
     // Measures the PC clock against internet time at start and then hourly, every 15 minutes while correcting (a PC
     // clock that is off usually drifts too), and 5 minutes after no server answered.
     private async Task ClockCheckLoopAsync()
@@ -1375,6 +1431,7 @@ public sealed class AppHost : IAsyncDisposable
         Lotw?.Dispose();
         if (Eqsl is not null) await Eqsl.DisposeAsync().ConfigureAwait(false);
         if (Cloudlog is not null) await Cloudlog.DisposeAsync().ConfigureAwait(false);
+        if (ClubLog is not null) await ClubLog.DisposeAsync().ConfigureAwait(false);
         Udp?.Dispose();
         Updates?.Dispose();
         if (Usage is not null) await Usage.DisposeAsync().ConfigureAwait(false);
@@ -1386,6 +1443,8 @@ public sealed class AppHost : IAsyncDisposable
         if (Rbn is not null) await Rbn.DisposeAsync().ConfigureAwait(false);
         await _rig.DisposeAsync().ConfigureAwait(false);
         foreach (var d in _disposables) d.Dispose();
+        // Last: an update starts the new version as soon as this returns, and it must be able to take the lock.
+        Instance?.Dispose();
         _decoder?.Dispose();
         Guard.Dispose();
         Crashes?.Dispose();

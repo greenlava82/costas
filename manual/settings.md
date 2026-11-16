@@ -16,6 +16,11 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
   radio and audio in **Station setup** while it is the active one. Worked-before and log totals count the contacts
   logged under that profile's callsign.
 - **Callsign** and **Grid square** (4 or 6 characters). Used in every message you send and to work out distances.
+  A `/P` or `/R` call is sent like any other. A compound call such as `VE3/W7LIT` or `W7LIT/7` does not fit a
+  normal FT8 message, so Costas sends it the way WSJT-X does: your CQ is just `CQ VE3/W7LIT` (no grid, and no CQ
+  modifier or contest), your answer is `<K1ABC> VE3/W7LIT`, reports go as `K1ABC <VE3/W7LIT> R-10` (your call as
+  a short code the other station's program recognises) and the sign-off as `<K1ABC> VE3/W7LIT RR73`. The message
+  preview under **Transmitting** shows exactly what will go out.
 - **Power (watts)**: recorded in the log when the radio cannot report its own power setting. It does not change the
   radio's power.
 - **Radio's top power (watts)**: empty (automatic) by default, which uses the range Hamlib reports for your radio. If
@@ -321,3 +326,19 @@ Contacts queue locally and retry when the site is down, even after restarting Co
 logbook is left alone and counts as sent. A wrong key or station id waits an hour before the next try; the
 **Wavelog/Cloudlog** indicator in the bottom bar (shown once this is set up) says what the logbook answered. Each
 station profile has its own settings. Off by default. Simulation never contacts the site.
+
+## Club Log {#club-log}
+
+Costas can send each contact to [Club Log](https://clublog.org) as soon as it is logged, so a DXpedition's online
+log shows it at once. In **Settings › Club Log**:
+
+1. Enter the **Account email** you sign in to Club Log with (not your callsign).
+2. In Club Log, open Settings › API and make an **Application Password**. It is shown once: paste it into
+   **Application Password**. It stays in the system credential store, not in the settings file.
+3. Tick **Upload each new contact as soon as it is logged** and save.
+
+The profile's callsign must be one of the callsigns on that Club Log account. Contacts queue locally and retry when
+Club Log is down. A contact Club Log already has counts as sent; one it rejects (a bad date, say) is dropped from the
+queue and the **Club Log** indicator says why. If Club Log refuses the login, uploads stop until you change the email
+or password, because Club Log blocks programs that keep trying. Each station profile has its own settings. Off by
+default. Simulation never contacts Club Log.

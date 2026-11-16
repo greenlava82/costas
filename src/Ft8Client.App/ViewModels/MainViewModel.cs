@@ -525,6 +525,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         // A line set by an operator action ("Added to your Hunt list", "not in the station list") stays for a few seconds;
         // the snapshot that the action itself publishes used to replace it before it could be read. A fault still shows.
         var (statusText, statusKind) = Status(s, SettingsMapper.Rtty(_host.Settings.Current));
+        // Lost or unsaved settings outrank everything but a fault or a transmission.
+        if (statusKind != TextKind.Critical && _host.Settings.Problem is { } settingsProblem) (statusText, statusKind) = (settingsProblem, TextKind.Caution);
         // After a first Esc in PSK or RTTY the bar keeps saying that the next Esc abandons, until the contact ends.
         if (s.Contact is not { Outcome: ContactOutcome.InProgress }) _escArmed = false;
         else if (_escArmed && s.Fault is null && !s.Transmitting) (statusText, statusKind) = (EscapeText(s.Contact, true), TextKind.Critical);
@@ -544,6 +546,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         // Shown only once set up: most operators have no Wavelog or Cloudlog site.
         if (s.Services.TryGetValue(ServiceNames.Cloudlog, out var logbook) && logbook.Health != ServiceHealth.Off)
             Indicators.Add(Indicator("Wavelog/Cloudlog", s, ServiceNames.Cloudlog));
+        if (s.Services.TryGetValue(ServiceNames.ClubLog, out var clubLog) && clubLog.Health != ServiceHealth.Off)
+            Indicators.Add(Indicator("Club Log", s, ServiceNames.ClubLog));
         Indicators.Add(Indicator("PSK Reporter", s, ServiceNames.Psk));
         Indicators.Add(Indicator("RBN", s, ServiceNames.Rbn));
         Indicators.Add(Indicator("POTA", s, ServiceNames.Pota));

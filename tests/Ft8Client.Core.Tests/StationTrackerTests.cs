@@ -259,4 +259,27 @@ public class StationTrackerTests
         t.Find("KH1X")!.MissedSlots.Should().Be(0, "the ordinary decode cannot read a SuperFox signal");
         t.Find("ZL2RPA")!.RunsSuperFox.Should().BeFalse();
     }
+
+    [Theory]
+    [InlineData("$VERIFY$ K8R 920749", "K8R", "920749")]
+    [InlineData("$VERIFY$ k8r 000000", "K8R", "000000")]
+    public void SuperFoxSignature_VerifyLine_Parsed(string text, string call, string code) =>
+        SuperFoxSignature.Parse(text).Should().Be(new SuperFoxSignature(call, code));
+
+    [Theory]
+    [InlineData("CQ K8R")]
+    [InlineData("$VERIFY$ K8R 92074")]
+    [InlineData("$VERIFY$ K8R")]
+    public void SuperFoxSignature_OtherText_Null(string text) => SuperFoxSignature.Parse(text).Should().BeNull();
+
+    [Fact]
+    public void ApplySuperFox_VerifyLine_NotAStationAndCheckKept()
+    {
+        var t = NewTracker();
+        t.ApplySuperFox(S(0), [H(S(0), "CQ KH1X", -5, 750), H(S(0), "$VERIFY$ KH1X 123456", -5, 750)]);
+        t.SetFoxCheck("KH1X", FoxCheck.Verified);
+        t.ApplySuperFox(S(2), [H(S(2), "W5FFF KH1X -18", -5, 750)]);
+
+        t.Stations.Should().ContainSingle().Which.FoxCheck.Should().Be(FoxCheck.Verified);
+    }
 }

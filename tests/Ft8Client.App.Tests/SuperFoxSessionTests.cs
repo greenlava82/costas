@@ -12,6 +12,7 @@ using Ft8Client.Audio.Timing;
 using Ft8Client.Core;
 using Ft8Client.Core.Decoding;
 using Ft8Client.Core.Ranking;
+using Ft8Client.Core.Stations;
 using Ft8Client.Core.Time;
 using Ft8Client.Core.Transmit;
 using Ft8Client.Data.Reference;
@@ -118,6 +119,40 @@ public class SuperFoxSessionTests
         await r.RunUntilAsync(Slot(5).AddSeconds(14));
         r.Session.Snapshot.LastLogged!.Call.Should().Be("KH1X");
         r.Sent.Should().HaveCount(2, "the Fox's RR73 ends a Hound contact with nothing more sent");
+    }
+
+    [Fact]
+    public async Task ApplySuperFox_SignatureHeard_CheckedOnceAndTagShowsResult()
+    {
+        var r = new Rig();
+        var asked = new List<(string Call, string Code, DateTime Slot)>();
+        r.Session.VerifyFox = (sig, slot) =>
+        {
+            lock (asked) asked.Add((sig.FoxCall, sig.Code, slot));
+            return Task.FromResult(FoxCheck.Verified);
+        };
+        r.Decoder.SuperFox(Slot(0), "CQ KH1X", "$VERIFY$ KH1X 123456");
+        r.Decoder.SuperFox(Slot(2), "CQ KH1X", "$VERIFY$ KH1X 654321");
+        await r.RunUntilAsync(Slot(2).AddSeconds(14.8));
+        for (var i = 0; i < 100 && r.Session.Snapshot.Rank.Line.All(x => x.Station.FoxCheck != FoxCheck.Verified); i++) await Task.Delay(10, TestContext.Current.CancellationToken);
+
+        var fox = r.Session.Snapshot.Rank.Line.Single(x => x.Station.Call == "KH1X").Station;
+        fox.FoxCheck.Should().Be(FoxCheck.Verified);
+        StationText.FoxTagFor(fox).Should().Be("SuperFox ✓ · Hound");
+        lock (asked) asked.Should().Equal([("KH1X", "123456", Slot(0))], "a verified Fox is not checked again for 10 minutes");
+    }
+
+    [Fact]
+    public async Task ApplySuperFox_NoSignatureCode_NotChecked()
+    {
+        var r = new Rig();
+        var asked = 0;
+        r.Session.VerifyFox = (_, _) => { Interlocked.Increment(ref asked); return Task.FromResult(FoxCheck.Verified); };
+        r.Decoder.SuperFox(Slot(0), "CQ K1JT", "$VERIFY$ K1JT 000000");
+        await r.RunUntilAsync(Slot(0).AddSeconds(14.8));
+
+        asked.Should().Be(0);
+        r.Session.Snapshot.Rank.Line.Should().ContainSingle(x => x.Station.Call == "K1JT", "the signature line is not a station");
     }
 
     /// <summary>Scripted decodes; the SuperFox lines of a slot only come back when the decode asks for SuperFox.</summary>

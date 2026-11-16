@@ -48,6 +48,8 @@ public sealed partial class SettingsViewModel : ObservableObject
                 EqslSync = p.Eqsl.SyncEnabled, EqslUpload = p.Eqsl.UploadOnComplete, EqslQth = p.Eqsl.QthNickname,
                 CloudlogUrl = p.Cloudlog.Url, CloudlogStationId = p.Cloudlog.StationId, CloudlogUpload = p.Cloudlog.UploadOnComplete,
                 CloudlogKey = host.Secrets.Get(SecretNames.CloudlogKey(p.Id)) ?? string.Empty,
+                ClubLogEmail = p.ClubLog.Email, ClubLogUpload = p.ClubLog.UploadOnComplete,
+                ClubLogPassword = host.Secrets.Get(SecretNames.ClubLogPassword(p.Id)) ?? string.Empty,
             });
         }
         _loadedProfile = s.Profile.Id;
@@ -123,6 +125,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         FeedEnabled = s.PskReporter.FeedEnabled;
         PotaSpots = s.Pota.SpotsEnabled;
         DxpeditionList = s.Dxpeditions.Enabled;
+        VerifySuperFox = s.Dxpeditions.VerifySuperFox;
         PreferNewParks = s.Ranking.PreferNewParks;
         CompareNeighbours = s.PskReporter.CompareNeighbours;
         BandActivity = s.PskReporter.BandActivity;
@@ -289,6 +292,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         _shownProfile.CloudlogKey = CloudlogKey;
         _shownProfile.CloudlogStationId = CloudlogStationId;
         _shownProfile.CloudlogUpload = CloudlogUploadOnComplete;
+        _shownProfile.ClubLogEmail = ClubLogEmail;
+        _shownProfile.ClubLogPassword = ClubLogPassword;
+        _shownProfile.ClubLogUpload = ClubLogUploadOnComplete;
     }
 
     private void ShowEqsl(ProfileDraft d)
@@ -297,6 +303,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         (CloudlogUrl, CloudlogKey, CloudlogStationId, CloudlogUploadOnComplete) = (d.CloudlogUrl, d.CloudlogKey, d.CloudlogStationId, d.CloudlogUpload);
         CloudlogStations.Clear();
         CloudlogStatus = string.Empty;
+        (ClubLogEmail, ClubLogPassword, ClubLogUploadOnComplete) = (d.ClubLogEmail, d.ClubLogPassword, d.ClubLogUpload);
     }
 
     /// <summary>
@@ -329,6 +336,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             p.Cloudlog.Url = d.CloudlogUrl.Trim();
             p.Cloudlog.StationId = d.CloudlogStationId.Trim();
             p.Cloudlog.UploadOnComplete = d.CloudlogUpload;
+            p.ClubLog.Email = d.ClubLogEmail.Trim();
+            p.ClubLog.UploadOnComplete = d.ClubLogUpload;
             result.Add(p);
         }
         s.Profiles = result;
@@ -420,11 +429,11 @@ public sealed partial class SettingsViewModel : ObservableObject
             var lines = new List<string>
             {
                 $"Calling CQ:        {OutgoingMessages.Cq(me, grid, s)}",
-                $"Report:            {dx} {me} -10",
-                $"Sign-off:          {dx} {me} {s.Signoff}",
+                $"Report:            {OutgoingMessages.Report(dx, me, "-10")}",
+                $"Sign-off:          {OutgoingMessages.Signoff(dx, me, s.Signoff)}",
                 string.Empty,
                 $"Answering a CQ:    {OutgoingMessages.Reply(dx, me, grid, s)}",
-                $"Roger and report:  {dx} {me} R-10",
+                $"Roger and report:  {OutgoingMessages.Report(dx, me, "R-10")}",
                 $"Last message:      {OutgoingMessages.Final(dx, me, s)}",
             };
             if (OutgoingMessages.FreeTextAfter(s) is { } free) lines.Add($"Then:              {free}");
@@ -845,6 +854,23 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial string CloudlogStationId { get; set; } = string.Empty;
 
+    /// <summary>Club Log account email.</summary>
+    [ObservableProperty]
+    public partial string ClubLogEmail { get; set; } = string.Empty;
+
+    /// <summary>Club Log Application Password.</summary>
+    [ObservableProperty]
+    public partial string ClubLogPassword { get; set; } = string.Empty;
+
+    /// <summary>Upload each new contact to Club Log.</summary>
+    [ObservableProperty]
+    public partial bool ClubLogUploadOnComplete { get; set; }
+
+    /// <summary>Why Club Log uploads cannot run in this build, or blank.</summary>
+    public string ClubLogBuildNote => AppHost.ClubLogApiKey is null
+        ? "This build of Costas has no Club Log application key, so it cannot upload to Club Log. Release builds have one."
+        : string.Empty;
+
     /// <summary>Upload each new contact to Wavelog/Cloudlog.</summary>
     [ObservableProperty]
     public partial bool CloudlogUploadOnComplete { get; set; }
@@ -922,6 +948,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Read NG3K's announced DXpeditions.</summary>
     [ObservableProperty]
     public partial bool DxpeditionList { get; set; }
+
+    /// <summary>Check SuperFox signatures online.</summary>
+    [ObservableProperty]
+    public partial bool VerifySuperFox { get; set; }
 
     /// <summary>Rank activators at parks not in the log higher.</summary>
     [ObservableProperty]
@@ -1313,6 +1343,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.PskReporter.FeedEnabled = FeedEnabled;
             s.Pota.SpotsEnabled = PotaSpots;
             s.Dxpeditions.Enabled = DxpeditionList;
+            s.Dxpeditions.VerifySuperFox = VerifySuperFox;
             s.Ranking.PreferNewParks = PreferNewParks;
             s.PskReporter.CompareNeighbours = CompareNeighbours;
             s.PskReporter.BandActivity = BandActivity;
@@ -1346,6 +1377,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Set(SecretNames.EqslUsername(d.Id), d.EqslUser.Trim());
             Set(SecretNames.EqslPassword(d.Id), d.EqslPassword);
             Set(SecretNames.CloudlogKey(d.Id), d.CloudlogKey.Trim());
+            Set(SecretNames.ClubLogPassword(d.Id), d.ClubLogPassword.Trim());
         }
         foreach (var id in removed)
         {
@@ -1353,6 +1385,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             _host.Secrets.Delete(SecretNames.EqslUsername(id));
             _host.Secrets.Delete(SecretNames.EqslPassword(id));
             _host.Secrets.Delete(SecretNames.CloudlogKey(id));
+            _host.Secrets.Delete(SecretNames.ClubLogPassword(id));
         }
         Set(SecretNames.QrzUsername, QrzUser.Trim());
         Set(SecretNames.QrzPassword, QrzPassword);

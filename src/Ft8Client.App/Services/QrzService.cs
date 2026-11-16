@@ -77,9 +77,9 @@ public sealed class QrzService : IDisposable
     /// <summary>Starts the background loops.</summary>
     public void Start()
     {
-        _ = Task.Run(() => SyncLoopAsync(_cts.Token));
-        _ = Task.Run(() => UploadLoopAsync(_cts.Token));
-        _ = Task.Run(() => LookupLoopAsync(_cts.Token));
+        _ = Task.Run(() => LoopSupervisor.RunAsync("QRZ sync", () => SyncLoopAsync(_cts.Token), _cts.Token));
+        _ = Task.Run(() => LoopSupervisor.RunAsync("QRZ upload", () => UploadLoopAsync(_cts.Token), _cts.Token));
+        _ = Task.Run(() => LoopSupervisor.RunAsync("QRZ lookup", () => LookupLoopAsync(_cts.Token), _cts.Token));
     }
 
     /// <summary>Tests the logbook key with STATUS.</summary>

@@ -13,4 +13,10 @@ public sealed class DxpeditionOptions
 {
     /// <summary>Read NG3K's announced DXpeditions list twice a day to label DXpedition stations and list them.</summary>
     public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Check each SuperFox signature heard with the online service WSJT-X uses (9dx.cc), to tell the real DXpedition
+    /// from a pirate. Sends only the Fox's call, the slot time and the code.
+    /// </summary>
+    public bool VerifySuperFox { get; set; } = true;
 }

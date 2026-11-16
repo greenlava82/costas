@@ -45,6 +45,10 @@
     <!-- Crash reports: CI passes the Sentry DSN (set in .github/workflows/ci.yml) to release builds. Not a secret: it ships inside the app and only accepts reports. Builds without it send nothing. -->
     <AssemblyMetadata Include="SentryDsn" Value="$(SENTRY_DSN)" />
   </ItemGroup>
+  <ItemGroup Condition="'$(CLUBLOG_API_KEY)' != ''">
+    <!-- Club Log uploads: CI passes Costas's Club Log application key from the CLUBLOG_API_KEY repository secret. Club Log deletes keys it finds published in a repository, so it lives only in the secret and the built app. Builds without it cannot upload to Club Log. -->
+    <AssemblyMetadata Include="ClubLogApiKey" Value="$(CLUBLOG_API_KEY)" />
+  </ItemGroup>
   <ItemGroup Condition="'$(COSTAS_CHANNEL)' != ''">
     <!-- Development builds: CI sets COSTAS_CHANNEL=dev on pushes to main, so a classic or Linux install knows it runs one and can go back to the latest release. -->
     <AssemblyMetadata Include="UpdateChannel" Value="$(COSTAS_CHANNEL)" />

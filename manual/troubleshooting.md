@@ -221,6 +221,19 @@ appeared within a few minutes.
    and run it over the top. Your log and settings are kept; they live in a different folder from the program.
 4. Still stuck: the update log is in `%LocalAppData%\Costas\logs`. Send it with a note through GitHub Issues.
 
+## Starting Costas does nothing
+
+Only one copy of Costas runs at a time, because two would fight over the radio, the sound card and the log. Starting
+it again brings the open window to the front instead. If no window appears, Costas may still be closing, or stuck:
+wait a few seconds and try again, or end **Costas** in Task Manager.
+
+## The status line says settings could not be read or saved
+
+Costas keeps a copy of your settings from the previous save. If the settings file is damaged it starts from that copy
+and says so; the damaged file is kept as `settings.json.bad` in the data folder. If settings cannot be saved
+(another program, such as a sync client or antivirus scan, holds the file), your changes still apply until Costas
+closes and it tries again on the next change. See also [Backups](log.md#backups).
+
 ## Report a problem or send feedback
 
 **☰ › Report a problem…** sends a note straight to the developer: a bug, something confusing, or an idea.
