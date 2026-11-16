@@ -5,7 +5,7 @@ centred on your grid square, so set it in [Settings › Station](settings.md#sta
 
 ## Heard here
 
-The **Heard** tab in the side column of Operate. Each dot is a station you decoded in the last 15 minutes. Hover over
+The first card in the side column of Operate (the **Heard** tab on a small window). Each dot is a station you decoded in the last 15 minutes. Hover over
 a dot for its call, place, need, report and when it was heard. Your choices are remembered.
 
 <div class="grid" markdown>
@@ -31,7 +31,7 @@ them. Without a grid, the map falls back to the World view and asks you to set y
 
 ## Reach view
 
-Press **Reach** in the top bar (++ctrl+3++), or **Open reach view** on the **Signal** tab in the side column.
+Press **Reach** in the top bar (++ctrl+3++), or **Open reach view** under *Your signal* in the side column (the **Signal** tab on a small window).
 
 ![Reach view, before any reports](images/reach-empty.png)
 

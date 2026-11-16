@@ -80,7 +80,7 @@ that is working someone else**. Costas then calls a station even when it is in a
 that answers someone else, until it answers you, **Give up after** is reached, or you stop. Raise **Give up after** if
 you want to wait out a whole contact.
 
-After logging, the panel shows *Logged* for one slot and then goes back to the idle card and band strip. The station drops out
+After logging, the panel shows *Logged* for one slot and then goes back to the idle card and the band summary (or band strip on a small window). The station drops out
 of Next in line (it is now worked on this band) and your tallies update:
 
 ![After logging](images/after-logging.png)
