@@ -65,6 +65,9 @@ public sealed class OperatingSettings
     /// <summary>After each logged contact, answer the station that has waited longest to call me. Off by default.</summary>
     public bool AnswerAllInTurn { get; set; }
 
+    /// <summary>Keep calling a station that is working someone else, as WSJT-X does, instead of stopping. Off by default.</summary>
+    public bool KeepCallingWhenBusy { get; set; }
+
     /// <summary><c>auto</c>, or a fixed offset in hertz.</summary>
     public string TxOffset { get; set; } = "auto";
 

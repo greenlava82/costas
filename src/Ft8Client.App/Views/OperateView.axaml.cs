@@ -226,13 +226,16 @@ public partial class OperateView : UserControl
         if (Vm is not { } vm || !e.GetCurrentPoint(LineList).Properties.IsLeftButtonPressed) return;
         AfterPress(e.ClickCount);
         if (e.ClickCount >= 2 && OnButton(e)) return;
-        vm.RowClicked((e.Source as Control)?.DataContext as StationRowViewModel, e.ClickCount);
+        vm.RowClicked((e.Source as Control)?.DataContext as StationRowViewModel, e.ClickCount, OnCall(e));
         if (e.ClickCount >= 2) e.Handled = true;
     }
 
     // A double-click on a button in a row (Call, a link in the strip) is the button's: it must not call the station as well.
     private static bool OnButton(PointerPressedEventArgs e) =>
         e.Source is Visual v && v.FindAncestorOfType<Button>(includeSelf: true) is not null;
+
+    // A click on the call opens the details strip; anywhere else on the row only picks it.
+    private static bool OnCall(PointerPressedEventArgs e) => e.Source is Control { Name: "RowCall" };
 
     // A press in a Repeats row; one in the strip under it has the details as its data and is ignored.
     private void OnRepeatPressed(object? sender, PointerPressedEventArgs e)
@@ -241,7 +244,7 @@ public partial class OperateView : UserControl
         if ((e.Source as Control)?.DataContext is not RepeatRowViewModel row) return;
         AfterPress(e.ClickCount);
         if (e.ClickCount >= 2 && OnButton(e)) return;
-        vm.RepeatClicked(row, e.ClickCount);
+        vm.RepeatClicked(row, e.ClickCount, OnCall(e));
         if (e.ClickCount >= 2) e.Handled = true;
     }
 

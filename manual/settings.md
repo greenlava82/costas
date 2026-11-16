@@ -18,6 +18,10 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
 - **Callsign** and **Grid square** (4 or 6 characters). Used in every message you send and to work out distances.
 - **Power (watts)**: recorded in the log when the radio cannot report its own power setting. It does not change the
   radio's power.
+- **Radio's top power (watts)**: empty (automatic) by default, which uses the range Hamlib reports for your radio. If
+  the power box at the top shows the wrong range, for example 1 to 200 W on a 100 W FTDX10 so that asking for 100 W
+  gives 50 W, type the radio's real top power here (100). Costas then reads and sets the power as a share of it. Each
+  profile keeps its own.
 
 ## Transmitting
 
@@ -52,6 +56,7 @@ exchange and the reports are fixed by FT8, so only the parts above can change.
 | **Clock limit** | 2.0 seconds | Transmitting is blocked when the PC clock is off by more than this |
 | **Clock correction** | on | When the PC clock is off, Costas times its slots, transmissions and log entries from internet time instead, checked every 15 minutes. The PC clock itself is not changed. Offsets over a minute are not corrected: set the Windows clock and time zone instead |
 | **Logging** | on | Log each contact automatically when it completes |
+| **Station is busy** | off | On: keep calling a station that is working someone else, as WSJT-X does. A Call on a station already in a contact calls it anyway, and a station that answers another caller is called again until it answers you, **Give up after** is reached, or you stop. Off: Costas stops and the contact card says *In another contact* |
 | **Calling you › Chime** | off | A chime on the computer's default speakers when a new station calls you. Never on the radio's audio device |
 
 ## PSK and RTTY

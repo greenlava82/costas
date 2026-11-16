@@ -61,8 +61,15 @@ public class DetailsStripTests
 
     private static IEnumerable<string> Open(OperateViewModel vm) => vm.Line.Where(r => r.DetailsOpen).Select(r => r.Call);
 
-    // A single click: the press, then the double-click time passing with no second press.
+    // A single click on the call: the press, then the double-click time passing with no second press.
     private static void Click(OperateViewModel vm, StationRowViewModel? row)
+    {
+        vm.RowClicked(row, showDetails: true);
+        vm.CompleteClick();
+    }
+
+    // A single click on the row away from the call.
+    private static void ClickOffCall(OperateViewModel vm, StationRowViewModel? row)
     {
         vm.RowClicked(row);
         vm.CompleteClick();
@@ -83,6 +90,39 @@ public class DetailsStripTests
 
         Open(vm).Should().Equal("B");
         vm.Details!.Call.Should().Be("B");
+    }
+
+    [Fact]
+    public void RowClicked_OffTheCall_SelectsWithoutOpeningTheStrip()
+    {
+        var vm = Build("A", "B");
+
+        ClickOffCall(vm, Row(vm, "B"));
+
+        vm.Selected!.Call.Should().Be("B");
+        Open(vm).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RowClicked_OffTheCallWhileAStripIsOpen_StripFollowsTheSelection()
+    {
+        var vm = Build("A", "B");
+        Click(vm, Row(vm, "A"));
+
+        ClickOffCall(vm, Row(vm, "B"));
+
+        Open(vm).Should().Equal("B");
+    }
+
+    [Fact]
+    public void ToggleDetails_RowSelected_OpensItsStripAtOnce()
+    {
+        var vm = Build("A", "B");
+        ClickOffCall(vm, Row(vm, "B"));
+
+        vm.ToggleDetails();
+
+        Open(vm).Should().Equal("B");
     }
 
     [Fact]
@@ -248,8 +288,19 @@ public class DetailsStripTests
 
     private static void Click(OperateViewModel vm, RepeatRowViewModel row)
     {
-        vm.RepeatClicked(row);
+        vm.RepeatClicked(row, showDetails: true);
         vm.CompleteClick();
+    }
+
+    [Fact]
+    public void RepeatClicked_OffTheCall_StripStaysClosed()
+    {
+        var vm = Build("r:K1ABC");
+
+        vm.RepeatClicked(Repeat(vm, "K1ABC"));
+        vm.CompleteClick();
+
+        OpenRepeats(vm).Should().BeEmpty();
     }
 
     [Fact]

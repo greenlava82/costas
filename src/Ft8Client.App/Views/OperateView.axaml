@@ -559,7 +559,9 @@
                           <TextBlock Grid.Column="0" Text="{Binding Rank}" Classes="num secondary" VerticalAlignment="Center" />
                           <!-- The call, with a purple Fox tag for a DXpedition Fox and an amber "3 calling" tag while others are calling this station. -->
                           <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Text="{Binding Call}" FontWeight="SemiBold" />
+                            <!-- Clicking the call opens the details card; the rest of the row only picks it. -->
+                            <TextBlock x:Name="RowCall" Text="{Binding Call}" FontWeight="SemiBold" Cursor="Hand" HorizontalAlignment="Left"
+                                       ToolTip.Tip="Click for station details (or press I)" />
                             <!-- A Fox (Fox/Hound DXpedition): Call works it the Hound way, so say so before the click. -->
                             <Border Classes="fox" IsVisible="{Binding IsFox}" ToolTip.Tip="{Binding FoxTip}" AutomationProperties.Name="{Binding FoxTip}">
                               <TextBlock Text="{Binding FoxTag}" />
@@ -651,7 +653,9 @@
                       <Grid ColumnDefinitions="36,100,190,160,*,100,46,64,230,120,74" v:ResizableColumns.Layout="Calls" MinHeight="36" Margin="14,0">
                         <TextBlock Grid.Column="0" Text="{Binding Rank}" Classes="num secondary" VerticalAlignment="Center" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                          <TextBlock Text="{Binding Call}" FontWeight="SemiBold" />
+                          <!-- Clicking the call opens the details strip; the rest of the row only picks it. -->
+                          <TextBlock x:Name="RowCall" Text="{Binding Call}" FontWeight="SemiBold" Cursor="Hand" HorizontalAlignment="Left"
+                                     ToolTip.Tip="Click for station details" />
                           <Border Classes="fox" IsVisible="{Binding IsFox}" ToolTip.Tip="{Binding FoxTip}" AutomationProperties.Name="{Binding FoxTip}">
                             <TextBlock Text="{Binding FoxTag}" />
                           </Border>

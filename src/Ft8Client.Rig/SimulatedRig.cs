@@ -66,9 +66,20 @@ public sealed class SimulatedRig(IClock clock, long frequencyHz = 14_074_000) : 
     public Task SetModeAsync(RigMode mode, CancellationToken ct)
     {
         Check();
-        lock (_gate) _mode = mode == RigMode.PktUsb ? "PKTUSB" : "USB";
+        lock (_gate)
+        {
+            var next = mode == RigMode.PktUsb ? "PKTUSB" : "USB";
+            if (next != _mode) _freq += ModeShiftHz;
+            _mode = next;
+        }
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// How far the dial moves when the mode changes, as some radios do (an FTDX10 going to DATA-U from another mode can
+    /// land 700 Hz off). 0, the default, leaves the dial alone.
+    /// </summary>
+    public long ModeShiftHz { get; set; }
 
     /// <summary>
     /// Stands for a PTT command that waits its turn behind other commands to the radio: while set, a PTT-on keys the

@@ -316,6 +316,8 @@
                              IsVisible="{Binding PowerMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                   <TextBlock Text="Changes the radio's power setting only; it does not transmit. Not while a transmission is on the air."
                              Classes="secondary" TextWrapping="Wrap" />
+                  <TextBlock Text="Range wrong for your radio (100 W gives 50 W)? Type its top power in Settings › Station › Radio's top power."
+                             Classes="secondary" TextWrapping="Wrap" />
                 </StackPanel>
               </Flyout>
             </Button.Flyout>

@@ -33,6 +33,9 @@ public sealed partial class ProfileDraft : ObservableObject
     /// <summary>Power in watts as typed.</summary>
     public string Power { get; set; } = string.Empty;
 
+    /// <summary>The radio's top power in watts as typed; empty to use what Hamlib reports.</summary>
+    public string MaxPower { get; set; } = string.Empty;
+
     /// <summary>QRZ logbook API key as typed (kept in the credential store per profile).</summary>
     public string LogbookKey { get; set; } = string.Empty;
 

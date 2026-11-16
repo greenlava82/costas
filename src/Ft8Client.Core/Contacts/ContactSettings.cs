@@ -48,4 +48,12 @@ public sealed record ContactSettings
     /// Off by default: it changes who gets called. The Tx watchdog still stops a run of answers with no operator input.
     /// </summary>
     public bool AnswerAllInTurn { get; init; }
+
+    /// <summary>
+    /// Keep calling a station that is working someone else, as WSJT-X does, instead of ending the contact as
+    /// <see cref="ContactOutcome.AnsweredOther"/>: a Call on a station in another contact still calls it (tail-ending),
+    /// and a station that answers another caller is called again until it answers, the retry limit is reached or the
+    /// operator stops. Off by default.
+    /// </summary>
+    public bool KeepCallingWhenBusy { get; init; }
 }

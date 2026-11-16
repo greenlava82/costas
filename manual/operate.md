@@ -153,15 +153,17 @@ pill appears; it applies when you click it or move the pointer away.
 The station you are in a contact with is tinted, with a bar down its left edge, the same in Repeats. That tint
 only ever marks the station you are working.
 
-Selecting a row (click, or ++up++ / ++down++) outlines it and shows a details card with the station's name (from QRZ lookups),
-location, grid, bearing and your past contacts with that call. For a station at a park it adds the park, such as
+Selecting a row (click, or ++up++ / ++down++) outlines it. To see the station's details, click its **call** in the
+row or press ++i++: a details strip opens under the row (in Repeats too). It shows the station's name (from QRZ lookups),
+location, grid, bearing and your past contacts with that call. While the strip is open it follows the row you select;
+close it by clicking the row again, with **✕**, ++esc++ or ++i++. A double-click calls the station and never opens the strip. For a station at a park it adds the park, such as
 *New park US-1234 · Example Lake State Park, US-WI*:
 
 ![Station details](images/station-details.png)
 
 ### Who else is calling
 
-The *3 calling* tag on a row is the short version. When other stations are calling the one you selected, the details card adds a **Who else is calling** section, shaded yellow so it stands out (the same box shows under your contact when you call a busy station, and on the phone's station sheet):
+The *3 calling* tag on a row is the short version. When other stations are calling the one you selected, the details strip adds a **Who else is calling** section, shaded yellow so it stands out (the same box shows under your contact when you call a busy station, and on the phone's station sheet):
 
 - how many stations called it in its latest answer slot, with each caller's signal at your station and audio offset;
 - whether your transmit offset is clear of them, or which caller is sitting on top of it;
@@ -189,7 +191,8 @@ It has the same columns as Next in line, lined up under them (including the ambe
 - **Doing now** says why they cannot be called right now instead, in grey: *In a contact with EA5HVK*, *Went quiet
   2 minutes ago* (counting up, like Last heard). The **Call** button still works, so you can call a station that went quiet or is finishing a
   contact. A station *in a contact* with someone else is not called: the contact card says *In another contact* and
-  why (see [Making contacts](contacts.md)).
+  why (see [Making contacts](contacts.md)), unless you turned on **Keep calling a station that is working someone
+  else** in Settings › Transmitting.
 
 **Last worked** shows when and on which band you last worked them: *Today · 20 m*, *Yesterday · 40 m*,
 *2026-10-03 · 20 m*. Hover for the number of contacts, the exact time, the mode and whether it is confirmed.
@@ -272,7 +275,7 @@ the column on that tab, or **«** to open it where you left it. Costas remembers
 | Status text | One line: *Not in a contact. Enter calls NT2A, the top of the line.*, *Transmitting to F5RXL.*, *Waiting for F5RXL.*, or a fault in red |
 | **Tx offset 1650 Hz · clear** | Your transmit audio offset. Click to choose **Automatic (picks a clear spot)**, the default, or type a fixed value (200 to 2900 Hz) and press **Use** |
 | **Call CQ** | Starts calling CQ in the next slot. Becomes **Stop CQ** while running. ++ctrl+q++ |
-| **50 W** | The radio's power setting, shown when the radio reports it over CAT. Click to type a new power and press **Use** (or ++enter++), or step it with **−5** and **+5**. Anything outside 1 W to the radio's maximum is refused; a radio with its own minimum (5 W on the FT-710) keeps it and Costas says so. Changes the setting only, never keys the radio, and not while a transmission is on the air. On the FT-710 it needs Hamlib 4.6 or newer, which the Windows installer includes |
+| **50 W** | The radio's power setting, shown when the radio reports it over CAT. Click to type a new power and press **Use** (or ++enter++), or step it with **−5** and **+5**. Anything outside 1 W to the radio's maximum is refused; a radio with its own minimum (5 W on the FT-710) keeps it and Costas says so. Changes the setting only, never keys the radio, and not while a transmission is on the air. On the FT-710 it needs Hamlib 4.6 or newer, which the Windows installer includes. If the range is wrong for your radio (for example 1 to 200 W on a 100 W radio, so asking for 100 W gives 50 W), type the radio's top power in **Settings › Station › Radio's top power** |
 | **Tune** | Starts your radio's own antenna tuner, as its TUNE button would. If the radio has no tuner Costas can start (or its tuner is switched off), Costas sends a steady tone at your transmit offset for up to 10 seconds instead, for an external tuner. Becomes **Stop tune** for up to 10 seconds; click it to stop. Available only when nothing else is being sent; calling a station or CQ stops the tone |
 | **Halt Tx** | Always available. Drops PTT at once and stops sequencing. ++esc++ does the same |
 | Slot progress | *Receiving* or *Transmitting*, seconds to the next slot, and a bar. Shown away from Operate, where the contact card has it. Hidden with an instrument skin, whose faceplate shows it |

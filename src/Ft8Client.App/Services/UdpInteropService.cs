@@ -65,17 +65,42 @@ public sealed class UdpInteropService : IDisposable
         _heartbeat.Change(TimeSpan.Zero, Pulse);
     }
 
-    /// <summary>Sends a logged contact as QSO Logged and Logged ADIF.</summary>
-    public void OnLogged(QsoRecord q)
+    /// <summary>
+    /// Sends a contact from the log again, for a logger that was not running when it was logged (Log view, "Send to
+    /// loggers again"). Returns one line for the operator: what was sent, or why nothing was.
+    /// </summary>
+    public string Resend(QsoRecord q)
     {
-        Send(WsjtxMessages.QsoLogged(ClientId, new WsjtxQso
+        ArgumentNullException.ThrowIfNull(q);
+        WsjtxUdpBroadcaster? udp;
+        (bool Enabled, string Address, int Port) target;
+        lock (_gate)
+        {
+            udp = _udp;
+            target = _target;
+        }
+        if (!target.Enabled) return "UDP to other programs is off. Turn it on in Settings › Other programs, then try again.";
+        if (udp is null) return $"Costas cannot send to {target.Address}:{target.Port}. Check the address in Settings › Other programs.";
+        var ok = SendLogged(q);
+        return ok ? $"Sent {q.Call} to {target.Address}:{target.Port} again (QSO Logged and Logged ADIF)."
+            : $"Sending {q.Call} to {target.Address}:{target.Port} failed: {udp.LastError}";
+    }
+
+    /// <summary>Sends a logged contact as QSO Logged and Logged ADIF.</summary>
+    public void OnLogged(QsoRecord q) => SendLogged(q);
+
+    // True when both datagrams went out.
+    private bool SendLogged(QsoRecord q)
+    {
+        var first = Send(WsjtxMessages.QsoLogged(ClientId, new WsjtxQso
         {
             TimeOnUtc = q.QsoDateOn, TimeOffUtc = q.QsoDateOff ?? q.QsoDateOn, DxCall = q.Call, DxGrid = q.Gridsquare ?? string.Empty,
             FrequencyHz = q.FreqHz ?? 0, Mode = q.Submode ?? q.Mode, ReportSent = q.RstSent ?? string.Empty,
             ReportReceived = q.RstRcvd ?? string.Empty, TxPower = q.TxPwr ?? string.Empty, Comments = q.Comment ?? string.Empty, Name = q.Name ?? string.Empty,
             MyCall = q.StationCallsign ?? string.Empty, MyGrid = q.MyGridsquare ?? string.Empty,
         }));
-        Send(WsjtxMessages.LoggedAdif(ClientId, AdifWriter.Document([AdifMapper.ToAdif(q)], DateTime.UtcNow)));
+        var second = Send(WsjtxMessages.LoggedAdif(ClientId, AdifWriter.Document([AdifMapper.ToAdif(q)], DateTime.UtcNow)));
+        return first && second;
     }
 
     private void Reconfigure(AppSettings s)
@@ -152,14 +177,17 @@ public sealed class UdpInteropService : IDisposable
 
     private void OnBandChanged() => Send(WsjtxMessages.Clear(ClientId));
 
-    private void Send(byte[] datagram)
+    // True when the datagram went out.
+    private bool Send(byte[] datagram)
     {
         WsjtxUdpBroadcaster? udp;
         lock (_gate) udp = _udp;
-        if (udp is null || udp.Send(datagram)) return;
-        if (_warned) return;
+        if (udp is null) return false;
+        if (udp.Send(datagram)) return true;
+        if (_warned) return false;
         _warned = true;
         Log.Warning("UDP interop send failed: {Error}", udp.LastError);
+        return false;
     }
 
     /// <inheritdoc />

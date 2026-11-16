@@ -705,6 +705,26 @@ public class RigTests
         }
     }
 
+    // The operator's top power stands in for Hamlib's power2mW table: the RFPOWER share is read and set against it.
+    [Fact]
+    public async Task SetPowerWatts_TopPowerOverride_ScalesAgainstIt()
+    {
+        var exe = HamlibModels.Find("rigctld", null);
+        Assert.SkipWhen(exe is null, "rigctld is not installed.");
+        var ct = TestContext.Current.CancellationToken;
+        await using var rig = await RigctldRig.StartAsync(new RigctldOptions(exe!, 1, null, null), NullProcessGuard.Instance, SystemClock.Instance, ct);
+        await rig.SetFrequencyAsync(14_074_000, ct);
+        await rig.SetModeAsync(RigMode.PktUsb, ct);
+        rig.MaxPowerOverride = () => 200;
+
+        (await rig.SetPowerWattsAsync(50, ct)).Should().Be(new RigPower(50, 200));
+        (await rig.ReadPowerLevelAsync(ct)).Should().BeApproximately(0.25, 0.01);
+        (await rig.ReadPowerWattsAsync(ct)).Should().Be(50);
+
+        rig.MaxPowerOverride = () => null;
+        (await rig.ReadPowerAsync(ct))!.MaxWatts.Should().NotBe(200, "without the figure Hamlib's table is used again");
+    }
+
     // The power setting through Hamlib's FT-710 backend: PC reads and sets it in watts (5 to 100), and power2mW of 1.0
     // gives the 100 W maximum that the RFPOWER fraction is scaled against. Hamlib before 4.6 scales PC by 255 (25 W
     // would go out as PC064), so with that rigctld (Ubuntu's 4.5.5) power control must stay off and send nothing.

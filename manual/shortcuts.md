@@ -7,6 +7,7 @@ the list from **☰ › Keyboard shortcuts** instead.
 | --- | --- |
 | ++enter++ | Call the selected station (does nothing during a contact) |
 | ++up++, ++down++ | Move the selection in Next in line |
+| ++i++ | Open or close the details strip of the selected station (clicking its call does the same) |
 | ++esc++ | Halt Tx. In a contact: abandon it. Once reports are exchanged, the first press only stops transmitting and keeps listening; press again to abandon. With a list or menu open, Esc only closes it (and halts if you are transmitting) |
 | ++ctrl+q++ | Call CQ / Stop CQ |
 | ++ctrl+r++ | Resend |

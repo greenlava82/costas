@@ -95,4 +95,41 @@ public class LineHighlightTests
         operate.Line[1].IsInContact.Should().BeFalse();
         operate.Line[0].IsInContact.Should().BeTrue();
     }
+
+    [Fact]
+    public void RowClicked_OffTheCall_SelectsWithoutDetails()
+    {
+        var s = new SessionSnapshot
+        {
+            Mode = Mode.Ft8,
+            Rank = new RankResult([Ranked("W9TJP", NeedTag.NewCall), Ranked("WD8DFW", NeedTag.NewCall)], [], [], []),
+        };
+        var operate = Build(s);
+
+        operate.RowClicked(operate.Line[1]);
+        operate.CompleteClick();
+
+        operate.Selected.Should().BeSameAs(operate.Line[1]);
+        operate.Details.Should().BeNull();
+    }
+
+    [Fact]
+    public void RowClicked_OnTheCallThenAnotherRow_OpensDetailsAndFollowsSelection()
+    {
+        var s = new SessionSnapshot
+        {
+            Mode = Mode.Ft8,
+            Rank = new RankResult([Ranked("W9TJP", NeedTag.NewCall), Ranked("WD8DFW", NeedTag.NewCall)], [], [], []),
+        };
+        var operate = Build(s);
+
+        operate.RowClicked(operate.Line[0], showDetails: true);
+        operate.CompleteClick();
+        operate.Details!.Call.Should().Be("W9TJP");
+        operate.RowClicked(operate.Line[1]);
+        operate.CompleteClick();
+        operate.Details!.Call.Should().Be("WD8DFW");
+        operate.ToggleDetails();
+        operate.Details.Should().BeNull();
+    }
 }

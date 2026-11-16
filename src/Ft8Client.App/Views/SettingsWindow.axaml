@@ -86,6 +86,13 @@
                 <TextBlock Classes="help" Text="Recorded in the log when the radio cannot report its own power setting. It does not change the radio's power." />
               </StackPanel>
             </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Radio's top power (watts)" />
+              <StackPanel Grid.Column="1">
+                <TextBox Text="{Binding MaxPower}" Width="90" HorizontalAlignment="Left" PlaceholderText="Automatic" />
+                <TextBlock Classes="help" Text="Leave empty to use what Hamlib reports. Type your radio's most power, such as 100, when the power box at the top shows the wrong range (for example 1 to 200 W on a 100 W radio, so 100 W gives 50 W)." />
+              </StackPanel>
+            </Grid>
             <TextBlock Classes="help" Text="Radio, audio devices and the transmit test are in Station setup (menu ☰)." />
           </StackPanel>
         </ScrollViewer>
@@ -229,6 +236,13 @@
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Logging" />
               <CheckBox Grid.Column="1" Content="Log each contact automatically when it completes" IsChecked="{Binding AutoLog}" />
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Station is busy" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <CheckBox Content="Keep calling a station that is working someone else" IsChecked="{Binding KeepCallingWhenBusy}" />
+                <TextBlock Classes="help" Text="Off: when the station you call answers another caller, or is already in a contact when you click Call, Costas stops and says so. On: it keeps calling, as WSJT-X does, until the station answers you, the retry limit is reached, or you stop." TextWrapping="Wrap" />
+              </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Calling you" />
@@ -638,6 +652,9 @@
                 <TextBlock Classes="help" Text="{Binding RemoteStatus}" />
                 <TextBlock Classes="help" IsVisible="{Binding RemoteEnabled}"
                            Text="If Windows asks whether Costas may use the network, choose Allow for private networks. Phones cannot connect until you do. Addresses outside your home network are always refused." />
+                <Button Content="Check why a phone can't connect" Command="{Binding CheckPhoneCommand}" HorizontalAlignment="Left" Margin="0,4,0,0" />
+                <SelectableTextBlock Text="{Binding PhoneCheck}" TextWrapping="Wrap"
+                                     IsVisible="{Binding PhoneCheck, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
             </Grid>
 

@@ -436,6 +436,9 @@ public sealed partial class OperateViewModel : ObservableObject
     // The row (Next in line or Repeats) whose single click waits for the double-click time before its strip opens or folds.
     private object? _pendingClick;
 
+    // Whether that waiting click opens a strip: it was on the call, or a strip was open (an open strip follows the click).
+    private bool _pendingShowDetails;
+
     // The Repeats station whose details are open, or null when they belong to the selected line row. One strip is open
     // at a time, in one list or the other.
     private string? _repeatDetails;
@@ -627,7 +630,11 @@ public sealed partial class OperateViewModel : ObservableObject
         ListUpdated = false;
     }
 
-    /// <summary>A row was clicked: select it and show details. In PSK and RTTY the conversation box reads its signal.</summary>
+    /// <summary>
+    /// A row was clicked: select it. In PSK and RTTY the conversation box reads its signal. The details strip opens only
+    /// for a click on the call itself (<paramref name="showDetails"/>) or the I key, so picking a row does not push the
+    /// list around (a Reddit user found the details in the way); an open strip follows the selection.
+    /// </summary>
     /// <remarks>
     /// A press in Next in line: <paramref name="row"/> is the row under the pointer, or null when the press was in a
     /// details strip. A single click selects the row at once; its details strip opens (or, on the row already showing it,
@@ -636,7 +643,7 @@ public sealed partial class OperateViewModel : ObservableObject
     /// click picked, wherever it lands (a strip closing elsewhere can move the rows under a pointer that has not moved).
     /// A double-click that starts in a strip calls nobody.
     /// </remarks>
-    public void RowClicked(StationRowViewModel? row, int clickCount = 1)
+    public void RowClicked(StationRowViewModel? row, int clickCount = 1, bool showDetails = false)
     {
         if (clickCount != 1)
         {
@@ -649,6 +656,8 @@ public sealed partial class OperateViewModel : ObservableObject
         if (row is null) return;
         _line.Clicked();
         if (Keyboard.Visible) _commands.KeyboardListen(row.Source.Station.OffsetHz);
+        // The strip opens after the wait for a click on the call, or when one is open now (it follows the selection).
+        _pendingShowDetails = showDetails || Details is not null;
         if (ReferenceEquals(row, Selected)) return;
         // Selected now, so Enter and the outline follow the click; the strip waits.
         _repeatDetails = null;
@@ -659,9 +668,10 @@ public sealed partial class OperateViewModel : ObservableObject
 
     /// <summary>
     /// A Repeats row was clicked. Once <see cref="CompleteClick"/> confirms a single click, its details open under it
-    /// (Next in line then has no row selected), or fold when they were open. A double-click never opens them.
+    /// (Next in line then has no row selected) when the click was on the call (<paramref name="showDetails"/>) or a strip
+    /// was already open, or fold when they were open on this row. A double-click never opens them.
     /// </summary>
-    public void RepeatClicked(RepeatRowViewModel row, int clickCount = 1)
+    public void RepeatClicked(RepeatRowViewModel row, int clickCount = 1, bool showDetails = false)
     {
         ArgumentNullException.ThrowIfNull(row);
         if (clickCount != 1)
@@ -673,24 +683,28 @@ public sealed partial class OperateViewModel : ObservableObject
         }
         _firstClick = null;
         _pendingClick = row;
+        _pendingShowDetails = showDetails || Details is not null;
         _repeats.Clicked();
         if (Keyboard.Visible) _commands.KeyboardListen(row.Source.Station.OffsetHz);
     }
 
     /// <summary>
-    /// The double-click time has passed since a single click with no second click: the clicked row's details strip
-    /// opens, or folds when it was already open. The row stays selected either way, so Enter still calls it.
+    /// The double-click time has passed since a single click with no second click: the clicked row's details strip folds
+    /// when it was open on that row, or opens when the click was on the call or a strip was open elsewhere. The row stays
+    /// selected either way, so Enter still calls it.
     /// </summary>
     public void CompleteClick()
     {
         var pending = _pendingClick;
+        var show = _pendingShowDetails;
         _pendingClick = null;
+        _pendingShowDetails = false;
         switch (pending)
         {
             // Matched by call: the line may have been rebuilt since the click.
             case StationRowViewModel clicked when Selected is { } row && Callsign.EqualsCall(row.Call, clicked.Call):
                 if (row.DetailsOpen) Details = null;
-                else Select(row);
+                else if (show) Select(row, showDetails: true);
                 break;
             case RepeatRowViewModel clicked when Repeats.FirstOrDefault(r => Callsign.EqualsCall(r.Call, clicked.Call)) is { } row:
                 if (row.DetailsOpen)
@@ -698,6 +712,7 @@ public sealed partial class OperateViewModel : ObservableObject
                     Details = null;
                     break;
                 }
+                if (!show) break;
                 Select(null);
                 _repeatDetails = row.Call;
                 Details = LoadDetails(row.Call, row.Source.Station);
@@ -705,13 +720,26 @@ public sealed partial class OperateViewModel : ObservableObject
         }
     }
 
-    /// <summary>Selects a row and loads its details.</summary>
-    public void Select(StationRowViewModel? row)
+    /// <summary>Opens the details card for the selected row, or closes it when it is open (the I key).</summary>
+    public void ToggleDetails()
+    {
+        if (Details is not null) Details = null;
+        else if (Selected is { } row) Select(row, showDetails: true);
+    }
+
+    /// <summary>Selects a row and, with <paramref name="showDetails"/>, loads its details into the card.</summary>
+    public void Select(StationRowViewModel? row, bool showDetails = false)
     {
         _repeatDetails = null;
         foreach (var r in Line) r.IsSelected = ReferenceEquals(r, row);
         Selected = row;
-        Details = row is null ? null : LoadDetails(row.Call, row.Source.Station);
+        if (row is null)
+        {
+            Details = null;
+            return;
+        }
+        if (showDetails) Details = LoadDetails(row.Call, row.Source.Station);
+        else _commands.Lookup(row.Call);
     }
 
     private StationDetailsViewModel LoadDetails(string call, Station station)
@@ -772,7 +800,7 @@ public sealed partial class OperateViewModel : ObservableObject
         if (Line.Count == 0) return;
         var i = Selected is null ? 0 : Line.IndexOf(Selected) + delta;
         _line.Clicked();
-        Select(Line[Math.Clamp(i, 0, Line.Count - 1)]);
+        Select(Line[Math.Clamp(i, 0, Line.Count - 1)], Details is not null);
     }
 
     /// <summary>

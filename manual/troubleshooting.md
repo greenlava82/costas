@@ -110,6 +110,13 @@ fault in versions before 0.1.0.336 that sometimes read the SWR meter as ALC. Lat
 they start; you can also type your usual level (for example -6) there and press Save. If the level looks normal, check the
 audio output device in Station setup and that the radio takes its transmit audio from USB in data mode.
 
+### After a band change the dial is a few hundred hertz off
+
+Some radios, such as the FTDX10, move the dial when the mode changes to DATA-U, so a band change could land on
+7.073 300 instead of 7.074 000. Costas now sets the frequency, then the mode, then the frequency again, so the dial ends
+where it should. If you change the mode on the radio yourself afterwards, the radio may move the dial again: pick the
+band again in Costas to put it back.
+
 ## Receiving
 
 ### No decodes
