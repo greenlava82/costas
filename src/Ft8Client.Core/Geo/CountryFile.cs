@@ -101,10 +101,21 @@ public sealed class CountryFile
     {
         for (var len = Math.Min(key.Length, _maxPrefixLength); len > 0; len--)
         {
-            if (_prefixes.TryGetValue(key[..len], out var e)) return e;
+            var prefix = key[..len];
+            if (prefix == GuantanamoPrefix && !IsGuantanamoCall(key)) continue;
+            if (_prefixes.TryGetValue(prefix, out var e)) return e;
         }
         return null;
     }
+
+    private const string GuantanamoPrefix = "KG4";
+
+    // cty.dat lists KG4 as Guantanamo Bay, but only KG4 calls with a two-letter suffix (KG4AB) are issued there.
+    // KG4 calls with a one- or three-letter suffix (KG4ABC) are ordinary US 4-area calls, so they fall through to K.
+    // The bare prefix (KG4/K1ABC) is still Guantanamo.
+    private static bool IsGuantanamoCall(string key) =>
+        key.Length == GuantanamoPrefix.Length
+        || (key.Length == GuantanamoPrefix.Length + 2 && char.IsAsciiLetter(key[3]) && char.IsAsciiLetter(key[4]));
 
     private void ParseRecord(ReadOnlySpan<char> record, bool includeWae)
     {

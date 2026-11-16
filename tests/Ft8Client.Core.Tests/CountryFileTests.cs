@@ -65,6 +65,19 @@ public class CountryFileTests
     }
 
     [Theory]
+    [InlineData("KG4ABC", "United States")]
+    [InlineData("KG4XYZ/P", "United States")]
+    [InlineData("KG4A", "United States")]
+    [InlineData("KG4AB", "Guantanamo Bay")]
+    [InlineData("KG4AC", "Guantanamo Bay")]
+    [InlineData("KG4/K1ABC", "Guantanamo Bay")]
+    [InlineData("W1AW/KG4", "Guantanamo Bay")]
+    public void Lookup_Kg4Call_IsGuantanamoOnlyForTwoLetterSuffix(string call, string entity)
+    {
+        TestData.Countries.Lookup(call)!.Entity.Name.Should().Be(entity);
+    }
+
+    [Theory]
     [InlineData("UW5EJX/MM")]
     [InlineData("K1ABC/AM")]
     [InlineData("<...>")]
