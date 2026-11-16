@@ -67,6 +67,11 @@ jt9 -s <key> -w 1 -m <FFT threads> -e <bin dir> -a <data dir> -t <temp dir>
 - Hashed calls resolve across requests (`<PJ4/K1ABC> W7LIT DN40` after `CQ PJ4/K1ABC`), and the DX call in `params` is added to the table, so the other station's hashed call resolves even if its full call was never heard.
 - SuperFox: in Hound mode (`nexp_decode` 7) with `b_superfox` set, the Fox's (even) slots are decoded only for SuperFox at `nfqso` 750 Hz, `ntol` 100. WSJT-X 3.0.2 prints the Fox's messages as normal decode lines and a `$VERIFY$ <fox call> <code>` line; the 2.7.0-rc3 Ubuntu build printed nothing for the same `sfoxsim` file. Checked again 2026-11-14 with `jt9` and `sfoxsim` built from the `wsjtx-2.7.0` tag: `sfoxsim 750 0.0 MM K1JT 2 2 1 0 1 -5` decodes through Costas's shared-memory request in about 1.2 s, with or without a DX call, as `W0AAA K1JT RR73`, `W5FFF K1JT -18`, `CQ K1JT` (no grid) and `$VERIFY$ K1JT 000000`, all at 750 Hz. That recording is `tests/Ft8Client.Decoding.Tests/Data/superfox/000000_000000.wav` (kept out of `samples/`, whose files are replayed in simulation and need an ordinary golden decode). The code on the `$VERIFY$` line is not checked by `jt9`: WSJT-X's `Network/FoxVerifier` looks it up online.
 
+## SuperFox signature check (9dx.cc)
+
+- Confirmed from the WSJT-X 2.7.0 source (`Network/FoxVerifier.cpp`, `widgets/mainwindow.cpp`) and one live request on 2026-11-15: `GET https://www.9dx.cc/check/<fox call, percent-encoded>/<slot time yyyy-MM-ddTHH:mm:ssZ>/<code>.text` returns `200 text/plain` with one line `<time> <call> <code> VERIFIED` or `... INVALID` (a made-up code for K1JT gave `INVALID`). WSJT-X sends its User-Agent and allows 5 s.
+- Costas sends the Fox's call, the slot time and the code, with its usual User-Agent. No limit is published; Costas sends at most one request per Fox per minute while unanswered and one per 10 minutes after an answer.
+
 ### Licensing
 
 `jt9` is GPLv3. This app is GPLv3. Credit the WSJT Development Group in About. Their request to derivative works: do not ship features based on WSJT-X release candidates before the matching general-availability release. Track GA releases only.
@@ -237,6 +242,16 @@ Test by decoding our own datagrams with a small reader in the test project and, 
 ## 7a. Club Log most-wanted list
 
 `GET https://clublog.org/mostwanted.php?api=1` (confirmed 2026-10-12, no account or key) returns a JSON object of rank to ADIF DXCC code, both as strings: `{"1":"344","2":"123",...}`, about 340 entries. A saved answer is in `samples/clublog/mostwanted.json`. The app downloads it at start when the cached copy (`cache/clublog-mostwanted.json`) is missing or a week old, with the app's User-Agent and the usual timeout, and keeps using the cached copy when Club Log cannot be reached. An answer with fewer than 300 entries is ignored.
+
+## 7a1. Club Log real-time upload
+
+Confirmed 2026-11-15 from clublog.org's developer pages ("How to upload QSOs in real time", updated 2025-12-17; "API keys", updated 2025-01-14; "Excessive API usage"; "App passwords", updated 2026-11-07).
+
+- `POST https://clublog.org/realtime.php`, `application/x-www-form-urlencoded`: `email` (the account's email, not a callsign), `password` (an Application Password, made under Settings › API, shown once), `callsign` (must belong to that email), `adif` (exactly one record ending `<EOR>`), `api` (the application's key).
+- 200 means stored: "QSO OK", "QSO Duplicate" (treat as success) or "QSO Modified". 400 "QSO Rejected": bad record, not logged. 403: credentials or prerequisites refused; the client "must STOP sending real time requests immediately" or the address is firewalled. 500: retry later.
+- Real time only: not for batches (over about 150 contacts use `putlogs.php`, not built). A throttle exists with no published number; Costas sends at most one every 2 s.
+- API key: requested at https://clublog.org/requestapikey.php. Club Log deletes keys found published in a Git repository, so Costas's key is the `CLUBLOG_API_KEY` repository secret, passed to release and development builds only. A build without it shows Club Log as unavailable.
+- **VERIFY** the exact 403 body for a wrong password and the live behaviour once the key exists; the delete endpoint is not used.
 
 ## 7b. LoTW (ARRL Logbook of the World)
 

@@ -13,6 +13,8 @@ namespace Ft8Client.App.Services;
 /// <summary>Holds the current settings and saves changes. Readers get a consistent object; writers replace it.</summary>
 public sealed class AppSettingsAccessor(SettingsStore store, AppSettings initial)
 {
+    private string? _loadProblem = store.LoadProblem;
+
     private readonly object _gate = new();
     private AppSettings _current = initial;
 
@@ -25,7 +27,30 @@ public sealed class AppSettingsAccessor(SettingsStore store, AppSettings initial
         get { lock (_gate) return _current; }
     }
 
-    /// <summary>Changes and saves settings.</summary>
+    /// <summary>
+    /// Why the last save failed (the file stayed locked or could not be written), or null after a good save. The
+    /// change still applies for this session, and the next save tries again with everything.
+    /// </summary>
+    public string? SaveProblem
+    {
+        get { lock (_gate) return _saveProblem; }
+    }
+
+    private string? _saveProblem;
+
+    /// <summary>
+    /// A settings problem the operator should see: a failed save, or a file that could not be read at start-up
+    /// (until the next good save writes a sound file). Null when all is well.
+    /// </summary>
+    public string? Problem
+    {
+        get { lock (_gate) return _saveProblem ?? _loadProblem; }
+    }
+
+    /// <summary>
+    /// Changes and saves settings. A failed save does not throw or lose the change: it stays in use, the failure is
+    /// in <see cref="SaveProblem"/>, and the next save writes it.
+    /// </summary>
     public void Update(Action<AppSettings> change)
     {
         AppSettings copy;
@@ -33,7 +58,17 @@ public sealed class AppSettingsAccessor(SettingsStore store, AppSettings initial
         {
             copy = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(System.Text.Json.JsonSerializer.Serialize(_current, SettingsStore.Json), SettingsStore.Json)!;
             change(copy);
-            store.Save(copy);
+            try
+            {
+                store.Save(copy);
+                _saveProblem = null;
+                _loadProblem = null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _saveProblem = $"Settings could not be saved ({ex.Message}). Changes apply until Costas closes; it tries again on the next change.";
+                Serilog.Log.Warning(ex, "Could not save settings to {Path}", store.Path);
+            }
             _current = copy;
         }
         Changed?.Invoke(copy);

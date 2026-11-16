@@ -32,6 +32,8 @@ jobs:
           SENTRY_DSN: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && (vars.SENTRY_DSN || 'https://b40c0b27e955f12511f0cdc8fc1bd45f@o4511527585054720.ingest.us.sentry.io/4512391935229952') || '' }}
           # Where Report a problem sends feedback (not secrets: both ship inside the app). A repository variable of the same name overrides each.
           FEEDBACK_URL: ${{ vars.FEEDBACK_URL || 'https://formspree.io/f/xaeepqap' }}
+          # Club Log uploads need Costas's application key; Club Log deletes keys published in a repository, so it is a secret. Release and development builds only.
+          CLUBLOG_API_KEY: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && secrets.CLUBLOG_API_KEY || '' }}
           FEEDBACK_EMAIL: ${{ vars.FEEDBACK_EMAIL || 'Tony@emberridgedev.com' }}
           # A push to main makes a development build, published on the "dev" prerelease for installs that follow them.
           COSTAS_CHANNEL: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'dev' || '' }}
@@ -93,6 +95,8 @@ jobs:
           SENTRY_DSN: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && (vars.SENTRY_DSN || 'https://b40c0b27e955f12511f0cdc8fc1bd45f@o4511527585054720.ingest.us.sentry.io/4512391935229952') || '' }}
           # Where Report a problem sends feedback (not secrets: both ship inside the app). A repository variable of the same name overrides each.
           FEEDBACK_URL: ${{ vars.FEEDBACK_URL || 'https://formspree.io/f/xaeepqap' }}
+          # Club Log uploads need Costas's application key; Club Log deletes keys published in a repository, so it is a secret. Release and development builds only.
+          CLUBLOG_API_KEY: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && secrets.CLUBLOG_API_KEY || '' }}
           FEEDBACK_EMAIL: ${{ vars.FEEDBACK_EMAIL || 'Tony@emberridgedev.com' }}
           # Release runs download the latest release's Velopack package so this one carries a delta from it.
           VELOPACK_PREVIOUS: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && '1' || '' }}

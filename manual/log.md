@@ -105,6 +105,28 @@ They can also drive Costas back, the same way they drive WSJT-X:
 
 With the address left at `127.0.0.1`, only programs on this computer can do this.
 
+## Club Log
+
+To send each contact to [Club Log](https://clublog.org) as you make it, open [Settings › Club Log](settings.md),
+enter the email your Club Log account uses and an **Application Password** (make one in Club Log under Settings ›
+API; it is not your Club Log password), and tick **Upload each new contact**. The Club Log light in the bottom bar
+shows how uploads are going. If Club Log refuses the login, Costas stops sending until you change the email or
+password, because Club Log blocks programs that keep trying. Real-time upload is for new contacts only: to send an
+older log, upload an ADIF export on the Club Log site.
+
+## Backups {#backups}
+
+Once a day Costas copies the log and your settings into the `backups` folder in its data folder
+(`%LOCALAPPDATA%\Costas\backups` on Windows), as `costas-2026-11-15.db` and `settings-2026-11-15.json`. It keeps the
+last 14 days. The copy is taken while Costas runs, so there is nothing to do.
+
+To go back to a copy: close Costas, rename `costas.db` in the data folder to keep it, copy the backup you want in as
+`costas.db`, and start Costas again. Contacts made after that backup are in your QRZ logbook, LoTW or your other
+logger if uploads were on, and an ADIF import brings them back.
+
+Settings are protected too: each save keeps the previous file as `settings.json.bak`, and if the settings file is
+ever damaged Costas starts from that copy and says so on the status bar.
+
 ## Decode journal and saved audio
 
 Every decode and transmission is written to a monthly text file in the data folder's `journal` folder. Costas reads

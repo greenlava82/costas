@@ -89,8 +89,8 @@ public sealed class LotwService : IDisposable
     public void Start()
     {
         ShowStatus(null);
-        _ = Task.Run(() => UserListAsync(_cts.Token));
-        _ = Task.Run(() => DownloadLoopAsync(_cts.Token));
+        _ = Task.Run(() => LoopSupervisor.RunAsync("LoTW user list", () => UserListAsync(_cts.Token), _cts.Token));
+        _ = Task.Run(() => LoopSupervisor.RunAsync("LoTW download", () => DownloadLoopAsync(_cts.Token), _cts.Token));
     }
 
     /// <summary>The TQSL found from the settings, or null.</summary>

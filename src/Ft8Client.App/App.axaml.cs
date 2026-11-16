@@ -8,6 +8,7 @@
 
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -51,6 +52,13 @@ public sealed class App : Application
             // After an update, the splash that covered it closes once this window has drawn (Background runs after render).
             window.Opened += (_, _) => Dispatcher.UIThread.Post(UpdateSplashLauncher.SignalReady, DispatcherPriority.Background);
             WatchForUnexpectedErrors(host, vm);
+            // Starting Costas again while it runs brings this window forward instead of a second copy.
+            if (host.Instance is { } instance)
+                instance.ShowRequested += () => Dispatcher.UIThread.Post(() =>
+                {
+                    if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
+                    window.Activate();
+                });
             // Exit, not ShutdownRequested: a shutdown for an update is forced and never raises ShutdownRequested, which
             // skipped the final saves (neighbour history, logs) and the services' clean stop.
             desktop.Exit += (_, _) => host.DisposeAsync().AsTask().GetAwaiter().GetResult();

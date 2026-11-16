@@ -407,6 +407,8 @@
               <StackPanel Grid.Column="1">
                 <CheckBox Content="Show announced DXpeditions (NG3K)" IsChecked="{Binding DxpeditionList}" />
                 <TextBlock Classes="help" Text="Reads NG3K's list of announced DX operations twice a day. A station that is one of them shows DXpedition and the country under Why, and the Awards view lists the ones on the air now and starting soon. It never changes the order or who is called." TextWrapping="Wrap" />
+                <CheckBox Content="Check SuperFox signatures online (9dx.cc)" IsChecked="{Binding VerifySuperFox}" Margin="0,8,0,0" />
+                <TextBlock Classes="help" Text="A SuperFox signal carries a code that proves it is the real DXpedition. Costas checks it with the same service WSJT-X uses, sending only the DXpedition's call, the time and the code, and marks the station verified or not verified. It never changes who is called." TextWrapping="Wrap" />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
@@ -928,6 +930,31 @@
             </Grid>
             <CheckBox Content="Upload each new contact as soon as it is logged" IsChecked="{Binding CloudlogUploadOnComplete}" />
             <TextBlock Classes="help" Text="Save to apply. A contact already in that logbook is left as it is. Simulation never contacts the site." />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="Club Log">
+        <ScrollViewer>
+          <StackPanel>
+            <TextBlock Classes="page" Text="Club Log" />
+            <TextBlock Classes="intro" Text="Send each contact to Club Log as you make it, so DXpeditions and their online logs see it at once. Optional; uploads run in the background and retry. These settings belong to the current station profile, whose callsign must be on your Club Log account." />
+            <TextBlock Classes="help" Text="{Binding ClubLogBuildNote}" IsVisible="{Binding ClubLogBuildNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Account email" />
+              <StackPanel Grid.Column="1">
+                <TextBox Text="{Binding ClubLogEmail}" Width="360" HorizontalAlignment="Left" PlaceholderText="The email you sign in to Club Log with" />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Application Password" />
+              <StackPanel Grid.Column="1" Spacing="6">
+                <TextBox Text="{Binding ClubLogPassword}" Width="360" HorizontalAlignment="Left" PasswordChar="•" PlaceholderText="Not your Club Log password" />
+                <TextBlock Classes="help" Text="Make one in Club Log under Settings › API › Application Passwords. It is shown once; paste it here." />
+                <TextBlock Classes="help" Text="{Binding SecretsNote}" />
+              </StackPanel>
+            </Grid>
+            <CheckBox Content="Upload each new contact as soon as it is logged" IsChecked="{Binding ClubLogUploadOnComplete}" />
+            <TextBlock Classes="help" Text="Save to apply. Club Log real-time upload is for new contacts only; to send an old log, upload an ADIF file on the Club Log site. If Club Log refuses the login, uploads stop until you change the email or password here, as Club Log asks. Simulation never contacts Club Log." />
           </StackPanel>
         </ScrollViewer>
       </TabItem>

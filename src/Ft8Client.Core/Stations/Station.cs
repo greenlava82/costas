@@ -98,6 +98,9 @@ public sealed record Station
     /// </summary>
     public bool RunsSuperFox { get; init; }
 
+    /// <summary>What the online check of its SuperFox signature said, for a SuperFox station.</summary>
+    public FoxCheck FoxCheck { get; init; }
+
     /// <summary>The last characters of its text, for a station heard in a keyboard mode; otherwise null.</summary>
     public string? RecentText { get; init; }
 

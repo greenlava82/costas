@@ -105,20 +105,37 @@ public static class StationText
 
     /// <summary>What calling a SuperFox station does, for the tooltip on <see cref="SuperFoxTag"/>.</summary>
     public const string SuperFoxTip = "DXpedition SuperFox. Click Call and Costas works it the Hound way: your call every slot " +
-                                      "above 1000 Hz for up to 2 minutes, then your report on the same frequency. Its RR73 logs the contact. " +
-                                      "Costas does not check the SuperFox signature, so it cannot tell the real DXpedition from a pirate.";
+                                      "above 1000 Hz for up to 2 minutes, then your report on the same frequency. Its RR73 logs the contact.";
+
+    /// <summary>Added to <see cref="SuperFoxTip"/> for each result of the signature check.</summary>
+    public static string SuperFoxCheckTip(FoxCheck check) => check switch
+    {
+        FoxCheck.Verified => " Its signature checked out online: this is the real DXpedition.",
+        FoxCheck.Invalid => " Its signature did NOT check out: it may be a pirate using the DXpedition's call. Compare with the DXpedition's announced frequency before you call.",
+        _ => " Its signature has not been checked (no signature heard yet, no answer from the check, or the check is off in Settings).",
+    };
 
     /// <summary>The Fox tag for a station: SuperFox or the older Fox/Hound.</summary>
-    public static string FoxTagFor(Station s) => s.RunsSuperFox ? SuperFoxTag : FoxTag;
+    public static string FoxTagFor(Station s) => !s.RunsSuperFox ? FoxTag : s.FoxCheck switch
+    {
+        FoxCheck.Verified => "SuperFox ✓ · Hound",
+        FoxCheck.Invalid => "SuperFox ✗ not verified",
+        _ => SuperFoxTag,
+    };
 
     /// <summary>The Fox tag tooltip for a station.</summary>
-    public static string FoxTipFor(Station s) => s.RunsSuperFox ? SuperFoxTip : FoxTip;
+    public static string FoxTipFor(Station s) => s.RunsSuperFox ? SuperFoxTip + SuperFoxCheckTip(s.FoxCheck) : FoxTip;
 
     /// <summary>The "Doing now" column.</summary>
     public static string DoingNow(Station s)
     {
         if (s.RunsSuperFox && s.State != StationState.CallingMe)
-            return "DXpedition (SuperFox), working Hounds";
+            return s.FoxCheck switch
+            {
+                FoxCheck.Verified => "DXpedition (SuperFox, verified), working Hounds",
+                FoxCheck.Invalid => "SuperFox signature did not check out: possibly a pirate",
+                _ => "DXpedition (SuperFox), working Hounds",
+            };
         if (s.RunsFox && s.State != StationState.CallingMe) return "DXpedition (Fox/Hound), working Hounds";
         // A keyboard-mode station shows what it is sending (docs/09-keyboard-modes.md section 6).
         if (s.RecentText is { } text) return text.Trim();

@@ -43,4 +43,7 @@ public static class ServiceNames
 
     /// <summary>Uploads to the operator's Wavelog or Cloudlog logbook.</summary>
     public const string Cloudlog = "cloudlog";
+
+    /// <summary>Real-time uploads to Club Log.</summary>
+    public const string ClubLog = "clublog";
 }

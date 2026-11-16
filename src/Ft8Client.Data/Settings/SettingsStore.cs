@@ -12,7 +12,11 @@ using System.Text.Json.Serialization;
 
 namespace Ft8Client.Data.Settings;
 
-/// <summary>Loads, migrates and saves <c>settings.json</c>. Writes are atomic (temp file then rename).</summary>
+/// <summary>
+/// Loads, migrates and saves <c>settings.json</c>. A save writes and flushes a temporary file, then swaps it in, keeping
+/// the file it replaced as <c>settings.json.bak</c>. A file that cannot be read falls back to that backup, and is kept
+/// as <c>settings.json.bad</c> (the last few bad files are kept, not overwritten).
+/// </summary>
 public sealed class SettingsStore(string path)
 {
     /// <summary>Serializer options: camelCase, indented.</summary>
@@ -24,35 +28,135 @@ public sealed class SettingsStore(string path)
         PropertyNameCaseInsensitive = true,
     };
 
+    /// <summary>How many earlier bad files are kept beside the latest (<c>.bad.1</c> to <c>.bad.3</c>).</summary>
+    public const int BadCopiesKept = 3;
+
+    /// <summary>Tries at a file that another program (an antivirus scan, a sync client) has open for a moment.</summary>
+    private const int IoTries = 5;
+
+    private static readonly TimeSpan IoRetryDelay = TimeSpan.FromMilliseconds(100);
+
     /// <summary>The file path.</summary>
     public string Path { get; } = path;
 
-    /// <summary>Loads settings; missing or unreadable files give defaults (an unreadable file is kept as <c>.bad</c>).</summary>
+    /// <summary>The backup kept by the last save: the settings as they were before it.</summary>
+    public string BackupPath => Path + ".bak";
+
+    /// <summary>
+    /// What went wrong with the last <see cref="Load"/>, in words for the operator, or null when the file was read
+    /// (or there was none yet).
+    /// </summary>
+    public string? LoadProblem { get; private set; }
+
+    /// <summary>
+    /// Loads settings. A missing file gives defaults. A file that cannot be read or understood is kept as
+    /// <c>.bad</c> and the backup from the last save is used instead; with no usable backup, defaults.
+    /// Never throws for a bad or locked file.
+    /// </summary>
     public AppSettings Load()
     {
+        LoadProblem = null;
         if (!File.Exists(Path)) return new AppSettings();
-        try
+        if (TryRead(Path, out var settings, out var error)) return settings;
+
+        KeepBadCopy();
+        if (File.Exists(BackupPath) && TryRead(BackupPath, out var backup, out _))
         {
-            var node = JsonNode.Parse(File.ReadAllText(Path)) as JsonObject ?? new JsonObject();
-            Migrate(node);
-            return node.Deserialize<AppSettings>(Json) ?? new AppSettings();
+            LoadProblem = $"Settings could not be read ({error}). The copy from the previous save was used; the unreadable file is kept as {System.IO.Path.GetFileName(Path)}.bad.";
+            return backup;
         }
-        catch (JsonException)
-        {
-            File.Copy(Path, Path + ".bad", overwrite: true);
-            return new AppSettings();
-        }
+        LoadProblem = $"Settings could not be read ({error}) and there was no usable backup, so defaults are in use. The unreadable file is kept as {System.IO.Path.GetFileName(Path)}.bad.";
+        return new AppSettings();
     }
 
-    /// <summary>Saves settings.</summary>
+    /// <summary>
+    /// Saves settings: the new file is flushed to disk before it replaces the old one, which becomes the backup.
+    /// A file another program holds open for a moment is retried; throws <see cref="IOException"/> or
+    /// <see cref="UnauthorizedAccessException"/> if it stays locked.
+    /// </summary>
     public void Save(AppSettings settings)
     {
         settings.Schema = AppSettings.CurrentSchema;
         var dir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(Path));
         if (dir is not null) Directory.CreateDirectory(dir);
         var tmp = Path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(settings, Json));
-        File.Move(tmp, Path, overwrite: true);
+        var json = JsonSerializer.Serialize(settings, Json);
+        Retry(() =>
+        {
+            using (var f = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var w = new StreamWriter(f))
+            {
+                w.Write(json);
+                w.Flush();
+                f.Flush(flushToDisk: true);
+            }
+            if (File.Exists(Path)) File.Replace(tmp, Path, BackupPath, ignoreMetadataErrors: true);
+            else File.Move(tmp, Path);
+        });
+    }
+
+    private static bool TryRead(string file, out AppSettings settings, out string error)
+    {
+        settings = new AppSettings();
+        error = string.Empty;
+        try
+        {
+            string text = string.Empty;
+            Retry(() => text = File.ReadAllText(file));
+            var node = JsonNode.Parse(text) as JsonObject ?? throw new JsonException("the file is not a JSON object");
+            Migrate(node);
+            settings = node.Deserialize<AppSettings>(Json) ?? throw new JsonException("the file is empty");
+            return true;
+        }
+        // Not JSON, a value of the wrong type (GetValue and the serializer throw InvalidOperationException or
+        // FormatException), or a file that stayed locked.
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or NotSupportedException
+                                       or IOException or UnauthorizedAccessException)
+        {
+            error = ex is IOException or UnauthorizedAccessException ? "the file is locked or cannot be opened" : "the file is damaged";
+            return false;
+        }
+    }
+
+    // The latest bad file is .bad; earlier ones move up to .bad.1 .. .bad.N and the oldest is dropped.
+    private void KeepBadCopy()
+    {
+        try
+        {
+            var bad = Path + ".bad";
+            if (File.Exists(bad))
+            {
+                var oldest = $"{bad}.{BadCopiesKept}";
+                if (File.Exists(oldest)) File.Delete(oldest);
+                for (var i = BadCopiesKept - 1; i >= 1; i--)
+                {
+                    if (File.Exists($"{bad}.{i}")) File.Move($"{bad}.{i}", $"{bad}.{i + 1}");
+                }
+                File.Move(bad, $"{bad}.1");
+            }
+            File.Copy(Path, bad);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Keeping a copy is a courtesy; a locked file is still not read.
+        }
+    }
+
+    private static void Retry(Action io)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                io();
+                return;
+            }
+            catch (Exception ex) when (ex is IOException and not FileNotFoundException and not DirectoryNotFoundException or UnauthorizedAccessException
+                                       && attempt < IoTries)
+            {
+                Thread.Sleep(IoRetryDelay);
+            }
+        }
     }
 
     /// <summary>

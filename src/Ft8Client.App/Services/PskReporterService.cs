@@ -122,7 +122,7 @@ public sealed class PskReporterService : IAsyncDisposable
         _session.KeyboardHeard += OnKeyboardHeard;
         // PSK31, PSK63 and RTTY have no slots to catch up on, so follow a band or mode change when it happens.
         _session.BandChanged += FollowNeighbours;
-        _ = Task.Run(() => UploadLoopAsync(_cts.Token));
+        _ = Task.Run(() => LoopSupervisor.RunAsync("PSK Reporter upload", () => UploadLoopAsync(_cts.Token), _cts.Token));
         _identity = Task.Run(() => FollowIdentityAsync(_settings.Current));
         _identity.Wait();
     }

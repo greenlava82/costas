@@ -35,6 +35,11 @@ internal static class Program
             if (UpdateService.RunAfterExit is { } next) System.Diagnostics.Process.Start(next)?.Dispose();
             return code;
         }
+        catch (AlreadyRunningException)
+        {
+            // The running copy has been asked to come to the front; nothing was opened here.
+            return 0;
+        }
         catch (Exception ex)
         {
             Log.Fatal(ex, "Unhandled exception");

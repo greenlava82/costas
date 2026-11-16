@@ -31,6 +31,9 @@ public sealed class StationProfile
     /// <summary>Wavelog or Cloudlog uploads for this station.</summary>
     public CloudlogOptions Cloudlog { get; set; } = new();
 
+    /// <summary>Club Log real-time uploads for this station.</summary>
+    public ClubLogOptions ClubLog { get; set; } = new();
+
     /// <summary>Radio control.</summary>
     public RigSettings Rig { get; set; } = new();
 

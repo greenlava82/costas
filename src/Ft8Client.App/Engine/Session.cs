@@ -91,8 +91,6 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     private (DateTime Slot, HashSet<string> Texts) _rawShown = (DateTime.MinValue, new HashSet<string>(StringComparer.Ordinal));
     private DateTime? _recordingSlot;
     private DateTime? _quickSlot;
-    // When the band or mode last changed. A slot that started earlier was recorded, at least in part, on the old band.
-    private DateTime _bandSinceUtc = DateTime.MinValue;
     private readonly Dictionary<DateTime, HashSet<string>> _fedToEngine = [];
     private DateTime? _finishedShownAt;
     private LoggedContact? _lastLogged;
@@ -302,7 +300,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         if (!result.Succeeded || result.Decodes.Count == 0) return;
         lock (_gate)
         {
-            if (FromOldBand(audio.SlotStartUtc, audio.Mode)) return;
+            if (audio.Mode != _config.Mode || HeardBeforeMove(audio.SlotStartUtc)) return;
             var heard = result.Decodes.Select(HeardMessage.From).ToList();
             AddRaw(audio.SlotStartUtc, heard);
             FeedEngine(audio.SlotStartUtc, audio.Mode, heard, _clock.UtcNow);
@@ -410,7 +408,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             if (!result.Succeeded || result.Decodes.Count == 0) return;
             lock (_gate)
             {
-                if (FromOldBand(audio.SlotStartUtc, audio.Mode)) return;
+                if (audio.Mode != _config.Mode || HeardBeforeMove(audio.SlotStartUtc)) return;
                 ApplySuperFox(audio.SlotStartUtc, audio.Mode, result);
             }
             PlanFor(SlotMath.SlotStart(_clock.UtcNow, audio.Mode), audio.Mode, late: true);
@@ -430,6 +428,46 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         _tracker.ApplySuperFox(slot, heard);
         AddRaw(slot, heard);
         FeedEngine(slot, mode, heard, _clock.UtcNow);
+        foreach (var h in heard)
+        {
+            if (SuperFoxSignature.Parse(h.Decode.Text) is { Checkable: true } sig) CheckSignature(sig, slot);
+        }
+    }
+
+    /// <summary>
+    /// Checks a SuperFox signature online (WSJT-X's service), or null to leave signatures unchecked. Set by the host;
+    /// returns <see cref="FoxCheck.None"/> when the check is off or the service does not answer.
+    /// </summary>
+    public Func<SuperFoxSignature, DateTime, Task<FoxCheck>>? VerifyFox { get; set; }
+
+    /// <summary>A Fox whose signature checked out (or failed) is checked again after this long; each slot's code differs.</summary>
+    public static readonly TimeSpan FoxRecheck = TimeSpan.FromMinutes(10);
+
+    // Under _gate: when each Fox's signature was last sent for checking, so one check is in flight at a time per Fox.
+    private readonly Dictionary<string, DateTime> _foxChecked = new(StringComparer.Ordinal);
+
+    // Under _gate. Display only: the result changes the Fox's tag and tooltip, never who is called or what is sent.
+    private void CheckSignature(SuperFoxSignature sig, DateTime slot)
+    {
+        if (VerifyFox is not { } verify) return;
+        var known = _tracker.Find(sig.FoxCall)?.FoxCheck ?? FoxCheck.None;
+        if (_foxChecked.TryGetValue(sig.FoxCall, out var last) && (known == FoxCheck.None ? slot - last < TimeSpan.FromMinutes(1) : slot - last < FoxRecheck)) return;
+        _foxChecked[sig.FoxCall] = slot;
+        _ = Task.Run(async () =>
+        {
+            FoxCheck check;
+            try
+            {
+                check = await verify(sig, slot).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return;
+            }
+            if (check == FoxCheck.None) return;
+            lock (_gate) _tracker.SetFoxCheck(sig.FoxCall, check);
+            Publish();
+        });
     }
 
     private async Task QuickDecodeAsync(SlotAudio audio, DecodeContext ctx)
@@ -458,7 +496,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         lock (_gate)
         {
             if (_quickSlot == audio.SlotStartUtc) _quickSlot = null;
-            if (FromOldBand(audio.SlotStartUtc, audio.Mode)) return;
+            if (audio.Mode != _config.Mode || HeardBeforeMove(audio.SlotStartUtc)) return;
             if (ctx.SuperFox) ApplySuperFox(audio.SlotStartUtc, audio.Mode, result);
             else FeedEngine(audio.SlotStartUtc, audio.Mode, result.Decodes.Select(HeardMessage.From).ToList(), _clock.UtcNow);
         }
@@ -518,17 +556,22 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         {
             result = new DecodeResult([], TimeSpan.Zero, DecodeStatus.Failed, ex.Message);
         }
-        ApplyDecodes(audio.SlotStartUtc, audio.Mode, result);
-        SlotAudioDecoded?.Invoke(audio, result.Decodes.Count);
+        if (ApplyDecodes(audio.SlotStartUtc, audio.Mode, result)) SlotAudioDecoded?.Invoke(audio, result.Decodes.Count);
     }
 
-    /// <summary>
-    /// True for a slot recorded in another mode, or started before the last band change: its audio is, at least in part,
-    /// from the old band, and its stations would refill the list the change cleared. Call under the lock.
-    /// </summary>
-    private bool FromOldBand(DateTime slot, Mode mode) => mode != _config.Mode || slot < _bandSinceUtc;
+    /// <summary>A dial move of more than this re-tunes the receiver: a slot recorded across it is not used (evaluation B7).</summary>
+    public const long RetuneHz = 3_000;
 
-    private void ApplyDecodes(DateTime slot, Mode mode, DecodeResult result)
+    // When the receiver last moved to another band, or by more than RetuneHz. Under _gate. A slot that started before
+    // it holds audio from the old frequency (all or part of it), so its decodes are not filed under the new band,
+    // given to the contact engine, or uploaded to PSK Reporter at the new frequency.
+    private DateTime _rxMovedUtc = DateTime.MinValue;
+
+    // Under _gate.
+    private bool HeardBeforeMove(DateTime slot) => slot < _rxMovedUtc;
+
+    // Returns false when the slot was not used (another mode, or recorded across a band change).
+    private bool ApplyDecodes(DateTime slot, Mode mode, DecodeResult result)
     {
         lock (_gate)
         {
@@ -536,7 +579,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             _services[ServiceNames.Decoder] = result.Succeeded
                 ? new ServiceStatus(ServiceHealth.Ok, $"{result.Decodes.Count} decodes in {result.Elapsed.TotalSeconds:0.0} s", _clock.UtcNow)
                 : new ServiceStatus(ServiceHealth.Degraded, result.Message, _clock.UtcNow);
-            if (FromOldBand(slot, mode)) return;
+            if (mode != _config.Mode || HeardBeforeMove(slot)) return false;
             var now = _clock.UtcNow;
             var heard = result.Decodes.Select(HeardMessage.From).ToList();
             AddRaw(slot, heard);
@@ -571,6 +614,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         // while its audio has not started, up to the late-start limit.
         PlanFor(SlotMath.SlotStart(_clock.UtcNow, mode), mode, late: true);
         Publish();
+        return true;
     }
 
     /// <summary>
@@ -1180,12 +1224,13 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             var oldMode = _config.Mode;
             _config = _config with { Band = band, Mode = mode };
             _dialHz = dialHz ?? _frequencies.Find(band, mode)?.DialHz ?? _dialHz;
+            _rxMovedUtc = _clock.UtcNow;
             _tracker = new StationTracker(_config.MyCall, _config.MyGrid, _countries, mode);
             _callWhenFree.Clear();
             StopAutoCall(null);
             _pileups = new PileupTracker(mode);
-            // The slot being recorded, and any decode still running, hold old-band audio: they are not applied.
-            _bandSinceUtc = _clock.UtcNow;
+            // The slot being recorded, and any decode still running, hold old-band audio: they are not applied
+            // (_rxMovedUtc, set above).
             _recordingSlot = null;
             foreach (var (call, e) in _lookups) _tracker.SetLookup(call, e.Grid, e.State, e.City);
             _engine.Abandon(_clock.UtcNow);
@@ -1244,6 +1289,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         {
             // The dial moved while something is on the air: check it still fits inside the band.
             if (hz != _dialHz) outside = _tx.OnAirOutsideBand(_config.Band, hz);
+            if (Math.Abs(hz - _dialHz) > RetuneHz) _rxMovedUtc = _clock.UtcNow;
             _dialHz = hz;
         }
         if (outside is not null) _ = HaltAsync($"Transmission stopped: the dial moved. {outside}");

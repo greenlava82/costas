@@ -65,7 +65,7 @@ public sealed class PotaService : IDisposable
     public event Action<PotaParks>? Changed;
 
     /// <summary>Starts polling in the background.</summary>
-    public void Start() => _ = Task.Run(() => LoopAsync(_cts.Token));
+    public void Start() => _ = Task.Run(() => LoopSupervisor.RunAsync("POTA spots", () => LoopAsync(_cts.Token), _cts.Token));
 
     /// <summary>Polls soon (the setting was turned on), still no sooner than two minutes after the last request.</summary>
     public void Wake()
