@@ -185,7 +185,7 @@ public sealed partial class LoggedNoticeViewModel : ObservableObject
     {
         // A snapshot that arrives late (window busy) still gets the full time from now, not from when it was logged.
         Call = logged.Call;
-        Need = StationText.Need(logged.Need);
+        Need = StationText.Need(logged.Need, logged.Band);
         NeedKind = StationRowViewModel.KindOf(logged.Need);
         Subline = SublineOf(logged);
         Reports = ReportsOf(logged);

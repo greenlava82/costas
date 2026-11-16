@@ -19,21 +19,26 @@ public static class StationText
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-    /// <summary>"New country", "New band", "New grid", "New call", "Worked before".</summary>
-    public static string Need(NeedTag tag) => tag switch
+    /// <summary>
+    /// "New DXCC", "New DXCC 20 m", "New grid", "New call", "Worked before". A new band (the DXCC entity is in the log,
+    /// but not on this band) names the band when <paramref name="band"/> is given ("20m"), else reads "New band DXCC"
+    /// (owner request 2026-11-14: "New band" alone did not say what was new on the band).
+    /// </summary>
+    public static string Need(NeedTag tag, string? band = null) => tag switch
     {
-        NeedTag.NewCountry => "New country",
-        NeedTag.NewBand => "New band",
+        NeedTag.NewCountry => "New DXCC",
+        NeedTag.NewBand => band is null ? "New band DXCC" : $"New DXCC {Bands.BandPlan.Display(band)}",
         NeedTag.NewGrid => "New grid",
         NeedTag.NewCall => "New call",
         _ => "Worked before",
     };
 
     /// <summary>
-    /// The Why column: the need tag, with the grid for a new grid ("New grid DO62") so the operator sees which one.
+    /// The Why column: the need tag, with the grid for a new grid ("New grid DO62") and the band for a new band ("New DXCC
+    /// 20 m") so the operator sees which one.
     /// </summary>
-    public static string Why(NeedTag tag, string? grid) =>
-        tag == NeedTag.NewGrid && Grid.Grid4(grid) is { } g ? $"New grid {g}" : Need(tag);
+    public static string Why(NeedTag tag, string? grid, string? band = null) =>
+        tag == NeedTag.NewGrid && Grid.Grid4(grid) is { } g ? $"New grid {g}" : Need(tag, band);
 
     /// <summary>
     /// The Why tooltip for a new band: "Canada is in your log on 40 m and 15 m, not on 20 m yet". Empty for other tags

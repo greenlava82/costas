@@ -168,6 +168,53 @@ public class LateDecodeTests
     }
 
     [Fact]
+    public async Task SetBand_DecodeOfOldBandSlotFinishesAfter_StationsNotListed()
+    {
+        var r = new Rig();
+        // The slot's decode finishes 3 s after the cut-off; the operator changes band while it runs.
+        r.Decoder.Script(CqSlot, TimeSpan.FromSeconds(3), "CQ N8WCR EN81");
+        await r.RunUntilAsync(CqSlot.AddSeconds(14.5));
+        r.Session.SetBand("40m", Mode.Ft8);
+
+        await r.RunUntilAsync(MyFirstSlot.AddSeconds(5));
+
+        var s = r.Session.Snapshot;
+        s.Stations.Should().BeEmpty("the slot was heard on the old band");
+        s.Rank.Line.Should().BeEmpty();
+        s.RawDecodes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SetBand_ChangedMidSlot_ThatSlotNotDecodedNextSlotIs()
+    {
+        var r = new Rig();
+        r.Decoder.Script(CqSlot, TimeSpan.FromSeconds(0.5), "CQ N8WCR EN81");
+        r.Decoder.Script(MyFirstSlot, TimeSpan.FromSeconds(0.5), "CQ K1ABC FN42");
+        await r.RunUntilAsync(CqSlot.AddSeconds(6));
+        r.Session.SetBand("40m", Mode.Ft8);
+
+        await r.RunUntilAsync(MyFirstSlot.AddSeconds(14.5));
+
+        r.Session.Snapshot.Stations.Select(x => x.Call).Should().Equal(["K1ABC"], "only the slot recorded on the new band counts");
+    }
+
+    [Fact]
+    public async Task Reconfigure_SettingsCarryAnotherBand_BandAndStationsUnchanged()
+    {
+        var r = new Rig();
+        r.Decoder.Script(CqSlot, TimeSpan.FromSeconds(0.5), "CQ N8WCR EN81");
+        await r.RunUntilAsync(CqSlot.AddSeconds(14.5));
+
+        // A band change saves the new band before SetBand runs; the settings reaching the session first must not
+        // show the new band with the old band's stations (owner report 2026-11-14: the list cleared only later).
+        r.Session.Reconfigure(r.Session.Config with { Band = "40m" });
+
+        var s = r.Session.Snapshot;
+        s.Band.Should().Be("20m", "only SetBand changes band");
+        s.Stations.Select(x => x.Call).Should().Equal("N8WCR");
+    }
+
+    [Fact]
     public async Task Reply_FullDecodeSlowQuickDecodeOnTime_SendsRReportOnTime()
     {
         var r = new Rig();

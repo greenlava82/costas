@@ -50,7 +50,7 @@ public sealed class SummaryViewModel
             : " · need " + string.Join(", ", s.StatesMissing) + (s.StatesMoreMissing > 0 ? $" and {s.StatesMoreMissing} more" : string.Empty);
         LogStates = $"{s.StatesWorked} of 50{missing}";
         LogGrids = $"{s.GridsWorked} worked";
-        Tonight = $"{s.TonightContacts} contacts · {s.TonightNewCountries} new country · {s.TonightNewBands} new bands";
+        Tonight = $"{s.TonightContacts} contacts · {s.TonightNewCountries} new DXCC · {s.TonightNewBands} new band DXCC";
         LogNotice = logEmpty ? "Your log is empty, so every station shows as a new call. Set up QRZ or import an ADIF file." : null;
     }
 

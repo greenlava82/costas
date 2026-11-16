@@ -554,6 +554,7 @@
                         <Border Width="3" HorizontalAlignment="Left" Background="{Binding IsInContact, Converter={x:Static v:Converters.SelectedBar}}" />
                         <Border BorderThickness="1" CornerRadius="3" Margin="1" IsHitTestVisible="False"
                                 BorderBrush="{Binding IsSelected, Converter={x:Static v:Converters.CursorOutline}}" />
+                        <StackPanel>
                         <Grid ColumnDefinitions="36,100,190,160,*,100,46,64,230,120,74" v:ResizableColumns.Layout="Calls" MinHeight="40" Margin="14,0">
                           <TextBlock Grid.Column="0" Text="{Binding Rank}" Classes="num secondary" VerticalAlignment="Center" />
                           <!-- The call, with a purple Fox tag for a DXpedition Fox and an amber "3 calling" tag while others are calling this station. -->
@@ -601,6 +602,12 @@
                                   Command="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).CallRowCommand}" CommandParameter="{Binding}"
                                   AutomationProperties.Name="{Binding Call, StringFormat='Call or answer {0}'}" />
                         </Grid>
+                        <!-- The selected station's details, across the row under it. Clicking the row again or Esc closes them. -->
+                        <Border IsVisible="{Binding DetailsOpen}" Margin="14,2,14,12"
+                                AutomationProperties.Name="Station details">
+                          <v:StationDetailsStrip DataContext="{Binding $parent[v:OperateView].((vm:OperateViewModel)DataContext).Details}" />
+                        </Border>
+                        </StackPanel>
                       </Panel>
                     </Border>
                   </DataTemplate>
@@ -611,33 +618,6 @@
                          IsVisible="{Binding UnnamedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               <TextBlock Text="{Binding MoreText}" Classes="secondary" Margin="14,6,14,10" IsVisible="{Binding MoreText, Converter={x:Static v:Converters.NotEmpty}}" />
             </StackPanel>
-
-            <!-- Details flyout -->
-            <Border Classes="card" IsVisible="{Binding Details, Converter={x:Static ObjectConverters.IsNotNull}}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                    Width="300" Margin="0,44,8,0" Padding="14" BoxShadow="0 4 16 0 #33000000">
-              <StackPanel DataContext="{Binding Details}" x:DataType="vm:StationDetailsViewModel" Spacing="4">
-                <DockPanel>
-                  <Button DockPanel.Dock="Right" Content="✕" Classes="link" AutomationProperties.Name="Close details"
-                          Command="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).CloseDetailsCommand}" />
-                  <TextBlock Text="{Binding Call}" Classes="title" />
-                </DockPanel>
-                <v:StationFacts />
-                <TextBlock Text="Your contacts" FontWeight="SemiBold" Margin="0,8,0,0" />
-                <TextBlock Text="No contacts with this call yet." Classes="secondary" IsVisible="{Binding NoPast}" />
-                <ItemsControl ItemsSource="{Binding Past}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:PastContactViewModel">
-                      <Grid ColumnDefinitions="90,50,50,*">
-                        <TextBlock Text="{Binding Date}" Classes="num" />
-                        <TextBlock Grid.Column="1" Text="{Binding Band}" />
-                        <TextBlock Grid.Column="2" Text="{Binding Mode}" />
-                        <TextBlock Grid.Column="3" Text="{Binding Confirmed}" Classes="secondary" />
-                      </Grid>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
-            </Border>
           </Panel>
         </Border>
 
@@ -666,10 +646,16 @@
                           BorderBrush="{DynamicResource RowDividerBrush}" BorderThickness="0,1,0,0">
                     <Panel>
                       <Border Width="3" HorizontalAlignment="Left" Background="{Binding IsInContact, Converter={x:Static v:Converters.SelectedBar}}" />
+                      <!-- The row with its details open gets the same outline as the picked row in Next in line. -->
+                      <Border BorderThickness="1" CornerRadius="3" Margin="1" IsHitTestVisible="False"
+                              BorderBrush="{Binding DetailsOpen, Converter={x:Static v:Converters.CursorOutline}}" />
+                      <StackPanel>
                       <Grid ColumnDefinitions="36,100,190,160,*,100,46,64,230,120,74" v:ResizableColumns.Layout="Calls" MinHeight="36" Margin="14,0">
                         <TextBlock Grid.Column="0" Text="{Binding Rank}" Classes="num secondary" VerticalAlignment="Center" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                          <TextBlock Text="{Binding Call}" FontWeight="SemiBold" />
+                          <!-- Clicking the call opens the details strip; the rest of the row only picks it. -->
+                          <TextBlock x:Name="RowCall" Text="{Binding Call}" FontWeight="SemiBold" Cursor="Hand" HorizontalAlignment="Left"
+                                     ToolTip.Tip="Click for station details" />
                           <Border Classes="fox" IsVisible="{Binding IsFox}" ToolTip.Tip="{Binding FoxTip}" AutomationProperties.Name="{Binding FoxTip}">
                             <TextBlock Text="{Binding FoxTag}" />
                           </Border>
@@ -697,6 +683,11 @@
                                 Command="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).CallRepeatCommand}" CommandParameter="{Binding}"
                                 AutomationProperties.Name="{Binding Call, StringFormat='Call or answer {0} again'}" />
                       </Grid>
+                      <!-- The clicked station's details, as in Next in line. Clicking the row again or Esc closes them. -->
+                      <Border IsVisible="{Binding DetailsOpen}" Margin="14,2,14,12" AutomationProperties.Name="Station details">
+                        <v:StationDetailsStrip DataContext="{Binding $parent[v:OperateView].((vm:OperateViewModel)DataContext).Details}" />
+                      </Border>
+                      </StackPanel>
                     </Panel>
                   </Border>
                 </DataTemplate>

@@ -33,17 +33,9 @@ public partial class OperateView : UserControl
         LineList.PointerEntered += (_, _) => Vm?.PointerEnteredLine();
         LineList.PointerExited += (_, _) => Vm?.PointerExitedLine();
         LineList.AddHandler(PointerPressedEvent, OnRowPressed, RoutingStrategies.Tunnel);
+        RepeatList.AddHandler(PointerPressedEvent, OnRepeatPressed, RoutingStrategies.Tunnel);
         RepeatList.PointerEntered += (_, _) => Vm?.PointerEnteredRepeats();
         RepeatList.PointerExited += (_, _) => Vm?.PointerExitedRepeats();
-        // A double-click on the Call button is two clicks of the button, not a double-click on the row.
-        LineList.DoubleTapped += (_, e) =>
-        {
-            if (!OnButton(e) && Vm?.Selected is { } row) Vm.DoubleClickedRow(row);
-        };
-        RepeatList.DoubleTapped += (_, e) =>
-        {
-            if (!OnButton(e) && (e.Source as Control)?.DataContext is RepeatRowViewModel row) Vm?.DoubleClickedRepeat(row);
-        };
         SizeChanged += (_, e) => Relayout(e.NewSize.Width);
         LeftPane.SizeChanged += (_, _) => FitPinned();
         CallingYou.SizeChanged += (_, _) => FitPinned();
@@ -225,13 +217,56 @@ public partial class OperateView : UserControl
         if (_columns.TryGetValue(name, out var layout)) ColumnsSaved?.Invoke(name, layout.ToSaved());
     }
 
-    private static bool OnButton(RoutedEventArgs e) => (e.Source as Visual)?.FindAncestorOfType<Button>(includeSelf: true) is not null;
-
+    // Double-click is read from the click count here, not from DoubleTapped: DoubleTapped needs both presses on the same
+    // element, and a strip closing can move the rows under the pointer between them. A press in a strip has the details
+    // as its data and goes in as no row. The second press is handled so the list does not select the row it landed on
+    // in place of the one being called.
     private void OnRowPressed(object? sender, PointerPressedEventArgs e)
     {
-        // A click on the call opens the details card; anywhere else on the row only picks it.
-        if ((e.Source as Control)?.DataContext is StationRowViewModel row)
-            Vm?.RowClicked(row, showDetails: e.Source is Control { Name: "RowCall" });
+        if (Vm is not { } vm || !e.GetCurrentPoint(LineList).Properties.IsLeftButtonPressed) return;
+        AfterPress(e.ClickCount);
+        if (e.ClickCount >= 2 && OnButton(e)) return;
+        vm.RowClicked((e.Source as Control)?.DataContext as StationRowViewModel, e.ClickCount, OnCall(e));
+        if (e.ClickCount >= 2) e.Handled = true;
+    }
+
+    // A double-click on a button in a row (Call, a link in the strip) is the button's: it must not call the station as well.
+    private static bool OnButton(PointerPressedEventArgs e) =>
+        e.Source is Visual v && v.FindAncestorOfType<Button>(includeSelf: true) is not null;
+
+    // A click on the call opens the details strip; anywhere else on the row only picks it.
+    private static bool OnCall(PointerPressedEventArgs e) => e.Source is Control { Name: "RowCall" };
+
+    // A press in a Repeats row; one in the strip under it has the details as its data and is ignored.
+    private void OnRepeatPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (Vm is not { } vm || !e.GetCurrentPoint(RepeatList).Properties.IsLeftButtonPressed) return;
+        if ((e.Source as Control)?.DataContext is not RepeatRowViewModel row) return;
+        AfterPress(e.ClickCount);
+        if (e.ClickCount >= 2 && OnButton(e)) return;
+        vm.RepeatClicked(row, e.ClickCount, OnCall(e));
+        if (e.ClickCount >= 2) e.Handled = true;
+    }
+
+    private DispatcherTimer? _clickTimer;
+
+    // A single click opens or folds a details strip only once the system's double-click time has passed with no second
+    // click, so a double-click (which calls) never opens one. The second click stops the wait.
+    private void AfterPress(int clickCount)
+    {
+        if (_clickTimer is null)
+        {
+            _clickTimer = new DispatcherTimer();
+            _clickTimer.Tick += (_, _) =>
+            {
+                _clickTimer.Stop();
+                Vm?.CompleteClick();
+            };
+        }
+        _clickTimer.Stop();
+        if (clickCount != 1) return;
+        _clickTimer.Interval = this.GetPlatformSettings()?.GetDoubleTapTime(PointerType.Mouse) ?? TimeSpan.FromMilliseconds(500);
+        _clickTimer.Start();
     }
 
     /// <summary>Width of the folded side column's rail.</summary>

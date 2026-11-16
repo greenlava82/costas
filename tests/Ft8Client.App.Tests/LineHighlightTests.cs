@@ -107,6 +107,7 @@ public class LineHighlightTests
         var operate = Build(s);
 
         operate.RowClicked(operate.Line[1]);
+        operate.CompleteClick();
 
         operate.Selected.Should().BeSameAs(operate.Line[1]);
         operate.Details.Should().BeNull();
@@ -123,8 +124,10 @@ public class LineHighlightTests
         var operate = Build(s);
 
         operate.RowClicked(operate.Line[0], showDetails: true);
+        operate.CompleteClick();
         operate.Details!.Call.Should().Be("W9TJP");
         operate.RowClicked(operate.Line[1]);
+        operate.CompleteClick();
         operate.Details!.Call.Should().Be("WD8DFW");
         operate.ToggleDetails();
         operate.Details.Should().BeNull();

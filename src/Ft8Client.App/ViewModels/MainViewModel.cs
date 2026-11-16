@@ -100,6 +100,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         _host.Settings.Changed += _ => Dispatch(ApplySettings);
         _host.Remote.Changed += () => Dispatch(UpdateRemote);
         _host.RadioPower.Changed += () => Dispatch(UpdatePower);
+        // The first reading can arrive before this subscribes, and Changed only fires when the value changes.
+        UpdatePower();
         UpdateRemote();
         _host.Udp.Inbound += m => Dispatch(() => OnUdp(m));
     }
@@ -501,7 +503,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         ApplyBandOpenings(s);
         if (_callers.Update(s.Waiting) && _host.Settings.Current.Operating.ChimeOnCaller) _host.Chime.Play(_host.Clock.UtcNow);
         Raw.Units = Operate.Units;
-        Raw.Apply(s.RawDecodes, s.Rank, s.Contact?.DxCall, keyboard: !ModeInfo.IsSlotted(s.Mode));
+        Raw.Apply(s.RawDecodes, s.Rank, s.Contact?.DxCall, keyboard: !ModeInfo.IsSlotted(s.Mode), band: s.Band);
         Logged.Apply(s.LastLogged);
         if (!ReferenceEquals(s.LastLogged, _lastLogged))
         {
@@ -1119,10 +1121,12 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
 
     /// <summary>
     /// Esc: once both reports are exchanged, the first press stops transmitting but keeps the contact (the DX's RR73 is
-    /// still logged) and a second press abandons it; otherwise it abandons at once.
+    /// still logged) and a second press abandons it; otherwise it abandons at once. It also closes the station details
+    /// strip; that never changes what it does to the radio.
     /// </summary>
     public void Escape()
     {
+        Operate.CloseDetails();
         var s = _host.Session.Snapshot;
         if (!ModeInfo.IsSlotted(s.Mode))
         {
@@ -1290,7 +1294,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
                 _ => ("Logged locally", TextKind.Secondary),
             };
             var where = StationText.Place(_host.Countries.Lookup(q.Call), q.State);
-            return new TonightRowViewModel($"{q.Call} · {where}", upload, kind, StationText.Need(tag), StationRowViewModel.KindOf(tag),
+            return new TonightRowViewModel($"{q.Call} · {where}", upload, kind, StationText.Need(tag, string.IsNullOrEmpty(q.Band) ? null : q.Band), StationRowViewModel.KindOf(tag),
                 TonightTime(q), q.Id);
         }).ToList();
         return (list, rows.Count);

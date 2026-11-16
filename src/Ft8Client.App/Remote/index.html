@@ -965,7 +965,7 @@ function stepLabel(m, i) {
   return /^CQ /.test(m) ? "CQ" : /RR73$|RRR$/.test(m) ? "RR73" : / 73$/.test(m) ? "73" : / R[+-]\d\d$/.test(m) ? "R-rpt"
     : / [+-]\d\d$/.test(m) ? "Report" : / [A-R]{2}\d\d$/.test(m) ? "Grid" : String(i + 1);
 }
-// The Why tag, shortened for the table: "New country" reads "Country".
+// The Why tag, shortened for the table: "New DXCC 20 m" reads "DXCC 20 m".
 function shortNeed(n) { return !n || n === "Worked before" ? "" : n.replace(/^New (\w)/, (_, x) => x.toUpperCase()); }
 function tileHead(text, right) {
   const h = el("div", "th"); h.append(el("span", "k", text));

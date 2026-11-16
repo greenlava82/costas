@@ -424,9 +424,32 @@ public sealed partial class OperateViewModel : ObservableObject
     /// <summary>ARRL's list of LoTW users; <see cref="LotwUsers.None"/> until loaded.</summary>
     public LotwUsers Lotw { get; set; } = LotwUsers.None;
 
-    /// <summary>Details flyout: the station shown.</summary>
+    /// <summary>The details strip under the selected row: the station shown, or null when it is closed.</summary>
     [ObservableProperty]
     public partial StationDetailsViewModel? Details { get; set; }
+
+    partial void OnDetailsChanged(StationDetailsViewModel? value) => MarkDetails();
+
+    // The row the last single click in Next in line went to (null: a details strip), for the double-click that follows.
+    private StationRowViewModel? _firstClick;
+
+    // The row (Next in line or Repeats) whose single click waits for the double-click time before its strip opens or folds.
+    private object? _pendingClick;
+
+    // Whether that waiting click opens a strip: it was on the call, or a strip was open (an open strip follows the click).
+    private bool _pendingShowDetails;
+
+    // The Repeats station whose details are open, or null when they belong to the selected line row. One strip is open
+    // at a time, in one list or the other.
+    private string? _repeatDetails;
+
+    // Opens the strip under the selected line row or the clicked Repeats row only, and only while its details are loaded.
+    private void MarkDetails()
+    {
+        foreach (var r in Line) r.DetailsOpen = _repeatDetails is null && r.IsSelected && Details is { } d && Callsign.EqualsCall(d.Call, r.Call);
+        foreach (var r in Repeats)
+            r.DetailsOpen = _repeatDetails is { } c && Callsign.EqualsCall(r.Call, c) && Details is { } d && Callsign.EqualsCall(d.Call, r.Call);
+    }
 
     /// <summary>"Who you're calling": what is known about the station in the current contact; null outside a contact.</summary>
     [ObservableProperty]
@@ -459,7 +482,8 @@ public sealed partial class OperateViewModel : ObservableObject
         var listKey = RankedKey(s);
         if (_lastRanked != listKey || _line.Applied is null || _lastRankedBand != bandMode || keyboardDue)
         {
-            var secondUpdate = _lastRankedBand == bandMode && _lastRanked is { Early: true } before && !listKey.Early && before.Slot == listKey.Slot;
+            var newBand = _lastRankedBand != bandMode;
+            var secondUpdate = !newBand && _lastRanked is { Early: true } before && !listKey.Early && before.Slot == listKey.Slot;
             _lastRanked = listKey;
             _lastKeyboardRank = now;
             _lastRankedBand = bandMode;
@@ -474,6 +498,12 @@ public sealed partial class OperateViewModel : ObservableObject
             }
             _line.Offer(line);
             _repeats.Offer(repeats);
+            // The old band's stations go at once, even with the pointer over the list: their Call buttons no longer work.
+            if (newBand)
+            {
+                _line.ApplyPending();
+                _repeats.ApplyPending();
+            }
         }
         ListUpdated = _line.HasPending;
         MarkInContact();
@@ -493,7 +523,7 @@ public sealed partial class OperateViewModel : ObservableObject
         var marked = s.CallWhenFree.ToHashSet(StringComparer.Ordinal);
         // A station marked "call when free" stays listed past the row limit, so its mark can always be seen and cancelled.
         foreach (var w in s.Rank.Watching.Where((w, i) => i < MaxWatching || marked.Contains(w.Station.Call)))
-            Watching.Add(new WatchRowViewModel(w, now, Units, marked.Contains(w.Station.Call)));
+            Watching.Add(new WatchRowViewModel(w, now, Units, marked.Contains(w.Station.Call), s.Band));
         WatchingCanFold = WatchingSummary.CanFold(s.Rank.Watching) && !Watching.Any(w => w.CallWhenFree);
         WatchingSummaryText = WatchingSummary.Text(s.Rank.Watching);
         OnPropertyChanged(nameof(WatchingFolded));
@@ -509,7 +539,7 @@ public sealed partial class OperateViewModel : ObservableObject
         RailBand = s.Summary is null ? "Band" : $"{BandPlan.Display(s.Summary.Band)} · {s.Summary.YouNeed} you need";
         OnPropertyChanged(nameof(Panel));
         Calling = s.Contact is null ? null : DetailsFor(s.Contact.DxCall, s, now);
-        // A lookup may have arrived since the flyout opened.
+        // A lookup may have arrived since the details strip opened.
         if (Details is not null) Details = DetailsFor(Details.Call, s, now);
 
         WaitingRows.Clear();
@@ -520,7 +550,7 @@ public sealed partial class OperateViewModel : ObservableObject
             var need = ranked?.Need.Tag;
             var verb = w.AfterStop ? "Resume" : "Answer";
             WaitingRows.Add(new WaitingRowViewModel(w.Call, st is null ? string.Empty : StationText.Place(st.Entity, st.Region, st.City),
-                need is { } n ? StationText.Need(n) : string.Empty, need is { } n2 ? StationRowViewModel.KindOf(n2) : TextKind.Normal,
+                need is { } n ? StationText.Need(n, s.Band) : string.Empty, need is { } n2 ? StationRowViewModel.KindOf(n2) : TextKind.Normal,
                 w.AfterStop ? $"Last heard at {w.LastCalledUtc:HH:mm:ss} · {Report.Format(w.Snr)}" : $"Called you at {w.FirstCalledUtc:HH:mm:ss} · {Report.Format(w.Snr)}",
                 s.Contact?.Outcome == ContactOutcome.InProgress
                     ? (w.AnswerAfter ? $"Will {verb.ToLowerInvariant()} after this contact" : $"{verb} after this contact")
@@ -538,7 +568,7 @@ public sealed partial class OperateViewModel : ObservableObject
         TonightRows.Clear();
         foreach (var t in tonight.Take(3)) TonightRows.Add(t);
         TonightTitle = $"Worked this session · {s.Tonight.Count}";
-        TonightSubline = $"{s.Tonight.Count(t => t.Need == NeedTag.NewCountry)} new country · {s.Tonight.Count(t => t.Need == NeedTag.NewBand)} new bands";
+        TonightSubline = $"{s.Tonight.Count(t => t.Need == NeedTag.NewCountry)} new DXCC · {s.Tonight.Count(t => t.Need == NeedTag.NewBand)} new band DXCC";
         TonightLink = $"Show all {tonightTotal} in the log";
 
         OrderText = OrderSentence(Ranking);
@@ -601,15 +631,93 @@ public sealed partial class OperateViewModel : ObservableObject
     }
 
     /// <summary>
-    /// A row was clicked: select it. The details card opens only when <paramref name="showDetails"/> (a click on the
-    /// call itself), so picking a row does not cover the list (a Reddit user found the card in the way). An open card
-    /// follows the selection. In PSK and RTTY the conversation box reads its signal.
+    /// A row was clicked: select it. In PSK and RTTY the conversation box reads its signal. The details strip opens only
+    /// for a click on the call itself (<paramref name="showDetails"/>) or the I key, so picking a row does not push the
+    /// list around (a Reddit user found the details in the way); an open strip follows the selection.
     /// </summary>
-    public void RowClicked(StationRowViewModel row, bool showDetails = false)
+    /// <remarks>
+    /// A press in Next in line: <paramref name="row"/> is the row under the pointer, or null when the press was in a
+    /// details strip. A single click selects the row at once; its details strip opens (or, on the row already showing it,
+    /// folds) only in <see cref="CompleteClick"/>, which the view calls once the double-click time has passed with no
+    /// second click. So a double-click never opens the strip: its second click cancels that and calls the row the first
+    /// click picked, wherever it lands (a strip closing elsewhere can move the rows under a pointer that has not moved).
+    /// A double-click that starts in a strip calls nobody.
+    /// </remarks>
+    public void RowClicked(StationRowViewModel? row, int clickCount = 1, bool showDetails = false)
     {
+        if (clickCount != 1)
+        {
+            _pendingClick = null;
+            if (clickCount == 2 && _firstClick is { } first && ReferenceEquals(first, Selected)) DoubleClickedRow(first);
+            return;
+        }
+        _firstClick = row;
+        _pendingClick = row;
+        if (row is null) return;
         _line.Clicked();
         if (Keyboard.Visible) _commands.KeyboardListen(row.Source.Station.OffsetHz);
-        Select(row, showDetails || Details is not null);
+        // The strip opens after the wait for a click on the call, or when one is open now (it follows the selection).
+        _pendingShowDetails = showDetails || Details is not null;
+        if (ReferenceEquals(row, Selected)) return;
+        // Selected now, so Enter and the outline follow the click; the strip waits.
+        _repeatDetails = null;
+        foreach (var r in Line) r.IsSelected = ReferenceEquals(r, row);
+        Selected = row;
+        Details = null;
+    }
+
+    /// <summary>
+    /// A Repeats row was clicked. Once <see cref="CompleteClick"/> confirms a single click, its details open under it
+    /// (Next in line then has no row selected) when the click was on the call (<paramref name="showDetails"/>) or a strip
+    /// was already open, or fold when they were open on this row. A double-click never opens them.
+    /// </summary>
+    public void RepeatClicked(RepeatRowViewModel row, int clickCount = 1, bool showDetails = false)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        if (clickCount != 1)
+        {
+            var first = _pendingClick as RepeatRowViewModel;
+            _pendingClick = null;
+            if (clickCount == 2 && first is not null) DoubleClickedRepeat(first);
+            return;
+        }
+        _firstClick = null;
+        _pendingClick = row;
+        _pendingShowDetails = showDetails || Details is not null;
+        _repeats.Clicked();
+        if (Keyboard.Visible) _commands.KeyboardListen(row.Source.Station.OffsetHz);
+    }
+
+    /// <summary>
+    /// The double-click time has passed since a single click with no second click: the clicked row's details strip folds
+    /// when it was open on that row, or opens when the click was on the call or a strip was open elsewhere. The row stays
+    /// selected either way, so Enter still calls it.
+    /// </summary>
+    public void CompleteClick()
+    {
+        var pending = _pendingClick;
+        var show = _pendingShowDetails;
+        _pendingClick = null;
+        _pendingShowDetails = false;
+        switch (pending)
+        {
+            // Matched by call: the line may have been rebuilt since the click.
+            case StationRowViewModel clicked when Selected is { } row && Callsign.EqualsCall(row.Call, clicked.Call):
+                if (row.DetailsOpen) Details = null;
+                else if (show) Select(row, showDetails: true);
+                break;
+            case RepeatRowViewModel clicked when Repeats.FirstOrDefault(r => Callsign.EqualsCall(r.Call, clicked.Call)) is { } row:
+                if (row.DetailsOpen)
+                {
+                    Details = null;
+                    break;
+                }
+                if (!show) break;
+                Select(null);
+                _repeatDetails = row.Call;
+                Details = LoadDetails(row.Call, row.Source.Station);
+                break;
+        }
     }
 
     /// <summary>Opens the details card for the selected row, or closes it when it is open (the I key).</summary>
@@ -622,6 +730,7 @@ public sealed partial class OperateViewModel : ObservableObject
     /// <summary>Selects a row and, with <paramref name="showDetails"/>, loads its details into the card.</summary>
     public void Select(StationRowViewModel? row, bool showDetails = false)
     {
+        _repeatDetails = null;
         foreach (var r in Line) r.IsSelected = ReferenceEquals(r, row);
         Selected = row;
         if (row is null)
@@ -629,13 +738,18 @@ public sealed partial class OperateViewModel : ObservableObject
             Details = null;
             return;
         }
-        _commands.Lookup(row.Call);
-        if (!showDetails) return;
-        Details = _snap is null
-            ? StationDetailsViewModel.From(row.Call, row.Source.Station, QrzLookup?.Invoke(row.Call), Log?.Invoke(), Units, _now(),
-                mostWantedRank: MostWanted.RankOf(row.Source.Station.EntityKey), lotwUpload: Lotw.LastUpload(row.Call), park: ParkOf(row.Source.Station),
-                dxpedition: DxpeditionOf(row.Call))
-            : DetailsFor(row.Call, _snap, _now(), row.Source.Station);
+        if (showDetails) Details = LoadDetails(row.Call, row.Source.Station);
+        else _commands.Lookup(row.Call);
+    }
+
+    private StationDetailsViewModel LoadDetails(string call, Station station)
+    {
+        _commands.Lookup(call);
+        return _snap is null
+            ? StationDetailsViewModel.From(call, station, QrzLookup?.Invoke(call), Log?.Invoke(), Units, _now(),
+                mostWantedRank: MostWanted.RankOf(station.EntityKey), lotwUpload: Lotw.LastUpload(call), park: ParkOf(station),
+                dxpedition: DxpeditionOf(call))
+            : DetailsFor(call, _snap, _now(), station);
     }
 
     private StationDetailsViewModel DetailsFor(string call, SessionSnapshot s, DateTime now, Station? fallback = null)
@@ -803,9 +917,8 @@ public sealed partial class OperateViewModel : ObservableObject
     [RelayCommand]
     private void RetryUpload(TonightRowViewModel row) => _commands.RetryUpload(row.QsoId);
 
-    /// <summary>Closes the details flyout.</summary>
-    [RelayCommand]
-    private void CloseDetails() => Details = null;
+    /// <summary>Closes the details strip (Esc). The row stays selected.</summary>
+    public void CloseDetails() => Details = null;
 
     private void ApplyLine(IReadOnlyList<RankedStation> list)
     {
@@ -816,7 +929,7 @@ public sealed partial class OperateViewModel : ObservableObject
         var i = 1;
         foreach (var r in list.Take(MaxLine))
             Line.Add(new StationRowViewModel(r, i++, Units, now, log?.LastContactWith(r.Station.Call), log?.ContactsWith(r.Station.Call).Count ?? 0,
-                MostWanted.RankOf(r.Station.EntityKey), WhyTip(r, log), ParkOf(r.Station), DxpeditionOf(r.Station.Call)));
+                MostWanted.RankOf(r.Station.EntityKey), WhyTip(r, log), ParkOf(r.Station), DxpeditionOf(r.Station.Call), _snap?.Band));
         MoreText = list.Count > MaxLine ? $"and {list.Count - MaxLine} more" : string.Empty;
         LineEmpty = Line.Count == 0;
         // Only a row the operator picked stays selected; nothing is selected for them, so the highlight never
@@ -824,6 +937,9 @@ public sealed partial class OperateViewModel : ObservableObject
         var sel = Line.FirstOrDefault(r => r.Call == keep);
         foreach (var r in Line) r.IsSelected = ReferenceEquals(r, sel);
         Selected = sel;
+        // The station left the line: its strip has no row to open under, so it closes rather than coming back later.
+        if (sel is null && keep is not null) Details = null;
+        MarkDetails();
         MarkInContact();
         MarkCallers();
     }
@@ -852,6 +968,13 @@ public sealed partial class OperateViewModel : ObservableObject
         foreach (var r in list.Take(MaxRepeats))
             Repeats.Add(new RepeatRowViewModel(r, log?.LastContactWith(r.Station.Call), log?.ContactsWith(r.Station.Call).Count ?? 0, Units, now, i++,
                 _snap is not null && (log?.CallConfirmed(r.Station.Call, _snap.Band, ModeInfo.Name(_snap.Mode)) ?? false)));
+        // The station left Repeats: its strip closes, as it does in Next in line.
+        if (_repeatDetails is { } open && !Repeats.Any(r => Callsign.EqualsCall(r.Call, open)))
+        {
+            _repeatDetails = null;
+            Details = null;
+        }
+        MarkDetails();
         MarkInContact();
         MarkCallers();
         RepeatsMoreText = list.Count > MaxRepeats ? $"and {list.Count - MaxRepeats} more" : string.Empty;
@@ -904,8 +1027,8 @@ public sealed partial class OperateViewModel : ObservableObject
     {
         static string Plural(NeedTag t) => t switch
         {
-            NeedTag.NewCountry => "countries",
-            NeedTag.NewBand => "bands",
+            NeedTag.NewCountry => "DXCC",
+            NeedTag.NewBand => "band DXCC",
             NeedTag.NewGrid => "grids",
             _ => "calls",
         };

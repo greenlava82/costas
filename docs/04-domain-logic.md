@@ -72,8 +72,8 @@ Trend, for "fading": compare the mean of the last two SNR values with the mean o
 
 | Tier | Tag | Condition (first that matches) |
 | --- | --- | --- |
-| 1 | New country | The station's entity has no contact in the log on any band |
-| 2 | New band | The entity has contacts, but none on this band |
+| 1 | New country (shown "New DXCC") | The station's entity has no contact in the log on any band |
+| 2 | New band (shown "New DXCC 20 m") | The entity has contacts, but none on this band |
 | 3 | New grid | The station's 4-character grid is known and has no contact in the log |
 | 4 | New call | This callsign has no contact on this band and mode |
 | 5 | Worked | This callsign has a contact on this band and mode |
@@ -356,7 +356,7 @@ Club Log publishes a most-wanted list of DXCC entities, ranked by how many of it
 | 151 to 250 | 2 | Fairly common |
 | 251 and up | 1 | Common |
 
-The meter is shown only on stations whose need tag is New country, and in the station details. It does not change the ranking. Without the list (never downloaded, Club Log unreachable) nothing is shown.
+The meter is shown only on stations whose need tag is New DXCC, and in the station details. It does not change the ranking. Without the list (never downloaded, Club Log unreachable) nothing is shown.
 
 ## 16. Hunt list (alerts)
 

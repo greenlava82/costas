@@ -16,7 +16,7 @@ namespace Ft8Client.Core.Tests;
 /// <summary>
 /// Reproduces the sample scenario in mockups/main-idle.html. The "Next in line" rows match the mockup row for row.
 /// One Watching row differs on purpose: the mockup tags JH4UTP "New call", but in the same mockup JA1QRS (also
-/// Japan) is "New band", so Japan has no 20 m contact and the spec's rule makes JH4UTP "New band" too.
+/// Japan) is "New DXCC 20 m", so Japan has no 20 m contact and the spec's rule makes JH4UTP "New DXCC 20 m" too.
 /// The spec wins over the mockup (CLAUDE.md).
 /// </summary>
 public class RankerMockupScenarioTests
@@ -101,16 +101,16 @@ public class RankerMockupScenarioTests
         var rows = Rank().Line.Select(r => string.Join(" | ",
             r.Station.Call,
             StationText.Place(r.Station.Entity, r.Station.Region),
-            StationText.Need(r.Need.Tag),
+            StationText.Need(r.Need.Tag, "20m"),
             StationText.DoingNow(r.Station),
             StationText.Hears(r.Hears),
             Messages.Report.Format(r.Station.LastSnr),
             StationText.Chance(r.Chance))).ToList();
 
         rows.Should().Equal(
-            "ZL2RPA | New Zealand | New country | Calling CQ, 6 slots | Yes, -22 | -19 | Fair",
-            "JA1QRS | Japan | New band | Calling CQ, 3 slots | Japan does, at -17 | -08 | Good",
-            "KH6TU | Hawaii | New band | Calling CQ, 4 slots, fading | Yes, -14 | -21 | Fair",
+            "ZL2RPA | New Zealand | New DXCC | Calling CQ, 6 slots | Yes, -22 | -19 | Fair",
+            "JA1QRS | Japan | New DXCC 20 m | Calling CQ, 3 slots | Japan does, at -17 | -08 | Good",
+            "KH6TU | Hawaii | New DXCC 20 m | Calling CQ, 4 slots, fading | Yes, -14 | -21 | Fair",
             "VK3BMT | Australia | New grid | Calling CQ DX, 2 slots | No reports yet | -11 | Fair",
             "VE7HLB | Canada | New call | Calling CQ, 2 slots | Yes, -10 | -10 | Good",
             "LU8DCM | Argentina | New call | Calling CQ, 2 slots | Yes, -20 | -12 | Fair",
@@ -121,9 +121,9 @@ public class RankerMockupScenarioTests
     public void Rank_MockupScenario_WatchingAndHiddenWorked()
     {
         var result = Rank();
-        result.Watching.Select(r => $"{r.Station.Call} | {StationText.Need(r.Need.Tag)} | {StationText.Watch(r.Reason!, Now)}").Should().Equal(
-            "CE3MPV | New country | Went quiet 45 seconds ago",
-            "JH4UTP | New band | Finishing a contact with K7RGB",
+        result.Watching.Select(r => $"{r.Station.Call} | {StationText.Need(r.Need.Tag, "20m")} | {StationText.Watch(r.Reason!, Now)}").Should().Equal(
+            "CE3MPV | New DXCC | Went quiet 45 seconds ago",
+            "JH4UTP | New DXCC 20 m | Finishing a contact with K7RGB",
             "W9RDL | New call | In a contact with EA5HVK",
             "OH2KQA | New call | Went quiet 1 minute ago");
         result.WorkedCount.Should().Be(5);

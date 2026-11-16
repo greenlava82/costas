@@ -50,7 +50,7 @@ public sealed class LogRowViewModel(QsoRecord q)
     public string Name { get; } = q.Name ?? string.Empty;
 
     /// <summary>Need tag at the time.</summary>
-    public string Need { get; } = q.NeedTier is { } t and >= 1 and <= 5 ? StationText.Need((NeedTag)(t - 1)) : string.Empty;
+    public string Need { get; } = q.NeedTier is { } t and >= 1 and <= 5 ? StationText.Need((NeedTag)(t - 1), string.IsNullOrEmpty(q.Band) ? null : q.Band) : string.Empty;
 
     /// <summary>Colour of the Why tag, as in the station list.</summary>
     public TextKind NeedKind { get; } = q.NeedTier is { } k and >= 1 and <= 5 ? StationRowViewModel.KindOf((NeedTag)(k - 1)) : TextKind.Secondary;

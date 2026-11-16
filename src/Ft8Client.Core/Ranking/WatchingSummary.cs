@@ -40,8 +40,8 @@ public static class WatchingSummary
 
     private static readonly (NeedTag Tag, string One, string Many)[] Names =
     [
-        (NeedTag.NewCountry, "new country", "new countries"),
-        (NeedTag.NewBand, "new band", "new bands"),
+        (NeedTag.NewCountry, "new DXCC", "new DXCC"),
+        (NeedTag.NewBand, "new band DXCC", "new band DXCC"),
         (NeedTag.NewGrid, "new grid", "new grids"),
         (NeedTag.NewCall, "new call", "new calls"),
     ];

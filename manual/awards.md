@@ -39,7 +39,7 @@ countries confirmed.
 
 Under the award cards, **DXpeditions on the air** lists the DX operations announced on NG3K's list whose dates
 include today, with how many days are left. The ones you are decoding right now come first (*Heard now: H44MS on
-20 m, -12 dB*), then the countries you have not worked yet, marked **New country**. *digital* means the announcement mentions FT8, FT4 or digital modes. Hover a row for the QSL route
+20 m, -12 dB*), then the countries you have not worked yet, marked **New DXCC**. *digital* means the announcement mentions FT8, FT4 or digital modes. Hover a row for the QSL route
 and the announcement's notes (operators, bands and modes: not every operation runs FT8). **Starting in the next two
 weeks** lists what is coming. On the Operate screen, a station that is one of these shows *DXpedition* and its
 country under **Why**. The calls come from the announcement: the listed call, a portable call with it (3B9/M0CFW),

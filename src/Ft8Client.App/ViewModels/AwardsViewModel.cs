@@ -83,7 +83,7 @@ public sealed partial class AwardsViewModel : ObservableObject
             var key = _countries.Lookup(d.Call)?.Entity.Key;
             var known = key is not null && _summary is not null && !_log().IsEmpty;
             var isNew = known && missing.Contains(key!);
-            var need = !known ? string.Empty : isNew ? "New country" : unconfirmed.Contains(key!) ? "Worked, not confirmed" : "Worked";
+            var need = !known ? string.Empty : isNew ? "New DXCC" : unconfirmed.Contains(key!) ? "Worked, not confirmed" : "Worked";
             var station = heard?.Stations.Where(s => ReferenceEquals(_dxpeditions.Match(s.Call, now), d))
                 .OrderByDescending(s => s.LastHeardEndUtc).FirstOrDefault();
             var heardText = station is null ? string.Empty
@@ -98,7 +98,7 @@ public sealed partial class AwardsViewModel : ObservableObject
         foreach (var d in _dxpeditions.StartingSoon(now, SoonDays)) DxpeditionsSoon.Add(Row(d));
         HasDxpeditionsSoon = DxpeditionsSoon.Count > 0;
         var newCount = onAir.Count(r => r.NewCountry);
-        DxpeditionText = $"{onAir.Count} on the air" + (newCount > 0 ? $", {newCount} of them new countries for you" : string.Empty)
+        DxpeditionText = $"{onAir.Count} on the air" + (newCount > 0 ? $", {newCount} of them new DXCC for you" : string.Empty)
             + $". From NG3K's announced DX operations, read {_dxpeditions.FetchedUtc.ToString("d MMM HH:mm", CultureInfo.InvariantCulture)} UTC. "
             + "Dates and calls are as announced; not every operation runs FT8.";
     }

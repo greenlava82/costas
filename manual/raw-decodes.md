@@ -14,7 +14,7 @@ bar or ++ctrl+2++.
 | **Message** | The message exactly as decoded |
 | **Country** | The sender's country, from the country file |
 | **Distance** | How far away the sender is, in miles or kilometres as set in Settings. Blank until their grid is known |
-| **Why** | What working the sender would add, as a coloured tag as in the station list: **New country** (orange), **New band** or **New grid** (blue), **New call**, or **Worked before** |
+| **Why** | What working the sender would add, as a coloured tag as in the station list: **New DXCC** (orange), **New DXCC 20 m** (in your log, not on this band) or **New grid** (blue), **New call**, or **Worked before** |
 
 - The newest slot is at the top. Each slot opens with a heading: its time, then what it held, for example
   "14:30:30  ·  6 decodes  ·  3 CQ  ·  1 to you  ·  DT +0.3 s". The DT there is the slot's median; if it stays well
@@ -29,7 +29,7 @@ bar or ++ctrl+2++.
   the top.
 - Type in **Filter by callsign, text or country** to show only matching lines.
 - The **Show** chips beside it narrow the list to **CQs**, lines **To or from me** (messages to you and your own
-  transmissions), or **New for me** (a new country, band or grid). Each chip shows how many lines it would show, so
+  transmissions), or **New for me** (a new DXCC, band DXCC or grid). Each chip shows how many lines it would show, so
   you can see at a glance whether anyone new is on. **Clear filters** shows everything again.
 - **Clear** (top right) empties the list. New lines keep arriving, the top bar of the page reads, for example, "Cleared at 174515 UTC", and
   **Show earlier lines** brings back what you cleared. Clear only tidies this page: the station list, the log, the

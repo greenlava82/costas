@@ -16,11 +16,28 @@ public class StationTextWhyTests
     [Theory]
     [InlineData(NeedTag.NewGrid, "do62xx", "New grid DO62")]
     [InlineData(NeedTag.NewGrid, null, "New grid")]
-    [InlineData(NeedTag.NewCountry, "DO62", "New country")]
+    [InlineData(NeedTag.NewCountry, "DO62", "New DXCC")]
     [InlineData(NeedTag.NewCall, "DO62", "New call")]
     public void Why_Tag_NamesTheGridForANewGrid(NeedTag tag, string? grid, string expected)
     {
         StationText.Why(tag, grid).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("20m", "New DXCC 20 m")]
+    [InlineData("160m", "New DXCC 160 m")]
+    [InlineData("6m", "New DXCC 6 m")]
+    [InlineData(null, "New band DXCC")]
+    public void Need_NewBand_NamesTheBandWhenKnown(string? band, string expected)
+    {
+        StationText.Need(NeedTag.NewBand, band).Should().Be(expected);
+        StationText.Why(NeedTag.NewBand, "PM95", band).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Need_NewCountry_ReadsNewDxccWithoutABand()
+    {
+        StationText.Need(NeedTag.NewCountry, "20m").Should().Be("New DXCC", "a new DXCC is new on every band");
     }
 
     [Fact]

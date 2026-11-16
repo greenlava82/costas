@@ -12,7 +12,7 @@ namespace Ft8Client.App.ViewModels;
 /// <param name="Call">"H44MS".</param>
 /// <param name="Entity">"Solomon Is".</param>
 /// <param name="When">"Oct 3 – Nov 20 · 13 days left".</param>
-/// <param name="Need">"New country", "Worked, not confirmed", "Worked", or blank when unknown.</param>
+/// <param name="Need">"New DXCC", "Worked, not confirmed", "Worked", or blank when unknown.</param>
 /// <param name="NewCountry">True for a country not in the log yet.</param>
 /// <param name="Heard">"Heard now on 20 m, -12 dB" while it is being decoded, otherwise blank.</param>
 /// <param name="Tip">QSL route and the listing's notes.</param>

@@ -1229,6 +1229,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             _callWhenFree.Clear();
             StopAutoCall(null);
             _pileups = new PileupTracker(mode);
+            // The slot being recorded, and any decode still running, hold old-band audio: they are not applied
+            // (_rxMovedUtc, set above).
+            _recordingSlot = null;
             foreach (var (call, e) in _lookups) _tracker.SetLookup(call, e.Grid, e.State, e.City);
             _engine.Abandon(_clock.UtcNow);
             _engine.StopCq(_clock.UtcNow);
@@ -1299,7 +1302,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         lock (_gate)
         {
             var stationChanged = config.MyCall != _config.MyCall || config.MyGrid != _config.MyGrid;
-            _config = config;
+            // Band and mode change only through SetBand, which clears the old band's stations. The saved band is
+            // written just before SetBand runs: taken from here, it published the new band with the old band's list.
+            _config = config with { Band = _config.Band, Mode = _config.Mode };
             _engine.Configure(config.MyCall, config.MyGrid, CappedContact());
             ReloadContestLog();
             _kbd.Configure(config.MyCall);

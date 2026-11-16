@@ -85,7 +85,7 @@ public static class RemoteStateBuilder
             Conversation = [.. s.Conversation.TakeLast(MaxConversation)
                 .Select(l => new RemoteLine(l.Utc.ToString("HH:mm:ss", CultureInfo.InvariantCulture), l.Who, l.Text, l.Mine))],
             Callers = [.. s.Waiting.Select(w => Caller(w, s, inContact))],
-            Line = [.. s.Rank.Line.Take(MaxLine).Select(x => Row(new StationRowViewModel(x, 0, units, nowUtc, log?.LastContactWith(x.Station.Call)), s))],
+            Line = [.. s.Rank.Line.Take(MaxLine).Select(x => Row(new StationRowViewModel(x, 0, units, nowUtc, log?.LastContactWith(x.Station.Call), band: s.Band), s))],
             Band = s.Band,
             Mode = ModeInfo.Name(s.Mode),
             Bands = [.. ctx.Bands(s.Mode).Select(b => new RemoteBand(b, BandPlan.Display(b)))],
@@ -103,11 +103,11 @@ public static class RemoteStateBuilder
             Summary = summary is null ? null : new RemoteSummary(summary.Title, summary.StationsHeard, summary.Countries, summary.CallingCq, summary.YouNeed, summary.Caption),
             Repeats = [.. OperateViewModel.RepeatOrder(s.Rank.Worked).Take(MaxRows).Select(x => Repeat(new RepeatRowViewModel(x, log?.LastContactWith(x.Station.Call),
                 log?.ContactsWith(x.Station.Call).Count ?? 0, units, nowUtc), s))],
-            Watching = [.. s.Rank.Watching.Take(MaxRows).Select(x => new WatchRowViewModel(x, nowUtc, units)).Select(x => new RemoteWatch(x.Call, x.Where, x.Why, x.Reason))],
+            Watching = [.. s.Rank.Watching.Take(MaxRows).Select(x => new WatchRowViewModel(x, nowUtc, units, band: s.Band)).Select(x => new RemoteWatch(x.Call, x.Where, x.Why, x.Reason))],
             Signal = Signal(s, nowUtc, ctx, log, band),
             TonightTitle = $"Worked this session · {s.Tonight.Count}",
             Tonight = [.. s.Tonight.OrderByDescending(t => t.TimeUtc).Take(MaxRecent).Select(t => new RemoteTonight(t.Call,
-                StationText.Place(ctx.Countries?.Lookup(t.Call), null), $"{BandPlan.Display(t.Band)} {t.ModeKey}", StationText.Need(t.Need), OperateViewModel.Hm(t.TimeUtc)))],
+                StationText.Place(ctx.Countries?.Lookup(t.Call), null), $"{BandPlan.Display(t.Band)} {t.ModeKey}", StationText.Need(t.Need, t.Band), OperateViewModel.Hm(t.TimeUtc)))],
             Logged = Logged(s.LastLogged, nowUtc),
             Decodes = [.. s.RawDecodes.Reverse().Take(MaxDecodes).Select(Decode)],
             Details = viewing is null ? null : Details(viewing, s, nowUtc, ctx, log, inContact),
@@ -158,7 +158,7 @@ public static class RemoteStateBuilder
     {
         var left = c is null ? TimeSpan.Zero : c.LoggedUtc + LoggedNoticeViewModel.ShowFor - now;
         return c is null || left <= TimeSpan.Zero ? null
-            : new RemoteLogged(c.Id, c.Call, StationText.Need(c.Need), string.Join(" · ", new[] { LoggedNoticeViewModel.ReportsOf(c, withTime: false), c.Place,
+            : new RemoteLogged(c.Id, c.Call, StationText.Need(c.Need, c.Band), string.Join(" · ", new[] { LoggedNoticeViewModel.ReportsOf(c, withTime: false), c.Place,
                 LoggedNoticeViewModel.PowerOf(c) }
                 .Where(x => x.Length > 0)), (int)left.TotalMilliseconds);
     }
@@ -214,7 +214,7 @@ public static class RemoteStateBuilder
             Zones = v.Zones,
             Rarity = v.Rarity,
             LookupNote = v.LookupNote,
-            Need = ranked is null ? string.Empty : StationText.Need(ranked.Need.Tag),
+            Need = ranked is null ? string.Empty : StationText.Need(ranked.Need.Tag, s.Band),
             Heard = station is null ? string.Empty
                 : $"{StationText.DoingNow(station)} · {Report.Format(station.LastSnr)} dB · {StationText.Ago(now - station.LastHeardEndUtc)}",
             Pileup = v.PileupHeadline,
@@ -250,7 +250,7 @@ public static class RemoteStateBuilder
             ? $"Last heard at {w.LastCalledUtc.ToString("HH:mm:ss", CultureInfo.InvariantCulture)} · {Report.Format(w.Snr)}"
             : $"Called you at {w.FirstCalledUtc.ToString("HH:mm:ss", CultureInfo.InvariantCulture)} · {Report.Format(w.Snr)}";
         var button = inContact ? (w.AnswerAfter ? $"Will {verb.ToLowerInvariant()} after this contact" : $"{verb} after this contact") : verb;
-        return new RemoteCaller(w.Call, st is null ? string.Empty : StationText.Place(st.Entity, st.Region, st.City), need is { } n ? StationText.Need(n) : string.Empty,
+        return new RemoteCaller(w.Call, st is null ? string.Empty : StationText.Place(st.Entity, st.Region, st.City), need is { } n ? StationText.Need(n, s.Band) : string.Empty,
             line, button, inContact ? "answerAfter" : "answer", w.AnswerAfter, w.AfterStop ? $"Replied after you stopped: {w.LastMessage}" : string.Empty);
     }
 }

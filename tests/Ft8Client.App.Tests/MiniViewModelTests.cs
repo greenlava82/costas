@@ -76,7 +76,7 @@ public class MiniViewModelTests
         mini.HasTop.Should().BeTrue();
         mini.InContact.Should().BeFalse();
         mini.Call.Should().Be("JA6VQA");
-        mini.Why.Should().Be("New country");
+        mini.Why.Should().Be("New DXCC");
         mini.Detail.Should().EndWith("-14");
     }
 
