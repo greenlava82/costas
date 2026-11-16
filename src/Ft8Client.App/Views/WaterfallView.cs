@@ -44,6 +44,8 @@ public sealed class WaterfallView : Control
     private float[] _levels = [];
     private readonly NoiseFloorTracker _floor = new();
     private WaterfallLevels _scale = WaterfallLevels.Default;
+    private string _palette = WaterfallPalette.Wsjtx;
+    private int[] _colours = WaterfallPalette.Colours(WaterfallPalette.Wsjtx);
     private readonly bool[] _slotStart = new bool[MaxRows];
     private int _bins;
     private int _head;
@@ -114,7 +116,7 @@ public sealed class WaterfallView : Control
             {
                 var level = (float)(row[bin] - floor);
                 _levels[start + bin] = level;
-                _pixels[start + bin] = WaterfallPalette.For(_scale, level);
+                _pixels[start + bin] = WaterfallPalette.For(_colours, _scale, level);
             }
             _slotStart[_head] = slotStart;
             _count = Math.Min(MaxRows, _count + 1);
@@ -132,7 +134,25 @@ public sealed class WaterfallView : Control
         levels = levels.Clamped();
         if (levels == _scale) return;
         _scale = levels;
-        for (var i = 0; i < _levels.Length; i++) _pixels[i] = WaterfallPalette.For(_scale, _levels[i]);
+        Recolour();
+    }
+
+    /// <summary>The palette in use (<see cref="WaterfallPalette.Choices"/>).</summary>
+    public string Palette => _palette;
+
+    /// <summary>Sets the palette and recolours the history with it.</summary>
+    public void SetPalette(string? palette)
+    {
+        palette = WaterfallPalette.Known(palette);
+        if (palette == _palette) return;
+        _palette = palette;
+        _colours = WaterfallPalette.Colours(palette);
+        Recolour();
+    }
+
+    private void Recolour()
+    {
+        for (var i = 0; i < _levels.Length; i++) _pixels[i] = WaterfallPalette.For(_colours, _scale, _levels[i]);
         _dirty = true;
         InvalidateVisual();
     }
@@ -163,7 +183,9 @@ public sealed class WaterfallView : Control
         _levels = (float[])other._levels.Clone();
         _pixels = new int[_levels.Length];
         _scale = other._scale;
-        for (var i = 0; i < _levels.Length; i++) _pixels[i] = WaterfallPalette.For(_scale, _levels[i]);
+        _palette = other._palette;
+        _colours = other._colours;
+        for (var i = 0; i < _levels.Length; i++) _pixels[i] = WaterfallPalette.For(_colours, _scale, _levels[i]);
         _floor.CopyFrom(other._floor);
         Array.Copy(other._slotStart, _slotStart, MaxRows);
         _head = other._head;

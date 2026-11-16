@@ -33,6 +33,42 @@ public class ReceiveSpectrumTests
     }
 
     [Fact]
+    public void Append_OverlappingFrames_NewFrameEveryHop()
+    {
+        var spectrum = new ReceiveSpectrum();
+        spectrum.Append(new float[ReceiveSpectrum.Size]);
+        spectrum.TakeLatest().Should().NotBeNull();
+        spectrum.Append(new float[ReceiveSpectrum.Hop - 1]);
+        spectrum.TakeLatest().Should().BeNull();
+        spectrum.Append(new float[1]);
+        spectrum.TakeLatest().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void TakeLatest_SeveralFrames_AveragesTheirPower()
+    {
+        // A full frame of tone then half a frame of silence: three frames hold all, three quarters and half of the tone,
+        // so their average sits below the full tone's level (−6 dB) but far above silence.
+        var spectrum = new ReceiveSpectrum();
+        var samples = Enumerable.Range(0, ReceiveSpectrum.Size + 2 * ReceiveSpectrum.Hop)
+            .Select(i => i < ReceiveSpectrum.Size ? (float)(0.5 * Math.Sin(2 * Math.PI * 1500 * i / 12000)) : 0f).ToArray();
+        spectrum.Append(samples);
+        var row = spectrum.TakeLatest()!;
+        var bin = (int)Math.Round(1500.0 * ReceiveSpectrum.Size / 12000);
+        row[bin].Should().BeLessThan(-6.5f).And.BeGreaterThan(-15);
+    }
+
+    [Fact]
+    public void TakeLatest_NotTakenForLong_KeepsOnlyRecentFrames()
+    {
+        // A tone, then much more silence than MaxAverage frames: the row must show silence, not a smear of the tone.
+        var spectrum = new ReceiveSpectrum();
+        spectrum.Append(Enumerable.Range(0, ReceiveSpectrum.Size).Select(i => (float)(0.5 * Math.Sin(2 * Math.PI * 1500 * i / 12000))).ToArray());
+        spectrum.Append(new float[ReceiveSpectrum.Size * 2 + ReceiveSpectrum.Hop * ReceiveSpectrum.MaxAverage]);
+        spectrum.TakeLatest()!.Max().Should().BeLessThan(-100);
+    }
+
+    [Fact]
     public void Append_Silence_ProducesFiniteFloor()
     {
         var spectrum = new ReceiveSpectrum();

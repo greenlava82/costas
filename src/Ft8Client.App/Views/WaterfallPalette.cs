@@ -11,15 +11,31 @@ using Ft8Client.Core.Spectrum;
 namespace Ft8Client.App.Views;
 
 /// <summary>
-/// The waterfall colours: dark navy for the noise, through blue and purple, to bright red for the strongest signals
-/// (owner request 2026-11-16). Plain integers, no Avalonia objects, so it can be used from any thread.
+/// The waterfall colour tables, darkest first. Plain integers (0xAARRGGBB, BGRA bytes in memory), no Avalonia objects,
+/// so they can be used from any thread.
 /// </summary>
 public static class WaterfallPalette
 {
     /// <summary>Colour steps from darkest to brightest.</summary>
     public const int Steps = 256;
 
-    private static readonly (double At, int R, int G, int B)[] Stops =
+    /// <summary>WSJT-X's Default palette: black, blues, yellows, then red-orange.</summary>
+    public const string Wsjtx = "wsjtx";
+
+    /// <summary>Dark navy through blue and purple to bright red (owner request 2026-11-16).</summary>
+    public const string Costas = "costas";
+
+    /// <summary>The palettes offered, by id and the name shown.</summary>
+    public static IReadOnlyList<(string Id, string Name)> Choices { get; } = [(Wsjtx, "WSJT-X"), (Costas, "Blue to red")];
+
+    // WSJT-X Palettes/Default.pal (sourceforge.net/p/wsjt/wsjtx, b4f9a43, read 2026-11-16). GPLv3, as Costas.
+    private static readonly (int R, int G, int B)[] WsjtxStops =
+    [
+        (0, 0, 0), (0, 6, 136), (0, 19, 198), (0, 32, 239), (172, 167, 105),
+        (194, 198, 49), (225, 228, 107), (255, 255, 0), (255, 51, 0),
+    ];
+
+    private static readonly (double At, int R, int G, int B)[] CostasStops =
     [
         (0.00, 4, 10, 32),
         (0.30, 20, 60, 200),
@@ -28,21 +44,46 @@ public static class WaterfallPalette
         (1.00, 255, 70, 50),
     ];
 
-    private static readonly int[] Colours = Enumerable.Range(0, Steps).Select(i => Colour(i / (Steps - 1.0))).ToArray();
+    private static readonly int[] WsjtxColours = WsjtxTable();
+    private static readonly int[] CostasColours = Enumerable.Range(0, Steps).Select(i => CostasColour(i / (Steps - 1.0))).ToArray();
 
-    /// <summary>The colour at a step, as 0xAARRGGBB (BGRA bytes in memory).</summary>
-    public static int At(int step) => Colours[Math.Clamp(step, 0, Steps - 1)];
+    /// <summary>The colour table for a palette id; an unknown id gets the WSJT-X palette.</summary>
+    public static int[] Colours(string? id) => id == Costas ? CostasColours : WsjtxColours;
+
+    /// <summary>A known palette id, or the WSJT-X palette for anything else.</summary>
+    public static string Known(string? id) => id == Costas ? Costas : Wsjtx;
+
+    /// <summary>The colour at a step of a palette.</summary>
+    public static int At(string? id, int step) => Colours(id)[Math.Clamp(step, 0, Steps - 1)];
 
     /// <summary>The colour for a level relative to the noise floor on a scale.</summary>
-    public static int For(WaterfallLevels scale, double relativeDb) => Colours[scale.Step(relativeDb, Steps)];
+    public static int For(int[] colours, WaterfallLevels scale, double relativeDb) => colours[scale.Step(relativeDb, Steps)];
 
-    private static int Colour(double t)
+    // The stops spread evenly over the table and joined in straight lines, as WSJT-X's WFPalette::interpolate does it,
+    // including its last step falling just short of the final stop.
+    private static int[] WsjtxTable()
+    {
+        var table = new int[Steps];
+        var interval = (double)Steps / (WsjtxStops.Length - 1);
+        for (var i = 0; i < Steps; i++)
+        {
+            var prior = Math.Min((int)(i / interval), WsjtxStops.Length - 2);
+            var (a, b) = (WsjtxStops[prior], WsjtxStops[prior + 1]);
+            var f = (i - interval * prior) / interval;
+            table[i] = Argb(a.R + f * (b.R - a.R), a.G + f * (b.G - a.G), a.B + f * (b.B - a.B));
+        }
+        return table;
+    }
+
+    private static int CostasColour(double t)
     {
         var k = 1;
-        while (k < Stops.Length - 1 && t > Stops[k].At) k++;
-        var (a, b) = (Stops[k - 1], Stops[k]);
+        while (k < CostasStops.Length - 1 && t > CostasStops[k].At) k++;
+        var (a, b) = (CostasStops[k - 1], CostasStops[k]);
         var f = Math.Clamp((t - a.At) / (b.At - a.At), 0, 1);
-        int Mix(int x, int y) => (int)Math.Round(x + (y - x) * f);
-        return unchecked((int)0xFF000000) | (Mix(a.R, b.R) << 16) | (Mix(a.G, b.G) << 8) | Mix(a.B, b.B);
+        return Argb(a.R + f * (b.R - a.R), a.G + f * (b.G - a.G), a.B + f * (b.B - a.B));
     }
+
+    private static int Argb(double r, double g, double b) =>
+        unchecked((int)0xFF000000) | ((int)Math.Round(r) << 16) | ((int)Math.Round(g) << 8) | (int)Math.Round(b);
 }

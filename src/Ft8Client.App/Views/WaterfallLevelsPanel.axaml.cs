@@ -12,40 +12,48 @@ using Ft8Client.Core.Spectrum;
 
 namespace Ft8Client.App.Views;
 
-/// <summary>Sliders for the waterfall colour scale: the darkest level and the range to the brightest.</summary>
+/// <summary>The waterfall colours: the palette, the darkest level and the range to the brightest.</summary>
 public partial class WaterfallLevelsPanel : UserControl
 {
     private bool _setting;
 
-    /// <summary>Creates the panel showing the default scale.</summary>
+    /// <summary>Creates the panel showing the default palette and scale.</summary>
     public WaterfallLevelsPanel()
     {
         InitializeComponent();
+        PaletteBox.ItemsSource = WaterfallPalette.Choices.Select(c => c.Name).ToList();
         FloorSlider.Minimum = WaterfallLevels.MinFloorDb;
         FloorSlider.Maximum = WaterfallLevels.MaxFloorDb;
         RangeSlider.Minimum = WaterfallLevels.MinRangeDb;
         RangeSlider.Maximum = WaterfallLevels.MaxRangeDb;
-        Show(WaterfallLevels.Default);
+        Show(WaterfallLevels.Default, WaterfallPalette.Wsjtx);
+        PaletteBox.SelectionChanged += (_, _) => Changed();
         FloorSlider.ValueChanged += (_, _) => Changed();
         RangeSlider.ValueChanged += (_, _) => Changed();
         ResetButton.Click += (_, _) =>
         {
-            Show(WaterfallLevels.Default);
+            Show(WaterfallLevels.Default, Palette);
             Changed();
         };
     }
 
-    /// <summary>Raised as the operator moves a slider or resets.</summary>
-    public event Action<WaterfallLevels>? LevelsChanged;
+    /// <summary>Raised as the operator picks a palette, moves a slider or resets.</summary>
+    public event Action<WaterfallLevels, string>? LevelsChanged;
 
     /// <summary>The scale the sliders show.</summary>
     public WaterfallLevels Levels => new WaterfallLevels((int)Math.Round(FloorSlider.Value), (int)Math.Round(RangeSlider.Value)).Clamped();
 
-    /// <summary>Shows a scale without raising <see cref="LevelsChanged"/>.</summary>
-    public void Show(WaterfallLevels levels)
+    /// <summary>The palette picked.</summary>
+    public string Palette =>
+        PaletteBox.SelectedIndex is var i && i >= 0 && i < WaterfallPalette.Choices.Count ? WaterfallPalette.Choices[i].Id : WaterfallPalette.Wsjtx;
+
+    /// <summary>Shows a scale and palette without raising <see cref="LevelsChanged"/>.</summary>
+    public void Show(WaterfallLevels levels, string? palette)
     {
         levels = levels.Clamped();
+        palette = WaterfallPalette.Known(palette);
         _setting = true;
+        PaletteBox.SelectedIndex = WaterfallPalette.Choices.Select(c => c.Id).ToList().IndexOf(palette);
         FloorSlider.Value = levels.FloorDb;
         RangeSlider.Value = levels.RangeDb;
         _setting = false;
@@ -55,7 +63,7 @@ public partial class WaterfallLevelsPanel : UserControl
     private void Changed()
     {
         ShowValues();
-        if (!_setting) LevelsChanged?.Invoke(Levels);
+        if (!_setting) LevelsChanged?.Invoke(Levels, Palette);
     }
 
     private void ShowValues()

@@ -47,7 +47,7 @@ public partial class MainWindow : Window
         };
         WaterfallGrip.KeyDown += OnGripKey;
         PopOutButton.Click += (_, _) => PopOutWaterfall();
-        LevelsPanel.LevelsChanged += l => ApplyLevels(l, save: true);
+        LevelsPanel.LevelsChanged += (l, p) => ApplyLevels(l, p, save: true);
         _levelsSave.Tick += (_, _) => SaveLevels();
         AddHandler(Button.ClickEvent, (_, e) =>
         {
@@ -83,7 +83,7 @@ public partial class MainWindow : Window
         Height = Math.Max(MinHeight, w.Height);
         if (w.X is { } x && w.Y is { } y) Position = new Avalonia.PixelPoint(x, y);
         SetWaterfallHeight(w.WaterfallHeight, save: false);
-        ApplyLevels(new Core.Spectrum.WaterfallLevels(w.WaterfallFloorDb, w.WaterfallRangeDb), save: false);
+        ApplyLevels(new Core.Spectrum.WaterfallLevels(w.WaterfallFloorDb, w.WaterfallRangeDb), w.WaterfallPalette, save: false);
         OperatePage.LoadColumns(w.ColumnWidths);
         OperatePage.ColumnsSaved += (name, widths) => vm.Host.Settings.Update(s => s.Window.ColumnWidths[name] = [.. widths]);
         vm.Operate.SideTab = Math.Clamp(w.SideTab, OperateViewModel.BandTab, OperateViewModel.SessionTab);
@@ -230,17 +230,19 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    // The colour scale is shared by the strip and the popped-out window. Dragging a slider applies at once; the setting
-    // is saved once the slider has rested, not on every step.
-    private void ApplyLevels(Core.Spectrum.WaterfallLevels levels, bool save)
+    // The colours are shared by the strip and the popped-out window. Dragging a slider applies at once; the setting is
+    // saved once the slider has rested, not on every step.
+    private void ApplyLevels(Core.Spectrum.WaterfallLevels levels, string? palette, bool save)
     {
         levels = levels.Clamped();
         ReceiveWaterfall.SetLevels(levels);
-        LevelsPanel.Show(levels);
+        ReceiveWaterfall.SetPalette(palette);
+        LevelsPanel.Show(levels, palette);
         if (_waterfallWindow is { } ww)
         {
             ww.View.SetLevels(levels);
-            ww.Levels.Show(levels);
+            ww.View.SetPalette(palette);
+            ww.Levels.Show(levels, palette);
         }
         if (!save) return;
         _levelsSave.Stop();
@@ -252,10 +254,12 @@ public partial class MainWindow : Window
         _levelsSave.Stop();
         if (Vm is not { } vm) return;
         var levels = ReceiveWaterfall.Levels;
+        var palette = ReceiveWaterfall.Palette;
         vm.Host.Settings.Update(s =>
         {
             s.Window.WaterfallFloorDb = levels.FloorDb;
             s.Window.WaterfallRangeDb = levels.RangeDb;
+            s.Window.WaterfallPalette = palette;
         });
     }
 
@@ -274,8 +278,8 @@ public partial class MainWindow : Window
         if (w is { WaterfallX: { } x, WaterfallY: { } y } && OnSomeScreen(new PixelPoint(x, y))) window.Position = new PixelPoint(x, y);
         else window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         window.View.CopyFrom(ReceiveWaterfall);
-        window.Levels.Show(ReceiveWaterfall.Levels);
-        window.Levels.LevelsChanged += l => ApplyLevels(l, save: true);
+        window.Levels.Show(ReceiveWaterfall.Levels, ReceiveWaterfall.Palette);
+        window.Levels.LevelsChanged += (l, p) => ApplyLevels(l, p, save: true);
         window.View.ChannelSelected += SelectChannel;
         window.Closing += (_, _) =>
         {

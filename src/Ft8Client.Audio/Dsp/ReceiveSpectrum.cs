@@ -10,18 +10,49 @@ using System.Numerics;
 
 namespace Ft8Client.Audio.Dsp;
 
-/// <summary>Windowed receive spectrum at 12 kHz, computed on the capture pump, never the audio callback.</summary>
+/// <summary>
+/// Windowed receive spectrum at 12 kHz, computed on the capture pump, never the audio callback. Frames overlap by three
+/// quarters (a new one every <see cref="Hop"/> samples, about 43 ms), and each waterfall row is the average power of the
+/// frames since the last row, as WSJT-X averages several spectra into each of its rows (its <c>WaterfallAvg</c>): the
+/// noise comes out even and signals solid instead of speckled.
+/// </summary>
 public sealed class ReceiveSpectrum
 {
     /// <summary>FFT length; frequency resolution is approximately 5.9 Hz.</summary>
     public const int Size = 2048;
+
+    /// <summary>Samples between frames.</summary>
+    public const int Hop = Size / 4;
+
+    /// <summary>Most frames averaged into one row; older ones are dropped, so audio from long ago never smears in.</summary>
+    public const int MaxAverage = 8;
+
+    private const int Bins = Size / 4 + 1; // 0–3000 Hz
     private readonly float[] _samples = new float[Size];
     private readonly Complex[] _fft = new Complex[Size];
+    private readonly double[] _power = new double[Bins];
+    private readonly Lock _gate = new();
     private int _count;
-    private float[]? _latest;
+    private int _frames;
 
-    /// <summary>Takes the newest complete spectrum, in dBFS, or null when no new audio arrived.</summary>
-    public float[]? TakeLatest() => Interlocked.Exchange(ref _latest, null);
+    /// <summary>
+    /// Takes the average spectrum of the frames since the last call, in dBFS, or null when no new frame arrived.
+    /// </summary>
+    public float[]? TakeLatest()
+    {
+        lock (_gate)
+        {
+            if (_frames == 0) return null;
+            var row = new float[Bins];
+            for (var i = 0; i < Bins; i++)
+            {
+                row[i] = (float)(10 * Math.Log10(Math.Max(1e-12, _power[i] / _frames)));
+                _power[i] = 0;
+            }
+            _frames = 0;
+            return row;
+        }
+    }
 
     /// <summary>Feeds resampled audio from the capture pump.</summary>
     public void Append(ReadOnlySpan<float> samples)
@@ -30,9 +61,11 @@ public sealed class ReceiveSpectrum
         {
             _samples[_count++] = sample;
             if (_count != Size) continue;
-            _count = 0;
+            _count = Size - Hop;
             for (var i = 0; i < Size; i++)
                 _fft[i] = new Complex(_samples[i] * (0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (Size - 1))), 0);
+            // Keep the newest three quarters for the next frame.
+            Array.Copy(_samples, Hop, _samples, 0, Size - Hop);
             for (int i = 1, j = 0; i < Size; i++)
             {
                 var bit = Size >> 1;
@@ -56,10 +89,20 @@ public sealed class ReceiveSpectrum
                     }
                 }
             }
-            var row = new float[Size / 4 + 1]; // 0–3000 Hz
-            for (var i = 0; i < row.Length; i++)
-                row[i] = (float)(20 * Math.Log10(Math.Max(1e-6, _fft[i].Magnitude * 4 / Size)));
-            Interlocked.Exchange(ref _latest, row);
+            lock (_gate)
+            {
+                if (_frames == MaxAverage)
+                {
+                    Array.Clear(_power);
+                    _frames = 0;
+                }
+                for (var i = 0; i < Bins; i++)
+                {
+                    var amplitude = _fft[i].Magnitude * 4 / Size;
+                    _power[i] += amplitude * amplitude;
+                }
+                _frames++;
+            }
         }
     }
 }

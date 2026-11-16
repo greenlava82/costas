@@ -1,4 +1,4 @@
-<!-- The waterfall colour scale, opened from the Levels button over the waterfall. Values are dB relative to the noise floor. -->
+<!-- The waterfall colours, opened from the Levels button over the waterfall. Levels are dB relative to the noise floor. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Ft8Client.App.Views.WaterfallLevelsPanel">
@@ -6,6 +6,10 @@
     <TextBlock Text="Waterfall levels" FontWeight="SemiBold" />
     <TextBlock Text="Measured from the noise floor, so they hold whatever the audio level." TextWrapping="Wrap" FontSize="11"
                Opacity="0.75" />
+    <DockPanel>
+      <TextBlock Text="Colours" VerticalAlignment="Center" Margin="0,0,8,0" />
+      <ComboBox x:Name="PaletteBox" HorizontalAlignment="Stretch" AutomationProperties.Name="Waterfall colours" />
+    </DockPanel>
     <DockPanel>
       <TextBlock x:Name="FloorValue" DockPanel.Dock="Right" VerticalAlignment="Center" />
       <TextBlock Text="Darkest" VerticalAlignment="Center" />
@@ -21,6 +25,6 @@
             ToolTip.Tip="dB from darkest to brightest. Narrow it for more contrast between weak signals."
             AutomationProperties.Name="Waterfall range from darkest to brightest, dB" />
     <Button x:Name="ResetButton" Content="Reset" HorizontalAlignment="Right"
-            ToolTip.Tip="Back to darkest −5 dB, range 35 dB" />
+            ToolTip.Tip="Back to darkest −5 dB, range 35 dB. The colours are kept." />
   </StackPanel>
 </UserControl>

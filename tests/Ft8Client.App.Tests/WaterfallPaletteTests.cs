@@ -16,29 +16,65 @@ public class WaterfallPaletteTests
 {
     private static double Luma(int c) => 0.3 * ((c >> 16) & 0xFF) + 0.59 * ((c >> 8) & 0xFF) + 0.11 * (c & 0xFF);
 
-    [Fact]
-    public void At_Ends_DarkBlueToBrightRed()
+    private static (int R, int G, int B) Rgb(int c) => ((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF);
+
+    [Theory]
+    [InlineData(0, 0, 0, 0)]
+    [InlineData(32, 0, 6, 136)]
+    [InlineData(64, 0, 19, 198)]
+    [InlineData(96, 0, 32, 239)]
+    [InlineData(128, 172, 167, 105)]
+    [InlineData(160, 194, 198, 49)]
+    [InlineData(192, 225, 228, 107)]
+    [InlineData(224, 255, 255, 0)]
+    public void At_Wsjtx_HitsDefaultPalStopsEvery32Steps(int step, int r, int g, int b)
     {
-        var dark = WaterfallPalette.At(0);
-        var bright = WaterfallPalette.At(WaterfallPalette.Steps - 1);
+        // WSJT-X Palettes/Default.pal spread over 256 colours by WFPalette::interpolate: a stop every 256/8 = 32 steps.
+        Rgb(WaterfallPalette.At(WaterfallPalette.Wsjtx, step)).Should().Be((r, g, b));
+    }
+
+    [Fact]
+    public void At_WsjtxLastStep_FallsJustShortOfTheFinalStop()
+    {
+        // WSJT-X never reaches 255,51,0 itself: step 255 is 31/32 of the way from yellow.
+        Rgb(WaterfallPalette.At(WaterfallPalette.Wsjtx, 255)).Should().Be((255, 57, 0));
+    }
+
+    [Fact]
+    public void At_Costas_DarkBlueToBrightRed()
+    {
+        var dark = WaterfallPalette.At(WaterfallPalette.Costas, 0);
+        var bright = WaterfallPalette.At(WaterfallPalette.Costas, WaterfallPalette.Steps - 1);
         ((dark >> 16) & 0xFF).Should().BeLessThan(dark & 0xFF, "the darkest colour is blue");
         ((bright >> 16) & 0xFF).Should().Be(255, "the brightest colour is full red");
         (bright & 0xFF).Should().BeLessThan(100);
     }
 
     [Fact]
-    public void At_EachStep_NoDarkerThanTheOneBefore()
+    public void At_CostasEachStep_NoDarkerThanTheOneBefore()
     {
         for (var i = 1; i < WaterfallPalette.Steps; i++)
-            Luma(WaterfallPalette.At(i)).Should().BeGreaterThanOrEqualTo(Luma(WaterfallPalette.At(i - 1)) - 1, $"step {i} (allowing for rounding to whole colour levels)");
+            Luma(WaterfallPalette.At(WaterfallPalette.Costas, i)).Should()
+                .BeGreaterThanOrEqualTo(Luma(WaterfallPalette.At(WaterfallPalette.Costas, i - 1)) - 1, $"step {i} (allowing for rounding to whole colour levels)");
+    }
+
+    [Theory]
+    [InlineData(null, WaterfallPalette.Wsjtx)]
+    [InlineData("", WaterfallPalette.Wsjtx)]
+    [InlineData("linrad", WaterfallPalette.Wsjtx)]
+    [InlineData(WaterfallPalette.Costas, WaterfallPalette.Costas)]
+    public void Known_UnknownId_FallsBackToWsjtx(string? id, string known)
+    {
+        WaterfallPalette.Known(id).Should().Be(known);
     }
 
     [Fact]
-    public void For_NoiseFloor_IsNearTheDarkEnd()
+    public void For_NoiseFloor_IsDarkBlueInWsjtxColours()
     {
-        // At the default scale the noise itself (0 dB) sits a seventh of the way up: dark, but not black.
-        var noise = WaterfallPalette.For(WaterfallLevels.Default, 0);
-        Luma(noise).Should().BeLessThan(Luma(WaterfallPalette.At(WaterfallPalette.Steps / 2)));
-        Luma(noise).Should().BeGreaterThan(Luma(WaterfallPalette.At(0)));
+        // At the default scale the noise itself (0 dB) sits about a seventh of the way up: between black and navy.
+        var colours = WaterfallPalette.Colours(WaterfallPalette.Wsjtx);
+        var (r, g, b) = Rgb(WaterfallPalette.For(colours, WaterfallLevels.Default, 0));
+        r.Should().Be(0);
+        b.Should().BeGreaterThan(g).And.BeGreaterThan(50);
     }
 }

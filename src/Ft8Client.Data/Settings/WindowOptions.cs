@@ -53,6 +53,9 @@ public sealed class WindowOptions
     /// <summary>Waterfall colour scale: dB from darkest to brightest.</summary>
     public int WaterfallRangeDb { get; set; } = Core.Spectrum.WaterfallLevels.DefaultRangeDb;
 
+    /// <summary>Waterfall colours: "wsjtx" (WSJT-X's Default palette) or "costas" (blue to red).</summary>
+    public string WaterfallPalette { get; set; } = "wsjtx";
+
     /// <summary>Views popped out into their own windows, by view name ("Raw decodes", "Reach", "Log", "Awards").</summary>
     public Dictionary<string, PanelWindowOptions> Panels { get; set; } = [];
 
