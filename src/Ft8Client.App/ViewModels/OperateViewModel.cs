@@ -600,16 +600,27 @@ public sealed partial class OperateViewModel : ObservableObject
         ListUpdated = false;
     }
 
-    /// <summary>A row was clicked: select it and show details. In PSK and RTTY the conversation box reads its signal.</summary>
-    public void RowClicked(StationRowViewModel row)
+    /// <summary>
+    /// A row was clicked: select it. The details card opens only when <paramref name="showDetails"/> (a click on the
+    /// call itself), so picking a row does not cover the list (a Reddit user found the card in the way). An open card
+    /// follows the selection. In PSK and RTTY the conversation box reads its signal.
+    /// </summary>
+    public void RowClicked(StationRowViewModel row, bool showDetails = false)
     {
         _line.Clicked();
         if (Keyboard.Visible) _commands.KeyboardListen(row.Source.Station.OffsetHz);
-        Select(row);
+        Select(row, showDetails || Details is not null);
     }
 
-    /// <summary>Selects a row and loads its details.</summary>
-    public void Select(StationRowViewModel? row)
+    /// <summary>Opens the details card for the selected row, or closes it when it is open (the I key).</summary>
+    public void ToggleDetails()
+    {
+        if (Details is not null) Details = null;
+        else if (Selected is { } row) Select(row, showDetails: true);
+    }
+
+    /// <summary>Selects a row and, with <paramref name="showDetails"/>, loads its details into the card.</summary>
+    public void Select(StationRowViewModel? row, bool showDetails = false)
     {
         foreach (var r in Line) r.IsSelected = ReferenceEquals(r, row);
         Selected = row;
@@ -619,6 +630,7 @@ public sealed partial class OperateViewModel : ObservableObject
             return;
         }
         _commands.Lookup(row.Call);
+        if (!showDetails) return;
         Details = _snap is null
             ? StationDetailsViewModel.From(row.Call, row.Source.Station, QrzLookup?.Invoke(row.Call), Log?.Invoke(), Units, _now(),
                 mostWantedRank: MostWanted.RankOf(row.Source.Station.EntityKey), lotwUpload: Lotw.LastUpload(row.Call), park: ParkOf(row.Source.Station),
@@ -674,7 +686,7 @@ public sealed partial class OperateViewModel : ObservableObject
         if (Line.Count == 0) return;
         var i = Selected is null ? 0 : Line.IndexOf(Selected) + delta;
         _line.Clicked();
-        Select(Line[Math.Clamp(i, 0, Line.Count - 1)]);
+        Select(Line[Math.Clamp(i, 0, Line.Count - 1)], Details is not null);
     }
 
     /// <summary>

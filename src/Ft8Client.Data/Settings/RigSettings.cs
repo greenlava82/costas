@@ -34,4 +34,11 @@ public sealed class RigSettings
     /// <c>civaddr=0x94</c> for an Icom radio set to a different CI-V address. Empty for none.
     /// </summary>
     public string? Config { get; set; }
+
+    /// <summary>
+    /// The most power the radio can send, in watts, when Hamlib reports it wrongly (an FTDX10 shown as 0 to 200 W, so
+    /// asking for 100 W gave 50 W). Costas then reads and sets the radio's power as a share of this. Null to use what
+    /// Hamlib reports.
+    /// </summary>
+    public int? MaxPowerWatts { get; set; }
 }
