@@ -193,10 +193,36 @@ public sealed partial class OperateViewModel : ObservableObject
     public static bool IsCompactSize(double width, double height) =>
         width > 0 && height > 0 && (width < CompactBelowWidth || height < CompactBelowHeight);
 
+    /// <summary>The layout choices in Settings › Appearance: automatic follows the window's size.</summary>
+    public static IReadOnlyList<string> Layouts { get; } = ["automatic", "roomy", "compact"];
+
+    /// <summary>The operator's layout choice (<c>Appearance.Layout</c>): automatic, roomy or compact.</summary>
+    [ObservableProperty]
+    public partial string Layout { get; set; } = "automatic";
+
+    partial void OnLayoutChanged(string value) => UpdateCompact();
+
+    private bool _smallWindow;
+
+    /// <summary>Tells the view model its window's client size, for the automatic layout.</summary>
+    public void FitWindow(double width, double height)
+    {
+        if (width <= 0 || height <= 0) return;
+        _smallWindow = IsCompactSize(width, height);
+        UpdateCompact();
+    }
+
+    private void UpdateCompact() => Compact = Layout switch
+    {
+        "compact" => true,
+        "roomy" => false,
+        _ => _smallWindow,
+    };
+
     /// <summary>
     /// True on a small window: the idle contact card folds to one line with the band strip under it, and the side column
     /// is one card with tabs that folds to a rail. False on a big one: the full idle card with the band summary under it,
-    /// and the side column's cards stacked. Set by the view from its window's size.
+    /// and the side column's cards stacked. Follows <see cref="Layout"/>, and the window's size when that is automatic.
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowStrip), nameof(FoldIdleCard), nameof(ShowSummaryCard), nameof(ShowSideTabs), nameof(ShowSideRail))]

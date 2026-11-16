@@ -204,6 +204,9 @@ See [Operating from a phone](phone.md).
   the next time you start Costas. Transmit and warning colors stay the same.
 - **Theme**: system (follows your device's light or dark setting), light or dark. Each skin supports both.
 - **Distances in**: miles or kilometres.
+- **Operate layout**: **automatic** (the default) uses the compact layout on a small window, narrower than 1280 or
+  shorter than 900, and the roomy layout on a big one; **roomy** or **compact** keeps that layout at any size. See
+  [Big and small windows](operate.md#big-and-small-windows).
 
 ## Updates
 

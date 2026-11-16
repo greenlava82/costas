@@ -144,6 +144,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         Theme = s.Appearance.Theme;
         Skin = AppSkin.Find(s.Appearance.Skin);
         Units = s.Appearance.Units;
+        Layout = Layouts.Contains(s.Appearance.Layout) ? s.Appearance.Layout : "automatic";
         Jt9Path = s.Paths.Jt9 ?? string.Empty;
         HamlibDir = s.Paths.HamlibDir ?? string.Empty;
         CheckUpdates = s.Updates.CheckEnabled;
@@ -1219,6 +1220,13 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial string Units { get; set; }
 
+    /// <summary>Operate layout choices.</summary>
+    public IReadOnlyList<string> Layouts => OperateViewModel.Layouts;
+
+    /// <summary>Operate layout: automatic, roomy or compact.</summary>
+    [ObservableProperty]
+    public partial string Layout { get; set; } = "automatic";
+
     /// <summary>jt9 path.</summary>
     [ObservableProperty]
     public partial string Jt9Path { get; set; }
@@ -1359,6 +1367,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Appearance.Theme = Theme;
             s.Appearance.Skin = Skin.Id;
             s.Appearance.Units = Units;
+            s.Appearance.Layout = Layout;
             s.Paths.Jt9 = string.IsNullOrWhiteSpace(Jt9Path) ? null : Jt9Path.Trim();
             s.Paths.HamlibDir = string.IsNullOrWhiteSpace(HamlibDir) ? null : HamlibDir.Trim();
             s.Updates.CheckEnabled = CheckUpdates;

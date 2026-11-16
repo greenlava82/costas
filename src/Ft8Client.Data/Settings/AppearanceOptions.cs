@@ -19,4 +19,9 @@ public sealed class AppearanceOptions
 
     /// <summary><c>miles</c> or <c>km</c>.</summary>
     public string Units { get; set; } = "miles";
+
+    /// <summary>
+    /// Operate layout: <c>automatic</c> (compact on a small window, roomy on a big one), <c>roomy</c> or <c>compact</c>.
+    /// </summary>
+    public string Layout { get; set; } = "automatic";
 }

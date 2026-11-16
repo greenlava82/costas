@@ -159,6 +159,46 @@ public class OperateCompactLayoutTests
     public void IsCompactSize_SmallWindowsOnly(double width, double height, bool compact) =>
         OperateViewModel.IsCompactSize(width, height).Should().Be(compact);
 
+    [Theory]
+    [InlineData("automatic", 1280, 720, true)]
+    [InlineData("automatic", 1920, 1080, false)]
+    [InlineData("roomy", 1280, 720, false)]
+    [InlineData("compact", 1920, 1080, true)]
+    public void Layout_ChoiceOverridesTheWindowSize(string layout, double width, double height, bool compact)
+    {
+        var vm = Vm();
+        vm.FitWindow(width, height);
+        vm.Layout = layout;
+        vm.Compact.Should().Be(compact);
+    }
+
+    [Fact]
+    public void Layout_BackToAutomatic_FollowsTheWindowAgain()
+    {
+        var vm = Vm();
+        vm.Layout = "roomy";
+        vm.FitWindow(1280, 720);
+        vm.Compact.Should().BeFalse();
+
+        vm.Layout = "automatic";
+        vm.Compact.Should().BeTrue();
+        vm.FitWindow(2560, 1440);
+        vm.Compact.Should().BeFalse();
+    }
+
+    [Fact]
+    public Task View_RoomyChosen_StaysRoomyOnALaptop()
+    {
+        var vm = Vm();
+        vm.Layout = "roomy";
+        return InWindow(vm, 1280, 720, (window, _) =>
+        {
+            vm.Compact.Should().BeFalse();
+            Named<Border>(window, "SummaryCard").IsEffectivelyVisible.Should().BeTrue();
+            Named<ScrollViewer>(window, "SideStacked").IsEffectivelyVisible.Should().BeTrue();
+        });
+    }
+
     [Fact]
     public void Roomy_IdleCardIsWholeWithTheSummaryCardAndNoStripTabsOrRail()
     {
@@ -416,6 +456,11 @@ public class OperateCompactLayoutTests
                     window.UpdateLayout();
                     vm.Operate.Compact.Should().BeFalse();
                     bar.Bounds.Height.Should().BeGreaterThan(36, "a big window keeps the full update bar");
+
+                    host.Settings.Update(s => s.Appearance.Layout = "compact");
+                    Dispatcher.UIThread.RunJobs();
+                    vm.Operate.Layout.Should().Be("compact", "the choice in Settings › Appearance reaches the Operate view");
+                    vm.Operate.Compact.Should().BeTrue("compact chosen is compact on a big window too");
                 }
                 finally
                 {

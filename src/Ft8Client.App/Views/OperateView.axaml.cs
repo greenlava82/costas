@@ -301,9 +301,7 @@ public partial class OperateView : UserControl
     private void FollowWindowSize()
     {
         if (Vm is not { } vm || _window is not { } w) return;
-        var size = w.ClientSize;
-        if (size.Width <= 0 || size.Height <= 0) return;
-        vm.Compact = OperateViewModel.IsCompactSize(size.Width, size.Height);
+        vm.FitWindow(w.ClientSize.Width, w.ClientSize.Height);
     }
 
     // The Heard here, Your signal and Worked this session panels sit in the side column's tabs on a small window and in

@@ -765,6 +765,13 @@
               <TextBlock Classes="label" Text="Distances in" />
               <ComboBox Grid.Column="1" ItemsSource="{Binding UnitChoices}" SelectedItem="{Binding Units}" MinWidth="120" />
             </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Operate layout" />
+              <StackPanel Grid.Column="1">
+                <ComboBox ItemsSource="{Binding Layouts}" SelectedItem="{Binding Layout}" MinWidth="120" AutomationProperties.Name="Operate layout" />
+                <TextBlock Classes="help" Text="Automatic uses the compact layout on a small window (narrower than 1280 or shorter than 900) and the roomy one on a big window. Roomy always shows the full idle card, the band summary and the side column's cards stacked. Compact always folds the idle card to two lines and puts the side column in tabs." />
+              </StackPanel>
+            </Grid>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

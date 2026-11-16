@@ -73,6 +73,9 @@ Costas picks one of two layouts for the Operate view from the size of its window
 Sizes are in Windows' scaled pixels, so a 1920 × 1080 laptop screen at 125% scaling counts as 1536 × 864 and gets the
 compact layout.
 
+To keep one layout whatever the window size, pick **Roomy** or **Compact** in
+[Settings › Appearance › Operate layout](settings.md#appearance). **Automatic** (the default) switches as above.
+
 ## The top slot: idle card and band summary
 
 On a big window, the idle card has the same shape as the contact panel: **Not in a contact**, the empty reports, the

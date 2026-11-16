@@ -62,7 +62,7 @@ Owner request 2026-11-16: the compact layout (owner decision 2026-11-14) is for 
 - **Compact** when the window is narrower than 1280 or shorter than 900 (a 13-inch laptop at about 1280 × 720, a 1080p laptop at 125% at 1536 × 864, a 1600 × 900 screen maximised): the one-line idle card with the band strip, the right column as one tabbed card with the fold rail, and the slim update bar.
 - **Roomy** otherwise (the 1440 × 900 default window, a maximised 1080p or larger monitor): the full idle card with the band summary card under it, the right column's cards stacked in a scrolling column (no tabs, no fold), and the full-height update bar. This is the layout from before 2026-11-14.
 
-It follows the window, not the view, so a taller waterfall or a faceplate skin never flips it. `Window.SideTab` and `Window.SideCollapsed` are kept while roomy and apply again when the window is small.
+The operator can override it in Settings › Appearance › **Operate layout** (`Appearance.Layout`): automatic (default, by window size as above), roomy or compact. It follows the window, not the view, so a taller waterfall or a faceplate skin never flips it. `Window.SideTab` and `Window.SideCollapsed` are kept while roomy and apply again when the window is small.
 
 ### Top slot, idle: band summary
 
