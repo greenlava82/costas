@@ -39,7 +39,7 @@ appears at the top of the main window:
 - **Release notes** opens the release on GitHub.
 - **Skip this version** hides the bar until a newer build comes out.
 
-You can turn the daily check off, or check by hand, in **Settings › Updates**. **☰ › About** also has a **Check for updates** button, which checks even when the daily check is off.
+You can turn the daily check off, or check by hand, in **Settings › Updates**. **☰ › About** also has a **Check for updates** button, which checks even when the daily check is off. When a newer build is found, an **Update** button appears beside it, so you can install it without closing About first.
 
 ### Development builds
 

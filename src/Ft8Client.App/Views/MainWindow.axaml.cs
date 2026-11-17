@@ -396,7 +396,7 @@ public partial class MainWindow : Window
             "diagnostics" => new DiagnosticsWindow { DataContext = new DiagnosticsViewModel(vm.Host) },
             "shortcuts" => new ShortcutsWindow(),
             "feedback" => NewFeedbackWindow(vm.Host),
-            _ => new AboutWindow(vm.Host.Settings, vm.Host.Updates),
+            _ => new AboutWindow(vm.Host.Settings, vm.Host.Updates, vm.Update),
         };
         w.ShowDialog(this);
     }

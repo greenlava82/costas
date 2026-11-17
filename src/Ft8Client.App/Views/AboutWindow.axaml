@@ -7,10 +7,15 @@
     <StackPanel Spacing="8">
       <TextBlock x:Name="Product" FontSize="20" FontWeight="SemiBold" Background="Transparent" />
       <TextBlock x:Name="Secret" TextWrapping="Wrap" Foreground="{DynamicResource AccentBrush}" IsVisible="False" />
-      <StackPanel Orientation="Horizontal" Spacing="10">
-        <Button x:Name="CheckUpdates" Content="Check for updates" />
+      <!-- Update sits beside Check for updates: About is a dialog, so the main window's update bar can't be clicked
+           until it closes (owner report 2026-11-17). -->
+      <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="6" Margin="0,0,10,0" VerticalAlignment="Center">
+          <Button x:Name="CheckUpdates" Content="Check for updates" />
+          <Button x:Name="InstallUpdate" Content="Update" Classes="accent" IsVisible="False" />
+        </StackPanel>
         <TextBlock x:Name="UpdateStatus" VerticalAlignment="Center" TextWrapping="Wrap" />
-      </StackPanel>
+      </DockPanel>
       <TextBlock TextWrapping="Wrap" Text="Free software under the GNU General Public License, version 3 or later. It comes with no warranty." />
       <TextBlock Text="Credits" Classes="title" Margin="0,8,0,0" />
       <TextBlock TextWrapping="Wrap" Text="Decoding by jt9 from WSJT-X, by the WSJT Development Group (K1JT, K9AN, G4WJS and others), GPLv3. https://wsjt.sourceforge.io/" />
