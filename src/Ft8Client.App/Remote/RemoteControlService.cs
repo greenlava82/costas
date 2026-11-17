@@ -59,7 +59,7 @@ public sealed class RemoteControlService : IAsyncDisposable
         {
             if (t.Length == 0) secrets.Delete(SecretNames.RemoteDevices);
             else secrets.Set(SecretNames.RemoteDevices, t);
-        }, tuning: tuning, power: power, controls: controls);
+        }, tuning: tuning, power: power, controls: controls, users: new RemoteUsers(() => settings.Current.Remote, secrets, clock));
         Control.Changed += () =>
         {
             _dirty = true;
@@ -82,10 +82,22 @@ public sealed class RemoteControlService : IAsyncDisposable
     /// <summary>Number of phones connected now.</summary>
     public int Connected => _server?.Connected ?? 0;
 
+    /// <summary>
+    /// A request came from this computer itself while sign-in was off, and sign-in is still off: perhaps a reverse
+    /// proxy here without its headers, letting the internet in with no password.
+    /// </summary>
+    public bool LoopbackWarning => _server?.LoopbackSeen == true && !_settings.Current.Remote.RequireSignIn;
+
     /// <summary>Starts serving if Settings has the page on.</summary>
     public void Start()
     {
-        _settings.Changed += s => _ = ApplyAsync(s.Remote);
+        _settings.Changed += s =>
+        {
+            // Sign-in turned on, a user removed or disabled: the next broadcast checks every phone again and cuts off
+            // the ones no longer allowed.
+            _dirty = true;
+            _ = ApplyAsync(s.Remote);
+        };
         _session.Changed += _ => _dirty = true;
         _loop = Task.Run(LoopAsync);
         _ = ApplyAsync(_settings.Current.Remote);
@@ -146,7 +158,9 @@ public sealed class RemoteControlService : IAsyncDisposable
             }
             else if (o.Enabled)
             {
-                var server = new RemoteServer(Control, StateFor);
+                var server = new RemoteServer(Control, StateFor,
+                    () => System.Net.IPAddress.TryParse(_settings.Current.Remote.TrustedProxy?.Trim(), out var a) ? a : null);
+                server.LoopbackNoticed += () => Changed?.Invoke();
                 try
                 {
                     await server.StartAsync(o.Port).ConfigureAwait(false);

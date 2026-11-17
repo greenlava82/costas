@@ -81,6 +81,9 @@ main{padding:12px 14px 120px;display:flex;flex-direction:column;gap:12px;flex:1}
 .halt.idle{background:#555}
 .pair{max-width:360px;margin:12vh auto 0;padding:0 20px;display:flex;flex-direction:column;gap:14px}
 .pair input{font:inherit;font-size:28px;letter-spacing:6px;text-align:center;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--tx)}
+.pair form{display:flex;flex-direction:column;gap:10px}
+.pair form input{font-size:18px;letter-spacing:0;text-align:left}
+.account{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 2px 0}
 .err{color:var(--red);font-size:14px;min-height:1.2em}
 .hidden{display:none!important}
 .slot{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px}
@@ -236,6 +239,11 @@ body.dashon #slot,body.dashon #onair{display:none!important}
   <div class="freq">Costas</div>
   <div id="pairErr" class="sub">Connecting to the station…</div>
   <button id="pairBtn" class="red hidden">Try again</button>
+  <form id="loginForm" class="hidden">
+    <input id="loginUser" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Username" aria-label="Username" required>
+    <input id="loginPass" name="password" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required>
+    <button id="loginBtn" class="red" type="submit">Sign in</button>
+  </form>
 </section>
 
 <section id="opView" class="hidden">
@@ -280,6 +288,7 @@ body.dashon #slot,body.dashon #onair{display:none!important}
     <div data-pane="log"><div id="tonight" class="card list"></div></div>
     <div data-pane="radio"><div id="radio" class="dash rad"></div></div>
     </div></div>
+    <div id="account" class="account mini hidden"><span>Signed in as <b id="who"></b></span><button id="signOut">Sign out</button></div>
   </main>
   <div id="detailsShade" class="shade hidden"><div id="details" class="sheet"></div></div>
   <div id="tuneShade" class="shade hidden"><div id="tune" class="sheet"></div></div>
@@ -322,26 +331,70 @@ function dismissButton(call) {
 function showPair(msg) {
   $("opView").classList.add("hidden");
   $("pairView").classList.remove("hidden");
+  $("loginForm").classList.add("hidden");
   $("pairErr").textContent = msg || "Connecting to the station…";
   $("pairBtn").classList.toggle("hidden", !msg);
+}
+function showLogin(msg) {
+  showPair(msg || "Sign in to operate the station.");
+  $("pairBtn").classList.add("hidden");
+  $("loginForm").classList.remove("hidden");
+  if (!$("loginUser").value) $("loginUser").focus(); else $("loginPass").focus();
 }
 function showOp() {
   $("pairView").classList.add("hidden");
   $("opView").classList.remove("hidden");
 }
+function setWho(name) {
+  $("who").textContent = name || "";
+  $("account").classList.toggle("hidden", !name);
+}
+
+// The station's answer: its JSON, or its plain-text reason (a refusal sent before the page's own handlers).
+async function answer(r) {
+  const text = await r.text().catch(() => "");
+  try { return JSON.parse(text); } catch { return { error: text || null }; }
+}
 
 // No code to type: any phone on the home network gets its own id from the station, kept on the phone so control
-// stays with it across reconnects.
+// stays with it across reconnects. When the station asks for a username and password, the phone signs in instead.
 async function pair() {
   showPair();
   try {
+    const c = await fetch("/api/config");
+    const cj = await answer(c);
+    if (!c.ok) { showPair(cj.error || "The station did not answer. Is Costas running with Mobile connection on?"); return; }
+    if (cj.signIn) { showLogin(); return; }
     const r = await fetch("/api/pair", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-    const j = await r.json().catch(() => ({}));
+    const j = await answer(r);
+    if (j.signIn) { showLogin(); return; }
     if (!r.ok || !j.token) { showPair(j.error || "The station did not answer. Is Costas running with Mobile connection on?"); return; }
     token = j.token; save(token); showOp(); connect();
   } catch { showPair("Cannot reach the station. Is this phone on the same network?"); }
 }
 $("pairBtn").onclick = pair;
+
+$("loginForm").onsubmit = async ev => {
+  ev.preventDefault();
+  $("loginBtn").disabled = true;
+  try {
+    const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: $("loginUser").value, password: $("loginPass").value }) });
+    const j = await answer(r);
+    if (!r.ok || !j.token) { $("loginPass").value = ""; showLogin(j.error || "The station did not answer."); return; }
+    $("loginPass").value = "";
+    token = j.token; save(token); setWho(j.username); showOp(); connect();
+  } catch { showLogin("Cannot reach the station."); }
+  finally { $("loginBtn").disabled = false; }
+};
+
+$("signOut").onclick = async () => {
+  const t = token;
+  token = null; save(null); setWho(null);
+  if (ws) { const old = ws; ws = null; old.onclose = null; try { old.close(); } catch { } }
+  try { await fetch("/api/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: t }) }); } catch { }
+  pair();
+};
 
 function send(obj) {
   if (ws && ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(obj)); return true; }
@@ -370,6 +423,7 @@ function connect() {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.type === "pong") { setLink("grn", "Link " + (Date.now() - pingAt) + " ms"); return; }
     if (m.type === "note") { if (m.note) note(m.note); return; }
+    if (m.type === "user") { setWho(m.username); return; }
     if (m.type === "state") {
       state = m.state; slotAt = Date.now(); render();
       if (m.note) note(m.note);
@@ -379,7 +433,7 @@ function connect() {
   sock.onclose = ev => {
     if (ws !== sock) return;
     ws = null;
-    if (ev.reason === "unpaired") { token = null; save(null); pair(); return; }
+    if (ev.reason === "unpaired") { token = null; save(null); setWho(null); pair(); return; }
     setLink("amb", "Reconnecting…");
     retryTimer = setTimeout(connect, backoff);
     backoff = Math.min(backoff * 2, 5000);

@@ -8,7 +8,6 @@
 
 using System.Collections.Concurrent;
 using System.Globalization;
-using System.Security.Cryptography;
 using Ft8Client.App.Engine;
 using Ft8Client.App.Services;
 using Ft8Client.Core;
@@ -49,8 +48,10 @@ public sealed class RemoteControl
     /// <param name="tuning">Band and Tx offset changes; without it the phone cannot change them.</param>
     /// <param name="power">The radio's power setting; without it the phone cannot change it.</param>
     /// <param name="controls">The radio's receive and tuner settings; without them the Radio tab shows only Tune and meters.</param>
+    /// <param name="users">Username and password sign-in; without it phones only pair.</param>
     public RemoteControl(IRemoteTarget target, IClock clock, DeviceTokens tokens, Action<string> saveTokens,
-                         IRemoteTuning? tuning = null, RadioPowerService? power = null, RadioControlsService? controls = null)
+                         IRemoteTuning? tuning = null, RadioPowerService? power = null, RadioControlsService? controls = null,
+                         RemoteUsers? users = null)
     {
         _target = target;
         _tuning = tuning;
@@ -59,6 +60,7 @@ public sealed class RemoteControl
         _clock = clock;
         Tokens = tokens;
         _saveTokens = saveTokens;
+        Users = users;
     }
 
     /// <summary>Raised when control changes hands or a phone connects for the first time.</summary>
@@ -70,11 +72,21 @@ public sealed class RemoteControl
     /// <summary>The paired phones.</summary>
     public DeviceTokens Tokens { get; }
 
-    /// <summary>A stable id for the phone holding <paramref name="token"/>, or null when the token is not paired.</summary>
-    public string? SignIn(string? token)
+    /// <summary>Username and password sign-in, or null when this station has none.</summary>
+    public RemoteUsers? Users { get; }
+
+    /// <summary>True when every device must sign in with a username and password; pairing is refused.</summary>
+    public bool SignInRequired => Users?.Required == true;
+
+    /// <summary>
+    /// Who holds <paramref name="token"/>, or null when it is not valid. With sign-in on only a user's sign-in counts, so
+    /// turning it on cuts off every paired phone; with it off only paired phones count.
+    /// </summary>
+    public RemoteIdentity? SignIn(string? token)
     {
+        if (SignInRequired) return Users!.SignIn(token);
         if (!Tokens.Verify(token)) return null;
-        return Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token!)))[..16];
+        return new RemoteIdentity(RemoteIdentity.DeviceIdFor(token!));
     }
 
     /// <summary>

@@ -17,6 +17,8 @@ using Ft8Client.App.Remote;
 using Ft8Client.Core;
 using Ft8Client.Core.Remote;
 using Ft8Client.Core.Time;
+using Ft8Client.Data.Secrets;
+using Ft8Client.Data.Settings;
 
 namespace Ft8Client.App.Tests;
 
@@ -28,13 +30,17 @@ public sealed class RemoteServerTests : IAsyncLifetime
         Snapshot = new SessionSnapshot { MyCall = "W7LIT", Band = "20m", Mode = Mode.Ft8, DialHz = 14_074_000 },
     };
     private readonly HttpClient _http = new();
+    private readonly RemoteOptions _options = new();
+    private readonly InMemorySecretStore _secrets = new();
+    private RemoteUsers _users = null!;
     private RemoteControl _control = null!;
     private RemoteServer _server = null!;
     private int _port;
 
     public async ValueTask InitializeAsync()
     {
-        _control = new RemoteControl(_target, _clock, new DeviceTokens(), _ => { });
+        _users = new RemoteUsers(() => _options, _secrets, _clock);
+        _control = new RemoteControl(_target, _clock, new DeviceTokens(), _ => { }, users: _users);
         _server = new RemoteServer(_control, id => RemoteStateBuilder.Build(_target.Snapshot, _clock.UtcNow, new RemoteContext { Units = DistanceUnit.Miles },
             _control.ControlFor(id), _control.ViewingFor(id)));
         _port = FreePort();
@@ -176,6 +182,230 @@ public sealed class RemoteServerTests : IAsyncLifetime
         ws.Options.SetRequestHeader("Origin", "http://evil.example");
         var act = () => ws.ConnectAsync(new Uri($"ws://127.0.0.1:{_port}/ws"), TestContext.Current.CancellationToken);
         await act.Should().ThrowAsync<WebSocketException>();
+    }
+
+    [Fact]
+    public async Task Config_SignInOff_PairsWithoutCode()
+    {
+        (await GetJsonAsync("/api/config")).GetProperty("signIn").GetBoolean().Should().BeFalse();
+        var r = await _http.PostAsJsonAsync("/api/login", new { username = "dan", password = "correct horse battery" }, TestContext.Current.CancellationToken);
+        r.StatusCode.Should().Be(HttpStatusCode.BadRequest, "there is nothing to sign in to");
+    }
+
+    [Fact]
+    public async Task Pair_SignInOn_RefusedAndAsksForSignIn()
+    {
+        AddUser("dan", "correct horse battery");
+        (await GetJsonAsync("/api/config")).GetProperty("signIn").GetBoolean().Should().BeTrue();
+        var r = await _http.PostAsJsonAsync("/api/pair", new { }, TestContext.Current.CancellationToken);
+        r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await r.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("signIn").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Login_RightPassword_SocketSignedInAsThatUser()
+    {
+        AddUser("Dan", "correct horse battery");
+        AddUser("guest", "another long password");
+        var token = await LoginAsync("dan", "correct horse battery");
+
+        using var ws = await ConnectAsync();
+        await SendAsync(ws, new { type = "hello", token });
+        var user = await ReceiveAsync(ws);
+        user.GetProperty("type").GetString().Should().Be("user");
+        user.GetProperty("username").GetString().Should().Be("Dan");
+        (await ReceiveAsync(ws)).GetProperty("state").GetProperty("myCall").GetString().Should().Be("W7LIT");
+        _control.SignIn(token)!.Username.Should().Be("Dan");
+    }
+
+    [Fact]
+    public async Task Login_WrongPassword_RefusedThenTooManyTries()
+    {
+        AddUser("dan", "correct horse battery");
+        for (var i = 0; i < LoginThrottle.FreeFailures; i++)
+        {
+            var r = await PostLoginAsync("dan", "wrong password!");
+            r.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        }
+        (await PostLoginAsync("nobody", "wrong password!")).StatusCode.Should().Be(HttpStatusCode.Unauthorized, "an unknown name reads the same");
+        var locked = await PostLoginAsync("dan", "correct horse battery");
+        locked.StatusCode.Should().Be(HttpStatusCode.TooManyRequests, "the address is held back even for the right password");
+        locked.Headers.RetryAfter.Should().NotBeNull();
+        _clock.Advance(LoginThrottle.MaxLockout);
+        (await PostLoginAsync("dan", "correct horse battery")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Socket_SignInTurnedOn_PairedPhoneCutOff()
+    {
+        var token = await PairAsync();
+        using var ws = await ConnectAsync();
+        await SendAsync(ws, new { type = "hello", token });
+        await ReceiveAsync(ws);
+
+        AddUser("dan", "correct horse battery");
+        await _server.BroadcastAsync();
+        await ExpectClosedAsync(ws, "unpaired");
+    }
+
+    [Fact]
+    public async Task Socket_UserDisabledOrSignedOut_CutOff()
+    {
+        AddUser("dan", "correct horse battery");
+        var token = await LoginAsync("dan", "correct horse battery");
+        using var ws = await ConnectAsync();
+        await SendAsync(ws, new { type = "hello", token });
+        await ReceiveAsync(ws);
+
+        _options.Users[0].Enabled = false;
+        await _server.BroadcastAsync();
+        await ExpectClosedAsync(ws, "unpaired");
+        _options.Users[0].Enabled = true;
+        _control.SignIn(token).Should().NotBeNull("disabling does not end the sign-in by itself");
+
+        var r = await _http.PostAsJsonAsync("/api/logout", new { token }, TestContext.Current.CancellationToken);
+        r.StatusCode.Should().Be(HttpStatusCode.OK);
+        _control.SignIn(token).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SignIn_UnusedFor30Days_SignInAgain()
+    {
+        AddUser("dan", "correct horse battery");
+        var token = await LoginAsync("dan", "correct horse battery");
+        _clock.Advance(TimeSpan.FromDays(29));
+        _control.SignIn(token).Should().NotBeNull();
+        _clock.Advance(TimeSpan.FromDays(29));
+        _control.SignIn(token).Should().NotBeNull("used 29 days ago");
+        _clock.Advance(TimeSpan.FromDays(30));
+        _control.SignIn(token).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SetPassword_Changed_SignedOutEverywhere()
+    {
+        AddUser("dan", "correct horse battery");
+        var token = await LoginAsync("dan", "correct horse battery");
+        _users.SetPassword(_options.Users[0].Id, "a brand new password");
+        _control.SignIn(token).Should().BeNull();
+        (await PostLoginAsync("dan", "correct horse battery")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        await LoginAsync("dan", "a brand new password");
+    }
+
+    [Fact]
+    public async Task Login_FromThisComputerWithoutProxyHeaders_Refused()
+    {
+        // A browser here, or nginx here without its headers: no telling whether the password crossed a network in the clear.
+        AddUser("dan", "correct horse battery");
+        var r = await _http.PostAsJsonAsync("/api/login", new { username = "dan", password = "correct horse battery" }, TestContext.Current.CancellationToken);
+        r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await r.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("error").GetString().Should().Contain("X-Forwarded-Proto");
+    }
+
+    [Fact]
+    public async Task Get_FromThisComputerWithSignInOff_ServedButNoticed()
+    {
+        var noticed = 0;
+        _server.LoopbackNoticed += () => noticed++;
+        _server.LoopbackSeen.Should().BeFalse();
+        (await _http.GetAsync("/", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await _http.GetAsync("/", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
+        _server.LoopbackSeen.Should().BeTrue();
+        noticed.Should().Be(1, "Settings is told once");
+    }
+
+    [Fact]
+    public async Task Get_FromThisComputerWithSignInOn_NotNoticed()
+    {
+        AddUser("dan", "correct horse battery");
+        await _http.GetAsync("/", TestContext.Current.CancellationToken);
+        _server.LoopbackSeen.Should().BeFalse("with sign-in on a password protects the station anyway");
+    }
+
+    [Fact]
+    public async Task Request_ThroughProxyWithSignInOff_Refused()
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, "/");
+        req.Headers.Add("X-Forwarded-For", "203.0.113.7");
+        var r = await _http.SendAsync(req, TestContext.Current.CancellationToken);
+        r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await r.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().Contain("sign-in is off");
+    }
+
+    [Theory]
+    [InlineData("http", HttpStatusCode.Forbidden)]
+    [InlineData(null, HttpStatusCode.Forbidden)]
+    [InlineData("https", HttpStatusCode.OK)]
+    public async Task Login_ThroughProxy_OnlyOverHttps(string? proto, HttpStatusCode expected)
+    {
+        AddUser("dan", "correct horse battery");
+        using var req = new HttpRequestMessage(HttpMethod.Post, "/api/login")
+        {
+            Content = JsonContent.Create(new { username = "dan", password = "correct horse battery" }),
+        };
+        req.Headers.Add("X-Forwarded-For", "203.0.113.7");
+        if (proto is not null) req.Headers.Add("X-Forwarded-Proto", proto);
+        (await _http.SendAsync(req, TestContext.Current.CancellationToken)).StatusCode.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task Socket_ThroughProxy_OriginOfTheForwardedHostAccepted()
+    {
+        AddUser("dan", "correct horse battery");
+        var token = await LoginAsync("dan", "correct horse battery");
+        using var ws = new ClientWebSocket();
+        ws.Options.SetRequestHeader("Origin", "https://radio.example.org");
+        ws.Options.SetRequestHeader("X-Forwarded-For", "203.0.113.7");
+        ws.Options.SetRequestHeader("X-Forwarded-Proto", "https");
+        ws.Options.SetRequestHeader("X-Forwarded-Host", "radio.example.org");
+        await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{_port}/ws"), TestContext.Current.CancellationToken);
+        await SendAsync(ws, new { type = "hello", token });
+        (await ReceiveAsync(ws)).GetProperty("type").GetString().Should().Be("user");
+
+        using var evil = new ClientWebSocket();
+        evil.Options.SetRequestHeader("Origin", "https://evil.example");
+        evil.Options.SetRequestHeader("X-Forwarded-For", "203.0.113.7");
+        evil.Options.SetRequestHeader("X-Forwarded-Host", "radio.example.org");
+        var act = () => evil.ConnectAsync(new Uri($"ws://127.0.0.1:{_port}/ws"), TestContext.Current.CancellationToken);
+        await act.Should().ThrowAsync<WebSocketException>();
+    }
+
+    private void AddUser(string username, string password)
+    {
+        var user = new RemoteUser { Username = username };
+        _options.Users.Add(user);
+        _options.RequireSignIn = true;
+        _users.SetPassword(user.Id, password);
+    }
+
+    // The test talks to 127.0.0.1, so it signs in the way nginx on this computer would pass a browser's https sign-in.
+    private Task<HttpResponseMessage> PostLoginAsync(string username, string password)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/login") { Content = JsonContent.Create(new { username, password }) };
+        req.Headers.Add("X-Forwarded-For", "203.0.113.7");
+        req.Headers.Add("X-Forwarded-Proto", "https");
+        return _http.SendAsync(req, TestContext.Current.CancellationToken);
+    }
+
+    private async Task<string> LoginAsync(string username, string password)
+    {
+        var r = await PostLoginAsync(username, password);
+        r.StatusCode.Should().Be(HttpStatusCode.OK);
+        return (await r.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("token").GetString()!;
+    }
+
+    private async Task<JsonElement> GetJsonAsync(string path) =>
+        await _http.GetFromJsonAsync<JsonElement>(path, TestContext.Current.CancellationToken);
+
+    private static async Task ExpectClosedAsync(ClientWebSocket ws, string reason)
+    {
+        var buf = new byte[64 * 1024];
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(10));
+        WebSocketReceiveResult r;
+        do r = await ws.ReceiveAsync(buf, cts.Token);
+        while (r.MessageType != WebSocketMessageType.Close);
+        ws.CloseStatusDescription.Should().Be(reason);
     }
 
     private async Task<string> PairAsync()

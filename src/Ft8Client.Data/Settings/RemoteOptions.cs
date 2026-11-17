@@ -16,4 +16,19 @@ public sealed class RemoteOptions
 
     /// <summary>TCP port for the remote page.</summary>
     public int Port { get; set; } = 8073;
+
+    /// <summary>
+    /// Every device must sign in with a username and password from <see cref="Users"/>. Off by default: at home and over
+    /// Tailscale a phone just opens the page. Needed behind a reverse proxy, which the page refuses without it.
+    /// </summary>
+    public bool RequireSignIn { get; set; }
+
+    /// <summary>
+    /// The address of a reverse proxy on another computer, whose proxy headers are believed (those from this computer
+    /// always are). Empty when the proxy runs on this computer or there is none.
+    /// </summary>
+    public string? TrustedProxy { get; set; }
+
+    /// <summary>Who may sign in. Their password hashes and sign-ins are in the secret store.</summary>
+    public List<RemoteUser> Users { get; set; } = [];
 }

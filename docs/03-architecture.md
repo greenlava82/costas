@@ -130,6 +130,53 @@ It also serves `manifest.webmanifest` and three icons (`icon-180/192/512.png`, d
 
 The page's extra data (log, QRZ lookups, country file, most-wanted list, bands) reaches `RemoteStateBuilder` through `RemoteContext`, which `AppHost` fills in. Band and Tx offset changes go through `IRemoteTuning` (`HostTuning` calls `AppHost.SetBandAsync` and `Session.SetTxOffset` and saves settings, as the desk does). Each phone's open station sheet is a view-only `show` command kept per device in `RemoteControl`; it does not take the control lease.
 
+### Sign-in (optional)
+
+Off by default (`RemoteOptions.RequireSignIn`, D25). When on, every device signs in with a username and password from `RemoteOptions.Users`, at home too, and `POST /api/pair` answers 403; paired phones' tokens stop counting, so they are cut off at the next broadcast. `GET /api/config` tells the page which to show. `POST /api/login {username, password}` returns `{token, username}`, 401 for a wrong name or password (an unknown name is checked against a decoy hash, so it takes as long), or 429 with `Retry-After` from `LoginThrottle` (5 free failures per username and per client address, then 30 s doubling to 15 min). `POST /api/logout {token}` ends one sign-in. The token goes in the WebSocket `hello` as before; the first message back is `{type: "user", username}`.
+
+`RemoteUsers` keeps, per user id, the password hash (`PasswordHash`: PBKDF2-SHA256, 210,000 rounds, random salt) and the signed-in devices (`UserSessions`: SHA-256 of each token and the day it was last used; a sign-in unused for 30 days ends) in the OS credential store, never in `settings.json`. Changing a password, Remove and "Sign out everywhere" in Settings end that user's sign-ins; unticking Allowed refuses them without ending them. `RemoteControl.SignIn` returns a `RemoteIdentity` (device id, user id, username); the control lease still holds the device id.
+
+Users are keyed by a random id, not the name, so a later station profile per user (another licensed operator working under their own callsign) can hang off `RemoteUser` and `RemoteIdentity.UserId` without moving any stored data. What that changes on the air needs owner decisions first (D25).
+
+### Behind a reverse proxy
+
+A request carrying `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` or `Forwarded` counts as proxied (`ProxyHeaders`). The headers are believed only from this computer (loopback) or the address in `RemoteOptions.TrustedProxy` (Settings, Proxy address, for nginx on another computer); from any other device they could be made up, so they are ignored and the request is treated as coming straight from that device. When believed, the client address for the log and `LoginThrottle` is the last `X-Forwarded-For` entry (the one the nearest proxy added), and a WebSocket's `Origin` may match `X-Forwarded-Host` as well as `Host`.
+
+The rules (`SignInPolicy`):
+
+| Request | Sign-in off | Sign-in on |
+|---|---|---|
+| Phone on home Wi-Fi | Served (pairing) | Served; password refused: it would cross the Wi-Fi unencrypted |
+| Tailscale (from or to a 100.64/10 address) | Served | Password accepted (WireGuard encrypts it) |
+| This computer, no proxy headers | Served; Settings warns (a proxy here without its headers would let the internet in with no password) | Password refused: no telling how it got here |
+| Believed proxy saying `https` | Refused (403, "turn on sign-in") | Password accepted |
+| Believed proxy saying `http` or nothing | Refused | Password refused: needs https |
+| Proxy headers from any other device | Refused | Headers ignored |
+
+The page and the WebSocket are served wherever the request is; the password rule applies to `POST /api/login`. A token, once issued, is accepted on any route, so a phone that signed in over Tailscale keeps working on home Wi-Fi with Tailscale off (its token then crosses the Wi-Fi unencrypted, a known limit).
+
+A minimal nginx site, with TLS set up as usual (for example by certbot):
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name radio.example.org;
+    # ssl_certificate ...; ssl_certificate_key ...;
+
+    location / {
+        proxy_pass http://127.0.0.1:8073;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;     # the /ws WebSocket
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_read_timeout 60s;                     # the page pings every 5 s
+    }
+}
+```
+
 ## Configuration and storage
 
 Per-user data lives in `%LOCALAPPDATA%\Costas\` (on other platforms, the equivalent app-data folder): `costas.db`, `settings.json`, `logs\`, `wav\`, `cache\`. See `06-data-model.md`.

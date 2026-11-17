@@ -31,23 +31,37 @@ public sealed class RemoteServer : IAsyncDisposable
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan HelloTimeout = TimeSpan.FromSeconds(10);
+    private const string ProxyKey = "costas-proxy";
 
     private readonly RemoteControl _control;
     private readonly Func<string, RemoteState> _state;
+    private readonly Func<IPAddress?> _trustedProxy;
     private readonly ConcurrentDictionary<Guid, Client> _clients = new();
     private WebApplication? _app;
+    private int _loopbackSeen;
 
     /// <summary>Creates the server.</summary>
     /// <param name="control">The rules.</param>
     /// <param name="state">Builds the state for a phone, by device id.</param>
-    public RemoteServer(RemoteControl control, Func<string, RemoteState> state)
+    /// <param name="trustedProxy">The proxy address set in Settings, whose proxy headers are believed besides this computer's.</param>
+    public RemoteServer(RemoteControl control, Func<string, RemoteState> state, Func<IPAddress?>? trustedProxy = null)
     {
         _control = control;
         _state = state;
+        _trustedProxy = trustedProxy ?? (() => null);
     }
 
     /// <summary>Number of phones connected and signed in.</summary>
     public int Connected => _clients.Count;
+
+    /// <summary>
+    /// True once a request came from this computer itself with no proxy headers while sign-in was off: perhaps a proxy
+    /// here without its headers, which would let the internet in with no password. Settings warns.
+    /// </summary>
+    public bool LoopbackSeen => Volatile.Read(ref _loopbackSeen) != 0;
+
+    /// <summary>Raised the first time <see cref="LoopbackSeen"/> becomes true.</summary>
+    public event Action? LoopbackNoticed;
 
     /// <summary>Starts listening on <paramref name="port"/> on every interface. Throws IOException when the port is taken.</summary>
     public async Task StartAsync(int port)
@@ -70,6 +84,23 @@ public sealed class RemoteServer : IAsyncDisposable
                 ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return;
             }
+            // A reverse proxy such as nginx arrives from a local address but may carry the whole internet: only with
+            // sign-in on.
+            var proxy = Proxy(ctx);
+            ctx.Items[ProxyKey] = proxy;
+            var signIn = _control.SignInRequired;
+            if (SignInPolicy.RequestRefusal(signIn, proxy) is { } refusal)
+            {
+                Log.Warning("Remote page refused a request through a proxy from {Address}: sign-in is off", ctx.Connection.RemoteIpAddress);
+                ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await ctx.Response.WriteAsync(refusal).ConfigureAwait(false);
+                return;
+            }
+            if (SignInPolicy.SuspectLoopback(signIn, ctx.Connection.RemoteIpAddress, proxy) && Interlocked.Exchange(ref _loopbackSeen, 1) == 0)
+            {
+                Log.Warning("Remote page: a request came from this computer itself while sign-in is off. If a reverse proxy runs here, turn on sign-in");
+                LoopbackNoticed?.Invoke();
+            }
             ctx.Response.Headers["Cache-Control"] = "no-store";
             ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
             ctx.Response.Headers["X-Frame-Options"] = "DENY";
@@ -82,7 +113,10 @@ public sealed class RemoteServer : IAsyncDisposable
         app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(10) });
         app.MapGet("/", (Delegate)ServePage);
         foreach (var (path, type) in Files) app.MapGet("/" + path, () => ServeFile(path, type));
+        app.MapGet("/api/config", () => Results.Json(new { signIn = _control.SignInRequired }));
         app.MapPost("/api/pair", (Delegate)Pair);
+        app.MapPost("/api/login", (Delegate)LoginAsync);
+        app.MapPost("/api/logout", (Delegate)LogoutAsync);
         app.Map("/ws", AcceptAsync);
         try
         {
@@ -156,16 +190,74 @@ public sealed class RemoteServer : IAsyncDisposable
 
     // No code (owner decision, 2026-10-25): any device on the home network is given a token, which only identifies it
     // so control stays with that phone. Addresses outside the local network are still refused.
+    // With sign-in on, a device gets its token only from /api/login.
     private IResult Pair(HttpContext ctx)
     {
+        if (_control.SignInRequired)
+            return Results.Json(new { error = "Sign in with your username and password.", signIn = true }, statusCode: StatusCodes.Status403Forbidden);
         var token = _control.Pair();
         Log.Information("Phone connected for the first time from {Address}", ctx.Connection.RemoteIpAddress);
         return Results.Json(new { token });
     }
 
+    private async Task<IResult> LoginAsync(HttpContext ctx)
+    {
+        if (_control.Users is not { Required: true } users)
+            return Results.Json(new { error = "Sign-in is off at the station." }, statusCode: StatusCodes.Status400BadRequest);
+        var proxy = (ProxyHeaders)ctx.Items[ProxyKey]!;
+        // A password only over https through a believed proxy, or over Tailscale: never in the clear.
+        if (SignInPolicy.PasswordRefusal(ctx.Connection.RemoteIpAddress, ctx.Connection.LocalIpAddress, proxy) is { } why)
+        {
+            Log.Warning("Remote sign-in from {Address} refused: {Reason}", proxy.Client, why);
+            return Results.Json(new { error = why }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        var body = await ReadAsync<LoginMessage>(ctx).ConfigureAwait(false);
+        var address = proxy.Client?.ToString() ?? "unknown";
+        // The hash takes about a tenth of a second: not on the request thread.
+        var r = await Task.Run(() => users.Login(body?.Username, body?.Password, address)).ConfigureAwait(false);
+        if (r.Token is not null) return Results.Json(new { token = r.Token, username = r.Username });
+        if (r.Wait > TimeSpan.Zero)
+        {
+            var seconds = (int)Math.Ceiling(r.Wait.TotalSeconds);
+            ctx.Response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return Results.Json(new { error = $"Too many wrong passwords. Try again in {Wait(seconds)}.", retryAfter = seconds },
+                statusCode: StatusCodes.Status429TooManyRequests);
+        }
+        return Results.Json(new { error = "Wrong username or password." }, statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    private async Task<IResult> LogoutAsync(HttpContext ctx)
+    {
+        var body = await ReadAsync<HelloMessage>(ctx).ConfigureAwait(false);
+        _control.Users?.Logout(body?.Token);
+        return Results.Json(new { ok = true });
+    }
+
+    private static string Wait(int seconds) => seconds < 90 ? $"{seconds} seconds" : $"{(seconds + 59) / 60} minutes";
+
+    private static async Task<T?> ReadAsync<T>(HttpContext ctx)
+        where T : class
+    {
+        try
+        {
+            return await JsonSerializer.DeserializeAsync<T>(ctx.Request.Body, Json, ctx.RequestAborted).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is JsonException or BadHttpRequestException or IOException)
+        {
+            return null;
+        }
+    }
+
+    private ProxyHeaders Proxy(HttpContext ctx)
+    {
+        var h = ctx.Request.Headers;
+        return ProxyHeaders.Read(ctx.Connection.RemoteIpAddress, _trustedProxy(), h["X-Forwarded-For"].ToString(), h["X-Forwarded-Proto"].ToString(),
+            h["X-Forwarded-Host"].ToString(), h["Forwarded"].ToString());
+    }
+
     private async Task AcceptAsync(HttpContext ctx)
     {
-        if (!ctx.WebSockets.IsWebSocketRequest || !SameOrigin(ctx.Request))
+        if (!ctx.WebSockets.IsWebSocketRequest || !SameOrigin(ctx.Request, (ProxyHeaders)ctx.Items[ProxyKey]!))
         {
             ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
@@ -178,18 +270,24 @@ public sealed class RemoteServer : IAsyncDisposable
         helloCts.CancelAfter(HelloTimeout);
         var hello = await ReceiveAsync(socket, buffer, helloCts.Token).ConfigureAwait(false);
         var token = hello is null ? null : Parse<HelloMessage>(hello)?.Token;
-        var deviceId = _control.SignIn(token);
-        if (deviceId is null)
+        var identity = _control.SignIn(token);
+        if (identity is null)
         {
             await CloseAsync(socket, "unpaired").ConfigureAwait(false);
             return;
         }
+        var deviceId = identity.DeviceId;
         var client = new Client(socket, deviceId, token!);
         var id = Guid.NewGuid();
         _clients[id] = client;
         try
         {
             await _control.HandleAsync(deviceId, new RemoteCommand("ping")).ConfigureAwait(false);
+            if (identity.Username is not null)
+            {
+                Log.Information("Remote page: {User} connected from {Address}", identity.Username, ((ProxyHeaders)ctx.Items[ProxyKey]!).Client);
+                await SendAsync(client, new { type = "user", username = identity.Username }).ConfigureAwait(false);
+            }
             await SendAsync(client, new { type = "state", state = _state(deviceId) }).ConfigureAwait(false);
             while (socket.State == WebSocketState.Open)
             {
@@ -231,13 +329,16 @@ public sealed class RemoteServer : IAsyncDisposable
         }
     }
 
-    // Browsers always send Origin on a WebSocket; a page on another site must not drive the station.
-    private static bool SameOrigin(HttpRequest req)
+    // Browsers always send Origin on a WebSocket; a page on another site must not drive the station. Behind a proxy the
+    // browser's host is the one the proxy forwarded.
+    private static bool SameOrigin(HttpRequest req, ProxyHeaders proxy)
     {
         var origin = req.Headers.Origin.ToString();
         if (string.IsNullOrEmpty(origin)) return true;
-        return Uri.TryCreate(origin, UriKind.Absolute, out var u)
-               && string.Equals(u.Authority, req.Host.Value, StringComparison.OrdinalIgnoreCase);
+        if (!Uri.TryCreate(origin, UriKind.Absolute, out var u)) return false;
+        return string.Equals(u.Authority, req.Host.Value, StringComparison.OrdinalIgnoreCase)
+               || (proxy.Host is { } host && (string.Equals(u.Authority, host, StringComparison.OrdinalIgnoreCase)
+                                              || string.Equals(u.Host, host, StringComparison.OrdinalIgnoreCase)));
     }
 
     private static async Task<string?> ReceiveAsync(WebSocket socket, byte[] buffer, CancellationToken ct)
@@ -326,6 +427,8 @@ public sealed class RemoteServer : IAsyncDisposable
 
 
     private sealed record HelloMessage(string? Type, string? Token);
+
+    private sealed record LoginMessage(string? Username, string? Password);
 
     private sealed class Client(WebSocket socket, string deviceId, string token)
     {

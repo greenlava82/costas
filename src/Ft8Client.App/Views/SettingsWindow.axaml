@@ -652,6 +652,10 @@
               <StackPanel Grid.Column="1" Spacing="6">
                 <CheckBox Content="Let a phone on this network operate the station" IsChecked="{Binding RemoteEnabled}" />
                 <TextBlock Classes="help" Text="{Binding RemoteStatus}" />
+                <Border IsVisible="{Binding RemoteLoopbackWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                        BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2" CornerRadius="6" Padding="10,8">
+                  <TextBlock Text="{Binding RemoteLoopbackWarning}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                </Border>
                 <TextBlock Classes="help" IsVisible="{Binding RemoteEnabled}"
                            Text="If Windows asks whether Costas may use the network, choose Allow for private networks. Phones cannot connect until you do. Addresses outside your home network are always refused." />
                 <Button Content="Check why a phone can't connect" Command="{Binding CheckPhoneCommand}" HorizontalAlignment="Left" Margin="0,4,0,0" />
@@ -667,7 +671,8 @@
                 <TextBlock Text="On the phone, open" FontSize="18" FontWeight="SemiBold" />
                 <SelectableTextBlock Text="{Binding PhoneUrl}" FontSize="22" FontWeight="SemiBold" />
                 <TextBlock Classes="help" Text="{Binding PhoneOtherUrls}" IsVisible="{Binding PhoneOtherUrls, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                <TextBlock Classes="help" Text="No code to type: any phone or tablet on your home network can open it and operate the station." />
+                <TextBlock Classes="help" IsVisible="{Binding !RemoteSignIn}" Text="No code to type: any phone or tablet on your home network can open it and operate the station." />
+                <TextBlock Classes="help" IsVisible="{Binding RemoteSignIn}" Text="Each phone or tablet signs in once with a username and password from the list below." />
               </StackPanel>
             </Border>
 
@@ -683,7 +688,7 @@
                   <SelectableTextBlock Text="{Binding OneIconCommand}" FontFamily="Consolas,Menlo,monospace" />
                 </StackPanel>
                 <TextBlock Classes="help" IsVisible="{Binding AwayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}"
-                           Text="To operate from anywhere, install Tailscale (free, tailscale.com) on this computer and on your phone and sign both in to the same account. Its address then appears here. Do not forward the port on your router: Costas refuses addresses from the open internet." />
+                           Text="To operate from anywhere, install Tailscale (free, tailscale.com) on this computer and on your phone and sign both in to the same account. Its address then appears here. Do not forward the port on your router: Costas refuses addresses from the open internet. To use a reverse proxy such as nginx instead, turn on sign-in below." />
                 <TextBlock Classes="help" Text="Leave this computer on with sleep turned off and Costas running. Every safety rule below applies away from home too." />
               </StackPanel>
             </Grid>
@@ -692,6 +697,30 @@
               <StackPanel Grid.Column="1" Spacing="6">
                 <TextBox Text="{Binding RemotePort}" Width="80" HorizontalAlignment="Left" />
                 <TextBlock Classes="help" Text="Change it only if another program uses 8073. A new port takes effect when you save." />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Sign-in" />
+              <StackPanel Grid.Column="1" Spacing="6">
+                <CheckBox Content="Require a username and password" IsChecked="{Binding RemoteSignIn}" />
+                <TextBlock Classes="help" TextWrapping="Wrap"
+                           Text="Turn this on before putting Costas behind a reverse proxy such as nginx; Costas refuses the proxy while it is off. Leave it off if phones connect only on your home network or through Tailscale. With it on, every device must sign in, and a password is accepted only where it travels encrypted: through Tailscale, or through the proxy over https. A phone on plain home Wi-Fi cannot sign in. A sign-in lasts 30 days from its last use. Takes effect when you save; phones already connected must then sign in." />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                  <TextBlock Text="Proxy address" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding RemoteProxyAddress}" Width="160" PlaceholderText="this computer" AutomationProperties.Name="Proxy address" />
+                </StackPanel>
+                <TextBlock Classes="help" TextWrapping="Wrap"
+                           Text="Leave empty when the proxy runs on this computer. If it runs on another computer on your network, enter that computer's address: Costas believes the proxy's headers (which address and scheme the browser used) only from there." />
+                <ItemsControl ItemsSource="{Binding RemoteUsers}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:RemoteUserEditViewModel">
+                      <v:RemoteUserCard />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="Add a user" Command="{Binding AddRemoteUserCommand}" HorizontalAlignment="Left" />
+                <TextBlock Classes="help" TextWrapping="Wrap"
+                           Text="Use a password of 10 characters or more that you use nowhere else. Changing a password signs that user out on every device. Edit opens a user. Untick Allowed to keep a user but let no device of theirs in; Delete takes them off the list. Both take effect when you save." />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
