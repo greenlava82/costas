@@ -59,7 +59,7 @@ public sealed class RemoteControlService : IAsyncDisposable
         {
             if (t.Length == 0) secrets.Delete(SecretNames.RemoteDevices);
             else secrets.Set(SecretNames.RemoteDevices, t);
-        }, tuning: tuning, power: power, controls: controls);
+        }, tuning: tuning, power: power, controls: controls, users: new RemoteUsers(() => settings.Current.Remote, secrets, clock));
         Control.Changed += () =>
         {
             _dirty = true;
@@ -85,7 +85,13 @@ public sealed class RemoteControlService : IAsyncDisposable
     /// <summary>Starts serving if Settings has the page on.</summary>
     public void Start()
     {
-        _settings.Changed += s => _ = ApplyAsync(s.Remote);
+        _settings.Changed += s =>
+        {
+            // Sign-in turned on, a user removed or disabled: the next broadcast checks every phone again and cuts off
+            // the ones no longer allowed.
+            _dirty = true;
+            _ = ApplyAsync(s.Remote);
+        };
         _session.Changed += _ => _dirty = true;
         _loop = Task.Run(LoopAsync);
         _ = ApplyAsync(_settings.Current.Remote);

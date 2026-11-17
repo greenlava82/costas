@@ -47,4 +47,10 @@ public static class SecretNames
 
     /// <summary>Hashes of the tokens of phones paired for remote control.</summary>
     public const string RemoteDevices = Prefix + "remote-devices";
+
+    /// <summary>The password hash of a remote-page user (<c>PasswordHash</c>), by the user's id.</summary>
+    public static string RemotePassword(string userId) => $"{Prefix}remote-password:{userId}";
+
+    /// <summary>The hashes of the devices a remote-page user is signed in on (<c>UserSessions</c>), by the user's id.</summary>
+    public static string RemoteSessions(string userId) => $"{Prefix}remote-sessions:{userId}";
 }
