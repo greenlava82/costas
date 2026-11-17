@@ -122,7 +122,7 @@
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="CQ" />
               <StackPanel Grid.Column="1">
-                <TextBox Text="{Binding CqModifier}" Width="90" MaxLength="4" Watermark="modifier" HorizontalAlignment="Left" />
+                <TextBox Text="{Binding CqModifier}" Width="90" MaxLength="4" PlaceholderText="modifier" HorizontalAlignment="Left" />
                 <TextBlock Classes="help" Text="Leave the modifier empty for a plain CQ, or use DX, POTA, NA, a number and so on." />
               </StackPanel>
             </Grid>
@@ -150,7 +150,7 @@
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Then send free text" />
               <StackPanel Grid.Column="1">
-                <TextBox Text="{Binding FreeTextAfter}" Width="160" HorizontalAlignment="Left" MaxLength="13" Watermark="none" />
+                <TextBox Text="{Binding FreeTextAfter}" Width="160" HorizontalAlignment="Left" MaxLength="13" PlaceholderText="none" />
                 <TextBlock Classes="help" Text="Optional, up to 13 characters such as TNX 73 GL. Sent once in your next slot after the last message, unless you start another contact first." />
               </StackPanel>
             </Grid>
