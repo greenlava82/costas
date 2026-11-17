@@ -11,7 +11,7 @@ You can also double-click a CQ in [Raw decodes](raw-decodes.md).
 
 If you click **Call** after your slot has started, the call still goes out in that slot, leaving out the part of the
 message already past, up to 3 seconds late (FT4: never more than 3 seconds). Change this with **Late start for a click**
-in [Settings › Transmitting](settings.md#transmitting). Later than that, it waits for your next slot.
+in [Settings › Contacts](settings.md#contacts). Later than that, it waits for your next slot.
 
 ### Switching to another station
 
@@ -21,7 +21,7 @@ air is cut off, and the new station is called in this slot if there is still tim
 
 During a contact a double-click on a row does nothing, so a stray double-click cannot end your contact. To make a
 double-click switch stations as **Call** does, turn on **Double-click** in
-[Settings › Transmitting](settings.md#transmitting). It works in Next in line and Repeats. ++enter++ never switches.
+[Settings › Contacts](settings.md#contacts). It works in Next in line and Repeats. ++enter++ never switches.
 PSK and RTTY are unchanged.
 
 The top card becomes the contact panel, and the red **ON AIR** banner shows while you transmit:
@@ -64,7 +64,7 @@ A typical contact answering a CQ:
    [Settings](settings.md#transmitting)).
 
 When the other station does not answer, Costas tries again, and gives up after the number of tries set in
-**Settings › Transmitting › Give up after** (4 by default). If they repeat themselves, Costas steps back and resends
+**Settings › Contacts › Give up after** (4 by default). If they repeat themselves, Costas steps back and resends
 what they missed.
 
 If the station you called answers someone else before it has replied to you (it sends its report or grid to another
@@ -75,7 +75,7 @@ calling.* If they come back to you within 5 minutes, they
 show in the Calling you bar with a **Resume** button, as below. A station that only signs off an earlier contact
 (RR73, 73) or calls CQ again does not end your call.
 
-To keep calling instead, as WSJT-X does, tick **Settings › Transmitting › Station is busy › Keep calling a station
+To keep calling instead, as WSJT-X does, tick **Settings › Contacts › Station is busy › Keep calling a station
 that is working someone else**. Costas then calls a station even when it is in another contact, and keeps calling one
 that answers someone else, until it answers you, **Give up after** is reached, or you stop. Raise **Give up after** if
 you want to wait out a whole contact.
@@ -99,14 +99,14 @@ time out. If Costas closes while a contact is held, it is sent on exit.
 
 ## Calling CQ
 
-Click **Call CQ** (or press ++ctrl+q++). Costas calls CQ in the parity set in **Settings › Transmitting › Call CQ in**
+Click **Call CQ** (or press ++ctrl+q++). Costas calls CQ in the parity set in **Settings › Contacts › Call CQ in**
 (even or odd slots) until you click **Stop CQ**. A contact that has just ended (*Logged*, *No reply* and so on) leaves
 the panel as soon as you click, so the boxes are clear for your CQ. A contact still in progress is kept and finished
 first.
 
 To call a part of the world, pick it in the dropdown beside **Call CQ**: **CQ** for everyone, **CQ DX** for stations
 outside your country, **CQ NA**, **CQ EU** and the other continents, or **CQ POTA**. It applies from your next CQ,
-and is the same setting as **Settings › Transmitting › CQ**. The bottom of the same dropdown starts a
+and is the same setting as **Settings › Contacts › CQ**. The bottom of the same dropdown starts a
 [contest](contests.md), which changes the exchange as well as the CQ.
 
 When someone answers, Costas starts the contact with the first caller. Anyone else who calls you meanwhile waits in
@@ -132,13 +132,13 @@ Each caller shows callsign, where, need tag and *Called you at 20:07:15 · +25*.
 The same station also appears in Next in line with *Calling you* under Doing now and an **Answer** button, which does
 the same thing.
 
-**Answer all in turn**: tick **Settings › Transmitting › Calling you › Answer all in turn** and, after each logged
+**Answer all in turn**: tick **Settings › Contacts › Calling you › Answer all in turn** and, after each logged
 contact, Costas answers the caller that has waited longest without a click, then the next, until nobody is left
 waiting. A caller you marked **Answer after this contact** still goes first. It only moves on after a contact is
 logged: if a station stops answering, Costas goes back to what it was doing and leaves the rest for you. Halt Tx stops
 it, and so does the Tx watchdog when you have not touched Costas for its set time. It is off by default.
 
-**Chime**: **Settings › Transmitting › Calling you › Chime when a new station calls me** plays a short sound when a new
+**Chime**: **Settings › Contacts › Calling you › Chime when a new station calls me** plays a short sound when a new
 caller appears. It is off by default. It plays on the computer's default speakers, and stays silent if the default
 device is the radio's audio device, so it can never go out over the air.
 
@@ -248,6 +248,6 @@ These are always on:
 
 ## Logging
 
-With **Settings › Transmitting › Logging › Log each contact automatically when it completes** on (the default),
+With **Settings › Contacts › Logging › Log each contact automatically when it completes** on (the default),
 contacts are logged when the exchange completes. Otherwise use **Log now**. Either way the contact goes to the local
 log and, if set up, to your QRZ logbook. See [Log, QRZ and ADIF](log.md).

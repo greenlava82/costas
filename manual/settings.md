@@ -1,6 +1,13 @@
 # Settings
 
-Open **☰ › Settings**. Sections are listed on the left; press **Save** to keep changes or **Cancel** to drop them.
+Open **☰ › Settings**. Pages are listed on the left in groups: **Station** (Station, Transmitting, Contacts, PSK and
+RTTY), **Finding stations** (Who to call, Hunt list), **Connections** (Logbooks, PSK Reporter and RBN, Mobile
+connection, Other programs) and **Costas** (Appearance, Updates, Privacy, Advanced, and Developer when developer mode
+is on). Press **Save** to keep changes or **Cancel** to drop them.
+
+**Search settings**, at the top of the list, finds a setting by any word in its name or description: type *upload*
+to see every logbook upload option, or *clock* for the clock limit and correction. Click a result to go straight to
+it; a setting inside a closed logbook section opens it.
 Radio, audio devices and the transmit test are not here: they are in **☰ › Station setup** (see
 [First-run setup](setup.md)).
 
@@ -20,7 +27,7 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
   normal FT8 message, so Costas sends it the way WSJT-X does: your CQ is just `CQ VE3/W7LIT` (no grid, and no CQ
   modifier or contest), your answer is `<K1ABC> VE3/W7LIT`, reports go as `K1ABC <VE3/W7LIT> R-10` (your call as
   a short code the other station's program recognises) and the sign-off as `<K1ABC> VE3/W7LIT RR73`. The message
-  preview under **Transmitting** shows exactly what will go out.
+  preview under **Contacts** shows exactly what will go out.
 - **Power (watts)**: recorded in the log when the radio cannot report its own power setting. It does not change the
   radio's power.
 - **Radio's top power (watts)**: empty (automatic) by default, which uses the range Hamlib reports for your radio. If
@@ -30,15 +37,29 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
 
 ## Transmitting
 
-How contacts are run once you start one. Nothing is sent unless you click Call or Call CQ.
+The transmit audio level and the safety limits that stop a transmission. Nothing is sent unless you click Call or
+Call CQ.
 
-![Settings: Transmitting, top](images/settings-transmitting.png)
+![Settings: Transmitting](images/settings-transmitting.png)
 
 | Setting | Default | What it does |
 | --- | --- | --- |
 | **Audio level on 20m (dB)** | -6 | Level of the transmit audio sent to the radio on the current band, -40 to 0. Each band remembers its own level |
 | **Adjust automatically from the radio's ALC** | on | After each transmission Costas reads the radio's ALC and nudges the level so ALC barely moves: up 0.5 dB when ALC did not move, down when it moved too much. Only the next transmission changes. It never goes more than 6 dB above, or 20 dB below, a level you type here. Turn it off to keep the level fixed. Needs a radio that reports ALC over CAT, such as the FT-710 or IC-7300 |
 | **Stop transmitting when the SWR stays at 3.0 or above** | on | While Costas sends, it reads the radio's SWR meter twice a second. Two readings in a row at 3.0 or more stop the transmission (as Halt Tx does) and the bottom bar says why. Tune is never stopped, so the radio's tuner can work. Needs a radio that reports SWR over CAT |
+| **Watchdog** | 6 minutes | Transmitting stops if you have not touched the app for this long. A contact the other station is answering is finished first |
+| **US data segments only** | on | Refuses to transmit outside the parts of each band where US rules allow data modes such as FT8: for example above 14.150 MHz on 20 m, above 7.125 MHz on 40 m or above 3.600 MHz on 80 m, and on 60 m outside the four channels and 5351.5 to 5366.5 kHz. These are the Extra class segments; a General licence has narrower ones at the bottom of some bands. Turn it off if you are licensed in another country; the band limits still apply. Since 13 February 2026 the US 60 m segment allows at most 9.15 W ERP (100 W ERP on the channels): set the radio's power yourself |
+| **Clock limit** | 2.0 seconds | Transmitting is blocked when the PC clock is off by more than this |
+| **Clock correction** | on | When the PC clock is off, Costas times its slots, transmissions and log entries from internet time instead, checked every 15 minutes. The PC clock itself is not changed. Offsets over a minute are not corrected: set the Windows clock and time zone instead |
+
+## Contacts
+
+How contacts are run once you start one: what you send, when Costas gives up, logging and stations calling you.
+
+![Settings: Contacts](images/settings-contacts.png)
+
+| Setting | Default | What it does |
+| --- | --- | --- |
 | **CQ** modifier | empty | Empty for a plain `CQ W7LIT DN40`, or `DX`, `POTA`, `NA`, a number and so on: `CQ DX W7LIT DN40`. The dropdown beside **Call CQ** on the Operate screen changes it too |
 | **Answering a CQ › Send my grid** | on | Your first message is `THEIRCALL W7LIT DN40`. Off: just `THEIRCALL W7LIT` |
 | **Sign-off on my CQ** | RR73 | When you called CQ: **RR73** ends the contact in one message; **RRR** waits for the other station's 73 |
@@ -48,18 +69,12 @@ How contacts are run once you start one. Nothing is sent unless you click Call o
 **What you send** previews every message exactly as it will go out with your current choices. The order of the
 exchange and the reports are fixed by FT8, so only the parts above can change.
 
-![Settings: Transmitting, bottom](images/settings-transmitting-2.png)
-
 | Setting | Default | What it does |
 | --- | --- | --- |
 | **Call CQ in** | even | Even slots start at :00 and :30, odd slots at :15 and :45 |
 | **Give up after** | 4 | Tries without an answer before a contact ends as *No reply* |
-| **Watchdog** | 6 minutes | Transmitting stops if you have not touched the app for this long. A contact the other station is answering is finished first |
 | **Late start for a click** | 3 seconds | When you click Call or Call CQ after your slot has started, it still goes out in that slot up to this late, leaving out the part of the message already past. Later, it waits for your next slot. 0 to 5 seconds; FT4 is held to at most 3 seconds, as its message is only 5 seconds long. In FT8 a message up to 3 seconds short still decodes down to about -18 dB. Automatic replies keep a 1 second limit |
 | **Double-click** | off | On: in FT8 and FT4, double-clicking another station in Next in line or Repeats during a contact ends the contact (as Abandon does; one already logged stays logged) and calls the new one. Off: during a contact a double-click does nothing. See [Switching to another station](contacts.md#switching-to-another-station) |
-| **US data segments only** | on | Refuses to transmit outside the parts of each band where US rules allow data modes such as FT8: for example above 14.150 MHz on 20 m, above 7.125 MHz on 40 m or above 3.600 MHz on 80 m, and on 60 m outside the four channels and 5351.5 to 5366.5 kHz. These are the Extra class segments; a General licence has narrower ones at the bottom of some bands. Turn it off if you are licensed in another country; the band limits still apply. Since 13 February 2026 the US 60 m segment allows at most 9.15 W ERP (100 W ERP on the channels): set the radio's power yourself |
-| **Clock limit** | 2.0 seconds | Transmitting is blocked when the PC clock is off by more than this |
-| **Clock correction** | on | When the PC clock is off, Costas times its slots, transmissions and log entries from internet time instead, checked every 15 minutes. The PC clock itself is not changed. Offsets over a minute are not corrected: set the Windows clock and time zone instead |
 | **Logging** | on | Log each contact automatically when it completes |
 | **Station is busy** | off | On: keep calling a station that is working someone else, as WSJT-X does. A Call on a station already in a contact calls it anyway, and a station that answers another caller is called again until it answers you, **Give up after** is reached, or you stop. Off: Costas stops and the contact card says *In another contact* |
 | **Calling you › Chime** | off | A chime on the computer's default speakers when a new station calls you. Never on the radio's audio device |
@@ -121,9 +136,14 @@ What you are looking for, and how you are told. See [Hunt list and alerts](hunt.
 - **Also watch the bands I am not on, through PSK Reporter**: on. **Count receivers within** 620 miles (1,000 km).
 - **Play the chime and flash Costas in the taskbar**: on.
 
-## QRZ
+## Logbooks
 
-![Settings: QRZ](images/settings-qrz.png)
+![Settings: Logbooks](images/settings-logbooks.png)
+
+QRZ, LoTW, eQSL, Club Log and Wavelog / Cloudlog are sections of one page; click a section's name to open it. All
+are optional, and passwords and keys are kept in Windows Credential Manager.
+
+### QRZ
 
 QRZ has two services, each with its own sign-in. Both are optional.
 
@@ -136,9 +156,7 @@ QRZ has two services, each with its own sign-in. Both are optional.
 
 The key and password are kept in Windows Credential Manager.
 
-## LoTW
-
-![Settings: LoTW](images/settings-lotw.png)
+### LoTW
 
 Logbook of the World confirmations, uploads through TQSL, and the list of LoTW users. See [LoTW](log.md#lotw).
 
@@ -150,6 +168,57 @@ Logbook of the World confirmations, uploads through TQSL, and the list of LoTW u
 
 The password is kept in Windows Credential Manager.
 
+### eQSL
+
+In **Settings › Logbooks › eQSL**, enter your eQSL.cc username and password, and copy the **QTH nickname** for the
+current callsign and location from your eQSL account. Credentials stay in the system credential store when
+available. Each station profile has its own account settings.
+
+Enable **Upload each new contact** for automatic uploads. Contacts queue locally and retry after failures,
+even after restarting Costas. The Log view shows eQSL delivery independently of QRZ.
+
+Enable **Read my eQSL inbox** to fetch incoming cards hourly. **Sync inbox now / test login** reads the inbox
+with the values entered on this page, even before saving them. A sync stores incoming cards and confirms a
+local contact when its callsign, band and mode match one contact within 15 minutes (the other station logs its own
+start time, often a minute or two from yours). With several contacts in that time, only one in the same minute is confirmed. Unmatched cards remain visible in
+the recent inbox list; they do not create contacts automatically. FT4 and MFSK/FT4 match as the same mode.
+
+Both automatic features are off by default. Save to apply. Simulation never contacts eQSL.
+
+### Wavelog / Cloudlog
+
+If you keep your log in your own [Wavelog](https://www.wavelog.org) or Cloudlog site, Costas can send each contact
+there as soon as it is logged. In **Settings › Logbooks › Wavelog / Cloudlog**:
+
+1. Enter the **Logbook address**, the address you open your logbook at (such as `https://log.example.com`). Use
+   https: the API key goes with every upload.
+2. In your logbook, make an API key with read and write access (under your account's API keys) and paste it into
+   **API key**. It stays in the system credential store, not in the settings file.
+3. Press **Test and list station locations**. Costas asks the logbook which station locations the key can use and
+   picks the one whose callsign matches this profile. Choose another from the list, or type its id, if needed. The
+   logbook only takes contacts for a location with this profile's callsign.
+4. Tick **Upload each new contact as soon as it is logged** and save.
+
+Contacts queue locally and retry when the site is down, even after restarting Costas. A contact already in that
+logbook is left alone and counts as sent. A wrong key or station id waits an hour before the next try; the
+**Wavelog/Cloudlog** indicator in the bottom bar (shown once this is set up) says what the logbook answered. Each
+station profile has its own settings. Off by default. Simulation never contacts the site.
+
+### Club Log {#club-log}
+
+Costas can send each contact to [Club Log](https://clublog.org) as soon as it is logged, so a DXpedition's online
+log shows it at once. In **Settings › Logbooks › Club Log**:
+
+1. Enter the **Account email** you sign in to Club Log with (not your callsign).
+2. In Club Log, open Settings › API and make an **Application Password**. It is shown once: paste it into
+   **Application Password**. It stays in the system credential store, not in the settings file.
+3. Tick **Upload each new contact as soon as it is logged** and save.
+
+The profile's callsign must be one of the callsigns on that Club Log account. Contacts queue locally and retry when
+Club Log is down. A contact Club Log already has counts as sent; one it rejects (a bad date, say) is dropped from the
+queue and the **Club Log** indicator says why. If Club Log refuses the login, uploads stop until you change the email
+or password, because Club Log blocks programs that keep trying. Each station profile has its own settings. Off by
+default. Simulation never contacts Club Log.
 ## PSK Reporter
 
 The page is called **PSK Reporter and RBN** in Settings.
@@ -298,57 +367,3 @@ testing Costas, not for operating.
 **Development builds** (off) updates Costas to each new build of the code that passes its tests, not only releases.
 Turning it off, or turning developer mode off, offers the latest release again. See
 [Install › Development builds](install.md#development-builds).
-
-## eQSL
-
-![Settings: eQSL](images/settings-eqsl.png)
-
-In **Settings › eQSL**, enter your eQSL.cc username and password, and copy the **QTH nickname** for the
-current callsign and location from your eQSL account. Credentials stay in the system credential store when
-available. Each station profile has its own account settings.
-
-Enable **Upload each new contact** for automatic uploads. Contacts queue locally and retry after failures,
-even after restarting Costas. The Log view shows eQSL delivery independently of QRZ.
-
-Enable **Read my eQSL inbox** to fetch incoming cards hourly. **Sync inbox now / test login** reads the inbox
-with the values entered on this page, even before saving them. A sync stores incoming cards and confirms a
-local contact when its callsign, band and mode match one contact within 15 minutes (the other station logs its own
-start time, often a minute or two from yours). With several contacts in that time, only one in the same minute is confirmed. Unmatched cards remain visible in
-the recent inbox list; they do not create contacts automatically. FT4 and MFSK/FT4 match as the same mode.
-
-Both automatic features are off by default. Save to apply. Simulation never contacts eQSL.
-
-## Wavelog / Cloudlog
-
-If you keep your log in your own [Wavelog](https://www.wavelog.org) or Cloudlog site, Costas can send each contact
-there as soon as it is logged. In **Settings › Wavelog / Cloudlog**:
-
-1. Enter the **Logbook address**, the address you open your logbook at (such as `https://log.example.com`). Use
-   https: the API key goes with every upload.
-2. In your logbook, make an API key with read and write access (under your account's API keys) and paste it into
-   **API key**. It stays in the system credential store, not in the settings file.
-3. Press **Test and list station locations**. Costas asks the logbook which station locations the key can use and
-   picks the one whose callsign matches this profile. Choose another from the list, or type its id, if needed. The
-   logbook only takes contacts for a location with this profile's callsign.
-4. Tick **Upload each new contact as soon as it is logged** and save.
-
-Contacts queue locally and retry when the site is down, even after restarting Costas. A contact already in that
-logbook is left alone and counts as sent. A wrong key or station id waits an hour before the next try; the
-**Wavelog/Cloudlog** indicator in the bottom bar (shown once this is set up) says what the logbook answered. Each
-station profile has its own settings. Off by default. Simulation never contacts the site.
-
-## Club Log {#club-log}
-
-Costas can send each contact to [Club Log](https://clublog.org) as soon as it is logged, so a DXpedition's online
-log shows it at once. In **Settings › Club Log**:
-
-1. Enter the **Account email** you sign in to Club Log with (not your callsign).
-2. In Club Log, open Settings › API and make an **Application Password**. It is shown once: paste it into
-   **Application Password**. It stays in the system credential store, not in the settings file.
-3. Tick **Upload each new contact as soon as it is logged** and save.
-
-The profile's callsign must be one of the callsigns on that Club Log account. Contacts queue locally and retry when
-Club Log is down. A contact Club Log already has counts as sent; one it rejects (a bad date, say) is dropped from the
-queue and the **Club Log** indicator says why. If Club Log refuses the login, uploads stop until you change the email
-or password, because Club Log blocks programs that keep trying. Each station profile has its own settings. Off by
-default. Simulation never contacts Club Log.

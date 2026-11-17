@@ -33,17 +33,59 @@
       <Setter Property="Opacity" Value="0.8" />
       <Setter Property="Margin" Value="0,0,0,18" />
     </Style>
-    <Style Selector="TabControl.pages > TabItem">
-      <Setter Property="FontSize" Value="14" />
-      <Setter Property="MinHeight" Value="36" />
+    <!-- The page list is the sidebar (grouped, searchable, scrolls), so the tab strip itself is hidden. -->
+    <Style Selector="TabControl.pages /template/ ItemsPresenter#PART_ItemsPresenter">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="TextBlock.navgroup">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="Margin" Value="14,14,0,4" />
+    </Style>
+    <Style Selector="Button.nav">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="Padding" Value="14,6" />
+      <Setter Property="Margin" Value="0,1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="Button.nav.selected">
+      <Setter Property="Background" Value="{DynamicResource SelectedRowBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Border.navmark">
+      <Setter Property="Width" Value="3" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Margin" Value="0,8" />
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="Expander.logbook">
+      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+    <Style Selector="TextBlock.intro.service">
+      <Setter Property="Margin" Value="0,0,0,14" />
+    </Style>
+    <Style Selector="TextBlock.navdetail">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
     </Style>
   </Window.Styles>
 
-  <Grid RowDefinitions="*,Auto">
-    <TabControl Classes="pages" TabStripPlacement="Left" SelectedIndex="{Binding SelectedPage}" Padding="24,16,24,0">
+  <Grid RowDefinitions="*,Auto" ColumnDefinitions="220,*">
+    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,1,0">
+      <DockPanel>
+        <TextBox x:Name="Search" DockPanel.Dock="Top" PlaceholderText="Search settings" Margin="10,12,10,4" />
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel x:Name="Nav" Margin="8,0,8,12" />
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+    <TabControl x:Name="Pages" Grid.Column="1" Classes="pages" TabStripPlacement="Left" SelectedIndex="{Binding SelectedPage}" Padding="24,16,24,0">
 
-      <!-- 0 Station -->
       <TabItem Header="Station">
         <ScrollViewer>
           <StackPanel>
@@ -98,12 +140,12 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- 1 Transmitting -->
+
       <TabItem Header="Transmitting">
         <ScrollViewer>
           <StackPanel>
             <TextBlock Classes="page" Text="Transmitting" />
-            <TextBlock Classes="intro" Text="How contacts are run once you start one. Nothing is sent unless you click Call or Call CQ." />
+            <TextBlock Classes="intro" Text="Audio level and the safety limits that stop a transmission. Nothing is sent unless you click Call or Call CQ." />
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="{Binding TxGainLabel}" />
               <StackPanel Grid.Column="1">
@@ -119,6 +161,51 @@
                 <TextBlock Classes="help" Text="Costas reads the radio's SWR meter twice a second while it sends. Two readings in a row at 3.0 or above stop the transmission and say so in the bottom bar. Tune is never stopped, so the radio's tuner can do its work. Needs a radio that reports SWR over CAT." />
               </StackPanel>
             </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Watchdog" />
+              <StackPanel Grid.Column="1">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox Text="{Binding Watchdog}" Width="70" />
+                  <TextBlock Text="minutes" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Classes="help" Text="Transmitting stops if you have not touched the app for this long." />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Where to transmit" />
+              <StackPanel Grid.Column="1">
+                <CheckBox Content="US data segments only" IsChecked="{Binding UsDataSegmentsOnly}" />
+                <TextBlock Classes="help" Text="Refuses to transmit outside the parts of each band where US rules allow data modes such as FT8 (for example above 14.150 MHz on 20 m or 7.125 MHz on 40 m), and on 60 m outside the channels and 5351.5 to 5366.5 kHz. Turn it off if you are licensed in another country; the band limits still apply." TextWrapping="Wrap" />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Clock limit" />
+              <StackPanel Grid.Column="1">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox Text="{Binding ClockBlock}" Width="70" />
+                  <TextBlock Text="seconds" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Classes="help" Text="Transmitting is blocked when the computer's clock is off by more than this. FT8 needs it within about a second." />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Clock correction" />
+              <StackPanel Grid.Column="1">
+                <CheckBox Content="Correct the clock inside Costas from internet time" IsChecked="{Binding CorrectClock}" />
+                <TextBlock Classes="help" Text="When the computer's clock is off, Costas times its slots from internet time instead, checked every 15 minutes. Your computer's clock is not changed. Offsets over a minute are not corrected: set the Windows clock and time zone instead." TextWrapping="Wrap" />
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+
+      <!-- Contacts: how a contact runs, split from Transmitting -->
+      <TabItem Header="Contacts">
+        <ScrollViewer>
+          <StackPanel>
+            <TextBlock Classes="page" Text="Contacts" />
+            <TextBlock Classes="intro" Text="How contacts are run once you start one: what is sent, when Costas gives up, and logging." />
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="CQ" />
               <StackPanel Grid.Column="1">
@@ -183,16 +270,6 @@
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Watchdog" />
-              <StackPanel Grid.Column="1">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBox Text="{Binding Watchdog}" Width="70" />
-                  <TextBlock Text="minutes" VerticalAlignment="Center" />
-                </StackPanel>
-                <TextBlock Classes="help" Text="Transmitting stops if you have not touched the app for this long." />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Late start for a click" />
               <StackPanel Grid.Column="1">
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -207,30 +284,6 @@
               <StackPanel Grid.Column="1">
                 <CheckBox Content="Double-click a station during a contact to abandon it and call the new one" IsChecked="{Binding DoubleClickSwitches}" />
                 <TextBlock Classes="help" Text="FT8 and FT4, in Next in line and Repeats. The contact ends at once, as with Abandon (one already logged stays in the log), and the new station is called in this slot if there is still time, otherwise in your next slot. Off: during a contact a double-click does nothing; use Abandon first. Enter never switches." TextWrapping="Wrap" />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Where to transmit" />
-              <StackPanel Grid.Column="1">
-                <CheckBox Content="US data segments only" IsChecked="{Binding UsDataSegmentsOnly}" />
-                <TextBlock Classes="help" Text="Refuses to transmit outside the parts of each band where US rules allow data modes such as FT8 (for example above 14.150 MHz on 20 m or 7.125 MHz on 40 m), and on 60 m outside the channels and 5351.5 to 5366.5 kHz. Turn it off if you are licensed in another country; the band limits still apply." TextWrapping="Wrap" />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Clock limit" />
-              <StackPanel Grid.Column="1">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBox Text="{Binding ClockBlock}" Width="70" />
-                  <TextBlock Text="seconds" VerticalAlignment="Center" />
-                </StackPanel>
-                <TextBlock Classes="help" Text="Transmitting is blocked when the computer's clock is off by more than this. FT8 needs it within about a second." />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Clock correction" />
-              <StackPanel Grid.Column="1">
-                <CheckBox Content="Correct the clock inside Costas from internet time" IsChecked="{Binding CorrectClock}" />
-                <TextBlock Classes="help" Text="When the computer's clock is off, Costas times its slots from internet time instead, checked every 15 minutes. Your computer's clock is not changed. Offsets over a minute are not corrected: set the Windows clock and time zone instead." TextWrapping="Wrap" />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
@@ -256,6 +309,7 @@
           </StackPanel>
         </ScrollViewer>
       </TabItem>
+
 
       <TabItem Header="PSK and RTTY">
         <ScrollViewer>
@@ -357,7 +411,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- 2 Who to call -->
+
       <TabItem Header="Who to call">
         <ScrollViewer>
           <StackPanel>
@@ -423,7 +477,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- 3 Hunt list -->
+
       <TabItem Header="Hunt list">
         <ScrollViewer>
           <StackPanel>
@@ -485,94 +539,201 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- 3 QRZ -->
-      <TabItem Header="QRZ">
+      <!-- Logbooks: QRZ, LoTW, eQSL, Club Log and Wavelog / Cloudlog, one section each (owner pick 2026-11-17) -->
+      <TabItem Header="Logbooks">
         <ScrollViewer>
           <StackPanel>
-            <TextBlock Classes="page" Text="QRZ" />
-            <TextBlock Classes="intro" Text="QRZ has two separate services, and each needs its own sign-in. The logbook API key opens your logbook only: what you have worked and confirmed, and uploading new contacts. Looking up other stations' names and locations goes through QRZ's XML callsign service, which does not accept the API key and needs your QRZ username and password. Both are optional." />
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Logbook API key" />
-              <StackPanel Grid.Column="1">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBox Text="{Binding LogbookKey}" Width="260" PasswordChar="•" PlaceholderText="XXXX-XXXX-XXXX-XXXX" />
-                  <Button Content="Test key" Command="{Binding TestKeyCommand}" />
+            <TextBlock Classes="page" Text="Logbooks" />
+            <TextBlock Classes="intro" Text="Online logbooks Costas can read confirmations from or send contacts to. Every one is optional; open a section to set it up." />
+            <TextBlock Classes="help" Text="{Binding SecretsNote}" Margin="0,-10,0,14" />
+            <Expander Classes="logbook" HorizontalAlignment="Stretch">
+              <Expander.Header>
+                <StackPanel>
+                  <TextBlock Text="QRZ" FontWeight="SemiBold" FontSize="15" />
+                  <TextBlock Text="Logbook sync and callsign lookups" Classes="help" Margin="0" />
                 </StackPanel>
-                <TextBlock Classes="help" Text="{Binding KeyStatus}" IsVisible="{Binding KeyStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                <TextBlock Classes="help" Text="Find it in your QRZ Logbook: open the logbook's Settings and copy its API access key." />
-                <Button Classes="link" Command="{Binding OpenQrzCommand}" Padding="0" Margin="0,4,0,0">
-                  <TextBlock Text="Open the QRZ Logbook" />
-                </Button>
+              </Expander.Header>
+              <StackPanel>
+                <TextBlock Classes="intro service" Text="QRZ has two separate services, and each needs its own sign-in. The logbook API key opens your logbook only: what you have worked and confirmed, and uploading new contacts. Looking up other stations' names and locations goes through QRZ's XML callsign service, which does not accept the API key and needs your QRZ username and password. Both are optional." />
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Logbook API key" />
+                  <StackPanel Grid.Column="1">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBox Text="{Binding LogbookKey}" Width="260" PasswordChar="•" PlaceholderText="XXXX-XXXX-XXXX-XXXX" />
+                      <Button Content="Test key" Command="{Binding TestKeyCommand}" />
+                    </StackPanel>
+                    <TextBlock Classes="help" Text="{Binding KeyStatus}" IsVisible="{Binding KeyStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Classes="help" Text="Find it in your QRZ Logbook: open the logbook's Settings and copy its API access key." />
+                    <Button Classes="link" Command="{Binding OpenQrzCommand}" Padding="0" Margin="0,4,0,0">
+                      <TextBlock Text="Open the QRZ Logbook" />
+                    </Button>
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Sync" />
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <CheckBox Content="Read my logbook and upload new contacts" IsChecked="{Binding LogbookEnabled}" />
+                    <CheckBox Content="Upload each contact as soon as it is logged" IsChecked="{Binding UploadOnComplete}" IsEnabled="{Binding LogbookEnabled}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding LogbookEnabled}">
+                      <TextBlock Text="Check for changes every" VerticalAlignment="Center" />
+                      <TextBox Text="{Binding SyncMinutes}" Width="70" />
+                      <TextBlock Text="minutes" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Callsign lookups" />
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <TextBox Text="{Binding QrzUser}" Width="260" HorizontalAlignment="Left" PlaceholderText="QRZ username" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBox Text="{Binding QrzPassword}" Width="260" PasswordChar="•" PlaceholderText="QRZ password" />
+                      <Button Content="Test login" Command="{Binding TestLookupCommand}" />
+                    </StackPanel>
+                    <TextBlock Classes="help" Text="{Binding LookupStatus}" IsVisible="{Binding LookupStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Classes="help" Text="Shows the name, city and state of the station you select or are working, and fills them in on logged contacts. The logbook API key cannot do this: QRZ only answers lookups for a signed-in user. Full details need a QRZ XML subscription; without one QRZ returns fewer fields. Leave both blank to turn lookups off." />
+                  </StackPanel>
+                </Grid>
               </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Sync" />
-              <StackPanel Grid.Column="1" Spacing="6">
-                <CheckBox Content="Read my logbook and upload new contacts" IsChecked="{Binding LogbookEnabled}" />
-                <CheckBox Content="Upload each contact as soon as it is logged" IsChecked="{Binding UploadOnComplete}" IsEnabled="{Binding LogbookEnabled}" />
-                <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding LogbookEnabled}">
-                  <TextBlock Text="Check for changes every" VerticalAlignment="Center" />
-                  <TextBox Text="{Binding SyncMinutes}" Width="70" />
-                  <TextBlock Text="minutes" VerticalAlignment="Center" />
+            </Expander>
+            <Expander Classes="logbook" HorizontalAlignment="Stretch">
+              <Expander.Header>
+                <StackPanel>
+                  <TextBlock Text="LoTW" FontWeight="SemiBold" FontSize="15" />
+                  <TextBlock Text="Confirmations and TQSL uploads" Classes="help" Margin="0" />
                 </StackPanel>
+              </Expander.Header>
+              <StackPanel>
+                <TextBlock Classes="intro service" Text="ARRL's Logbook of the World is where DXCC and WAS credit comes from. Costas downloads your LoTW confirmations with your LoTW website login, and uploads your contacts through TQSL, which signs them with your callsign certificate. Both are optional." />
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Confirmations" />
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <CheckBox Content="Download my LoTW confirmations" IsChecked="{Binding LotwEnabled}" />
+                    <TextBox Text="{Binding LotwUser}" Width="260" HorizontalAlignment="Left" PlaceholderText="LoTW login (usually your call)" IsEnabled="{Binding LotwEnabled}" />
+                    <TextBox Text="{Binding LotwPassword}" Width="260" HorizontalAlignment="Left" PasswordChar="•" PlaceholderText="LoTW website password" IsEnabled="{Binding LotwEnabled}" />
+                    <TextBlock Classes="help" Text="The website password, not the TQSL certificate password. Costas checks for new confirmations every 12 hours, and when you choose Download new confirmations in the Log view. A confirmation for a contact missing from your log adds it." />
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Uploads (TQSL)" />
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <TextBox Text="{Binding TqslPath}" Width="420" HorizontalAlignment="Left" PlaceholderText="Leave blank to find TQSL in its usual folder" />
+                    <TextBlock Classes="help" Text="{Binding TqslFound}" />
+                    <TextBox Text="{Binding StationLocation}" Width="260" HorizontalAlignment="Left" PlaceholderText="TQSL Station Location" Margin="0,6,0,0" />
+                    <TextBlock Classes="help" Text="The Station Location name exactly as it is in TQSL. Leave blank if TQSL has only one." />
+                    <CheckBox Content="Sign and upload each contact as soon as it is logged" IsChecked="{Binding LotwUploadOnComplete}" Margin="0,6,0,0" />
+                    <TextBlock Classes="help" Text="Otherwise use Upload new contacts with TQSL in the Log view. TQSL skips contacts LoTW already has. Your certificate must not have a password, or TQSL will ask for it." />
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Who uses LoTW" />
+                  <StackPanel Grid.Column="1">
+                    <CheckBox Content="Download ARRL's list of LoTW users once a week" IsChecked="{Binding LotwUserList}" />
+                    <TextBlock Classes="help" Text="Shows Uses LoTW in station details and the Why tooltip, and ranks LoTW users ahead when only confirmed contacts count. About 6 MB; no login needed." />
+                  </StackPanel>
+                </Grid>
               </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Callsign lookups" />
-              <StackPanel Grid.Column="1" Spacing="6">
-                <TextBox Text="{Binding QrzUser}" Width="260" HorizontalAlignment="Left" PlaceholderText="QRZ username" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBox Text="{Binding QrzPassword}" Width="260" PasswordChar="•" PlaceholderText="QRZ password" />
-                  <Button Content="Test login" Command="{Binding TestLookupCommand}" />
+            </Expander>
+            <Expander Classes="logbook" HorizontalAlignment="Stretch">
+              <Expander.Header>
+                <StackPanel>
+                  <TextBlock Text="eQSL" FontWeight="SemiBold" FontSize="15" />
+                  <TextBlock Text="Uploads and inbox confirmations" Classes="help" Margin="0" />
                 </StackPanel>
-                <TextBlock Classes="help" Text="{Binding LookupStatus}" IsVisible="{Binding LookupStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                <TextBlock Classes="help" Text="Shows the name, city and state of the station you select or are working, and fills them in on logged contacts. The logbook API key cannot do this: QRZ only answers lookups for a signed-in user. Full details need a QRZ XML subscription; without one QRZ returns fewer fields. Leave both blank to turn lookups off." />
+              </Expander.Header>
+              <StackPanel>
+                <TextBlock Classes="intro service" Text="Send newly logged contacts to eQSL.cc. Uploads are optional, run in the background and retry when eQSL is unavailable. These settings belong to the current station profile." />
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Account" />
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <TextBox Text="{Binding EqslUser}" Width="260" HorizontalAlignment="Left" PlaceholderText="eQSL username" />
+                    <TextBox Text="{Binding EqslPassword}" Width="260" HorizontalAlignment="Left" PasswordChar="•" PlaceholderText="eQSL password" />
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="QTH nickname" />
+                  <StackPanel Grid.Column="1">
+                    <TextBox Text="{Binding EqslQthNickname}" Width="260" HorizontalAlignment="Left" />
+                    <TextBlock Classes="help" Text="Copy the nickname from your eQSL account for this callsign and location. Leave blank only if your account has a single matching QTH." />
+                  </StackPanel>
+                </Grid>
+                <CheckBox Content="Upload each new contact to eQSL as soon as it is logged" IsChecked="{Binding EqslUploadOnComplete}" />
+                <CheckBox Content="Read my eQSL inbox and sync confirmations hourly" IsChecked="{Binding EqslSyncEnabled}" />
+                <Button Content="Sync inbox now / test login" Command="{Binding SyncEqslCommand}" HorizontalAlignment="Left" />
+                <TextBlock Classes="help" Text="{Binding EqslSyncStatus}" />
+                <TextBlock Classes="help" Text="Save to apply automatic sync and uploads. Incoming cards confirm matching contacts in your local log. Unmatched cards stay in your inbox below. Simulation never contacts eQSL." />
+                <TextBlock Text="Recent inbox cards (up to 100)" FontWeight="SemiBold" Margin="0,12,0,4" />
+                <ItemsControl ItemsSource="{Binding EqslInboxCards}" />
               </StackPanel>
-            </Grid>
-            <TextBlock Classes="help" Text="{Binding SecretsNote}" />
+            </Expander>
+            <Expander Classes="logbook" HorizontalAlignment="Stretch">
+              <Expander.Header>
+                <StackPanel>
+                  <TextBlock Text="Club Log" FontWeight="SemiBold" FontSize="15" />
+                  <TextBlock Text="Real-time uploads" Classes="help" Margin="0" />
+                </StackPanel>
+              </Expander.Header>
+              <StackPanel>
+                <TextBlock Classes="intro service" Text="Send each contact to Club Log as you make it, so DXpeditions and their online logs see it at once. Optional; uploads run in the background and retry. These settings belong to the current station profile, whose callsign must be on your Club Log account." />
+                <TextBlock Classes="help" Text="{Binding ClubLogBuildNote}" IsVisible="{Binding ClubLogBuildNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Account email" />
+                  <StackPanel Grid.Column="1">
+                    <TextBox Text="{Binding ClubLogEmail}" Width="360" HorizontalAlignment="Left" PlaceholderText="The email you sign in to Club Log with" />
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Application Password" />
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <TextBox Text="{Binding ClubLogPassword}" Width="360" HorizontalAlignment="Left" PasswordChar="•" PlaceholderText="Not your Club Log password" />
+                    <TextBlock Classes="help" Text="Make one in Club Log under Settings › API › Application Passwords. It is shown once; paste it here." />
+                  </StackPanel>
+                </Grid>
+                <CheckBox Content="Upload each new contact as soon as it is logged" IsChecked="{Binding ClubLogUploadOnComplete}" />
+                <TextBlock Classes="help" Text="Save to apply. Club Log real-time upload is for new contacts only; to send an old log, upload an ADIF file on the Club Log site. If Club Log refuses the login, uploads stop until you change the email or password here, as Club Log asks. Simulation never contacts Club Log." />
+              </StackPanel>
+            </Expander>
+            <Expander Classes="logbook" HorizontalAlignment="Stretch">
+              <Expander.Header>
+                <StackPanel>
+                  <TextBlock Text="Wavelog / Cloudlog" FontWeight="SemiBold" FontSize="15" />
+                  <TextBlock Text="Uploads to your own logbook" Classes="help" Margin="0" />
+                </StackPanel>
+              </Expander.Header>
+              <StackPanel>
+                <TextBlock Classes="intro service" Text="Send newly logged contacts to your own Wavelog or Cloudlog logbook. Uploads are optional, run in the background and retry when the site is unavailable. These settings belong to the current station profile." />
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Logbook address" />
+                  <StackPanel Grid.Column="1">
+                    <TextBox Text="{Binding CloudlogUrl}" Width="360" HorizontalAlignment="Left" PlaceholderText="https://log.example.com" />
+                    <TextBlock Classes="help" Text="The address you open your logbook at. Use https: the API key travels with every upload." />
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="API key" />
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <TextBox Text="{Binding CloudlogKey}" Width="360" HorizontalAlignment="Left" PasswordChar="•" PlaceholderText="API key with read and write" />
+                    <TextBlock Classes="help" Text="Make one in your logbook under your account's API keys, with read and write access." />
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Station location" />
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <Button Content="Test and list station locations" Command="{Binding TestCloudlogCommand}" HorizontalAlignment="Left" />
+                    <TextBlock Classes="help" Text="{Binding CloudlogStatus}" />
+                    <ComboBox ItemsSource="{Binding CloudlogStations}" SelectedItem="{Binding CloudlogStation}" MinWidth="360" PlaceholderText="Pick after Test" />
+                    <TextBox Text="{Binding CloudlogStationId}" Width="90" HorizontalAlignment="Left" PlaceholderText="Id" />
+                    <TextBlock Classes="help" Text="The logbook only takes contacts for a location whose callsign matches this profile's callsign." />
+                  </StackPanel>
+                </Grid>
+                <CheckBox Content="Upload each new contact as soon as it is logged" IsChecked="{Binding CloudlogUploadOnComplete}" />
+                <TextBlock Classes="help" Text="Save to apply. A contact already in that logbook is left as it is. Simulation never contacts the site." />
+              </StackPanel>
+            </Expander>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
 
-      <!-- LoTW -->
-      <TabItem Header="LoTW">
-        <ScrollViewer>
-          <StackPanel>
-            <TextBlock Classes="page" Text="LoTW" />
-            <TextBlock Classes="intro" Text="ARRL's Logbook of the World is where DXCC and WAS credit comes from. Costas downloads your LoTW confirmations with your LoTW website login, and uploads your contacts through TQSL, which signs them with your callsign certificate. Both are optional." />
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Confirmations" />
-              <StackPanel Grid.Column="1" Spacing="6">
-                <CheckBox Content="Download my LoTW confirmations" IsChecked="{Binding LotwEnabled}" />
-                <TextBox Text="{Binding LotwUser}" Width="260" HorizontalAlignment="Left" PlaceholderText="LoTW login (usually your call)" IsEnabled="{Binding LotwEnabled}" />
-                <TextBox Text="{Binding LotwPassword}" Width="260" HorizontalAlignment="Left" PasswordChar="•" PlaceholderText="LoTW website password" IsEnabled="{Binding LotwEnabled}" />
-                <TextBlock Classes="help" Text="The website password, not the TQSL certificate password. Costas checks for new confirmations every 12 hours, and when you choose Download new confirmations in the Log view. A confirmation for a contact missing from your log adds it." />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Uploads (TQSL)" />
-              <StackPanel Grid.Column="1" Spacing="6">
-                <TextBox Text="{Binding TqslPath}" Width="420" HorizontalAlignment="Left" PlaceholderText="Leave blank to find TQSL in its usual folder" />
-                <TextBlock Classes="help" Text="{Binding TqslFound}" />
-                <TextBox Text="{Binding StationLocation}" Width="260" HorizontalAlignment="Left" PlaceholderText="TQSL Station Location" Margin="0,6,0,0" />
-                <TextBlock Classes="help" Text="The Station Location name exactly as it is in TQSL. Leave blank if TQSL has only one." />
-                <CheckBox Content="Sign and upload each contact as soon as it is logged" IsChecked="{Binding LotwUploadOnComplete}" Margin="0,6,0,0" />
-                <TextBlock Classes="help" Text="Otherwise use Upload new contacts with TQSL in the Log view. TQSL skips contacts LoTW already has. Your certificate must not have a password, or TQSL will ask for it." />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Who uses LoTW" />
-              <StackPanel Grid.Column="1">
-                <CheckBox Content="Download ARRL's list of LoTW users once a week" IsChecked="{Binding LotwUserList}" />
-                <TextBlock Classes="help" Text="Shows Uses LoTW in station details and the Why tooltip, and ranks LoTW users ahead when only confirmed contacts count. About 6 MB; no login needed." />
-              </StackPanel>
-            </Grid>
-            <TextBlock Classes="help" Text="{Binding SecretsNote}" />
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
 
-      <!-- 4 PSK Reporter and the Reverse Beacon Network -->
       <TabItem Header="PSK Reporter and RBN">
         <ScrollViewer>
           <StackPanel>
@@ -606,40 +767,6 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- 5 Other programs -->
-      <TabItem Header="Other programs">
-        <ScrollViewer>
-          <StackPanel>
-            <TextBlock Classes="page" Text="Other programs" />
-            <TextBlock Classes="intro" Text="Share decodes and logged contacts with GridTracker, JTAlert, N1MM+ and loggers that understand WSJT-X." />
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="WSJT-X UDP" />
-              <StackPanel Grid.Column="1" Spacing="6">
-                <CheckBox Content="Send decodes, status and logged contacts" IsChecked="{Binding UdpEnabled}" />
-                <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding UdpEnabled}">
-                  <TextBlock Text="Address" VerticalAlignment="Center" />
-                  <TextBox Text="{Binding UdpAddress}" Width="150" />
-                  <TextBlock Text="Port" VerticalAlignment="Center" />
-                  <TextBox Text="{Binding UdpPort}" Width="80" />
-                </StackPanel>
-                <TextBlock Classes="help" Text="The defaults (127.0.0.1, port 2237) work with GridTracker and JTAlert on this computer." />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Save received audio" />
-              <StackPanel Grid.Column="1">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ComboBox ItemsSource="{Binding WavChoices}" SelectedItem="{Binding SaveWav}" MinWidth="110" />
-                  <TextBlock Text="keep for" VerticalAlignment="Center" />
-                  <TextBox Text="{Binding Retention}" Width="70" />
-                  <TextBlock Text="days" VerticalAlignment="Center" />
-                </StackPanel>
-                <TextBlock Classes="help" Text="Saves each 15-second slot as a WAV file: none, only slots with decodes, or all. Useful for checking reception later." />
-              </StackPanel>
-            </Grid>
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
 
       <!-- Mobile connection -->
       <TabItem Header="Mobile connection">
@@ -733,7 +860,42 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- 6 Appearance -->
+
+      <TabItem Header="Other programs">
+        <ScrollViewer>
+          <StackPanel>
+            <TextBlock Classes="page" Text="Other programs" />
+            <TextBlock Classes="intro" Text="Share decodes and logged contacts with GridTracker, JTAlert, N1MM+ and loggers that understand WSJT-X." />
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="WSJT-X UDP" />
+              <StackPanel Grid.Column="1" Spacing="6">
+                <CheckBox Content="Send decodes, status and logged contacts" IsChecked="{Binding UdpEnabled}" />
+                <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding UdpEnabled}">
+                  <TextBlock Text="Address" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding UdpAddress}" Width="150" />
+                  <TextBlock Text="Port" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding UdpPort}" Width="80" />
+                </StackPanel>
+                <TextBlock Classes="help" Text="The defaults (127.0.0.1, port 2237) work with GridTracker and JTAlert on this computer." />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Save received audio" />
+              <StackPanel Grid.Column="1">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <ComboBox ItemsSource="{Binding WavChoices}" SelectedItem="{Binding SaveWav}" MinWidth="110" />
+                  <TextBlock Text="keep for" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding Retention}" Width="70" />
+                  <TextBlock Text="days" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Classes="help" Text="Saves each 15-second slot as a WAV file: none, only slots with decodes, or all. Useful for checking reception later." />
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+
       <TabItem Header="Appearance">
         <ScrollViewer>
           <StackPanel>
@@ -805,7 +967,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- 7 Updates -->
+
       <TabItem Header="Updates">
         <ScrollViewer>
           <StackPanel>
@@ -826,7 +988,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- 8 Advanced -->
+
       <!-- Privacy: anonymous usage statistics (opt-out) -->
       <TabItem Header="Privacy">
         <ScrollViewer>
@@ -854,6 +1016,7 @@
         </ScrollViewer>
       </TabItem>
 
+
       <TabItem Header="Advanced">
         <ScrollViewer>
           <StackPanel>
@@ -877,7 +1040,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- 9 Developer (hidden unless developer mode is on) -->
+
       <TabItem Header="Developer" IsVisible="{Binding ShowDeveloper}">
         <ScrollViewer>
           <StackPanel>
@@ -904,99 +1067,10 @@
           </StackPanel>
         </ScrollViewer>
       </TabItem>
-      <TabItem Header="eQSL">
-        <ScrollViewer>
-          <StackPanel>
-            <TextBlock Classes="page" Text="eQSL" />
-            <TextBlock Classes="intro" Text="Send newly logged contacts to eQSL.cc. Uploads are optional, run in the background and retry when eQSL is unavailable. These settings belong to the current station profile." />
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Account" />
-              <StackPanel Grid.Column="1" Spacing="6">
-                <TextBox Text="{Binding EqslUser}" Width="260" HorizontalAlignment="Left" PlaceholderText="eQSL username" />
-                <TextBox Text="{Binding EqslPassword}" Width="260" HorizontalAlignment="Left" PasswordChar="•" PlaceholderText="eQSL password" />
-                <TextBlock Classes="help" Text="{Binding SecretsNote}" />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="QTH nickname" />
-              <StackPanel Grid.Column="1">
-                <TextBox Text="{Binding EqslQthNickname}" Width="260" HorizontalAlignment="Left" />
-                <TextBlock Classes="help" Text="Copy the nickname from your eQSL account for this callsign and location. Leave blank only if your account has a single matching QTH." />
-              </StackPanel>
-            </Grid>
-            <CheckBox Content="Upload each new contact to eQSL as soon as it is logged" IsChecked="{Binding EqslUploadOnComplete}" />
-            <CheckBox Content="Read my eQSL inbox and sync confirmations hourly" IsChecked="{Binding EqslSyncEnabled}" />
-            <Button Content="Sync inbox now / test login" Command="{Binding SyncEqslCommand}" HorizontalAlignment="Left" />
-            <TextBlock Classes="help" Text="{Binding EqslSyncStatus}" />
-            <TextBlock Classes="help" Text="Save to apply automatic sync and uploads. Incoming cards confirm matching contacts in your local log. Unmatched cards stay in your inbox below. Simulation never contacts eQSL." />
-            <TextBlock Text="Recent inbox cards (up to 100)" FontWeight="SemiBold" Margin="0,12,0,4" />
-            <ItemsControl ItemsSource="{Binding EqslInboxCards}" />
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-      <TabItem Header="Wavelog / Cloudlog">
-        <ScrollViewer>
-          <StackPanel>
-            <TextBlock Classes="page" Text="Wavelog / Cloudlog" />
-            <TextBlock Classes="intro" Text="Send newly logged contacts to your own Wavelog or Cloudlog logbook. Uploads are optional, run in the background and retry when the site is unavailable. These settings belong to the current station profile." />
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Logbook address" />
-              <StackPanel Grid.Column="1">
-                <TextBox Text="{Binding CloudlogUrl}" Width="360" HorizontalAlignment="Left" PlaceholderText="https://log.example.com" />
-                <TextBlock Classes="help" Text="The address you open your logbook at. Use https: the API key travels with every upload." />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="API key" />
-              <StackPanel Grid.Column="1" Spacing="6">
-                <TextBox Text="{Binding CloudlogKey}" Width="360" HorizontalAlignment="Left" PasswordChar="•" PlaceholderText="API key with read and write" />
-                <TextBlock Classes="help" Text="Make one in your logbook under your account's API keys, with read and write access." />
-                <TextBlock Classes="help" Text="{Binding SecretsNote}" />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Station location" />
-              <StackPanel Grid.Column="1" Spacing="6">
-                <Button Content="Test and list station locations" Command="{Binding TestCloudlogCommand}" HorizontalAlignment="Left" />
-                <TextBlock Classes="help" Text="{Binding CloudlogStatus}" />
-                <ComboBox ItemsSource="{Binding CloudlogStations}" SelectedItem="{Binding CloudlogStation}" MinWidth="360" PlaceholderText="Pick after Test" />
-                <TextBox Text="{Binding CloudlogStationId}" Width="90" HorizontalAlignment="Left" PlaceholderText="Id" />
-                <TextBlock Classes="help" Text="The logbook only takes contacts for a location whose callsign matches this profile's callsign." />
-              </StackPanel>
-            </Grid>
-            <CheckBox Content="Upload each new contact as soon as it is logged" IsChecked="{Binding CloudlogUploadOnComplete}" />
-            <TextBlock Classes="help" Text="Save to apply. A contact already in that logbook is left as it is. Simulation never contacts the site." />
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-      <TabItem Header="Club Log">
-        <ScrollViewer>
-          <StackPanel>
-            <TextBlock Classes="page" Text="Club Log" />
-            <TextBlock Classes="intro" Text="Send each contact to Club Log as you make it, so DXpeditions and their online logs see it at once. Optional; uploads run in the background and retry. These settings belong to the current station profile, whose callsign must be on your Club Log account." />
-            <TextBlock Classes="help" Text="{Binding ClubLogBuildNote}" IsVisible="{Binding ClubLogBuildNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Account email" />
-              <StackPanel Grid.Column="1">
-                <TextBox Text="{Binding ClubLogEmail}" Width="360" HorizontalAlignment="Left" PlaceholderText="The email you sign in to Club Log with" />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Application Password" />
-              <StackPanel Grid.Column="1" Spacing="6">
-                <TextBox Text="{Binding ClubLogPassword}" Width="360" HorizontalAlignment="Left" PasswordChar="•" PlaceholderText="Not your Club Log password" />
-                <TextBlock Classes="help" Text="Make one in Club Log under Settings › API › Application Passwords. It is shown once; paste it here." />
-                <TextBlock Classes="help" Text="{Binding SecretsNote}" />
-              </StackPanel>
-            </Grid>
-            <CheckBox Content="Upload each new contact as soon as it is logged" IsChecked="{Binding ClubLogUploadOnComplete}" />
-            <TextBlock Classes="help" Text="Save to apply. Club Log real-time upload is for new contacts only; to send an old log, upload an ADIF file on the Club Log site. If Club Log refuses the login, uploads stop until you change the email or password here, as Club Log asks. Simulation never contacts Club Log." />
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
+
     </TabControl>
 
-    <Border Grid.Row="1" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0">
+    <Border Grid.Row="1" Grid.ColumnSpan="2" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0">
       <DockPanel Margin="20,12">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
           <Button Content="Cancel" Command="{Binding CancelCommand}" />
