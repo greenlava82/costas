@@ -47,6 +47,15 @@ public sealed class WindowOptions
     /// <summary>Popped-out waterfall window: height.</summary>
     public double WaterfallWindowHeight { get; set; } = 320;
 
+    /// <summary>Waterfall colour scale: the level shown darkest, in dB relative to the noise floor.</summary>
+    public int WaterfallFloorDb { get; set; } = Core.Spectrum.WaterfallLevels.DefaultFloorDb;
+
+    /// <summary>Waterfall colour scale: dB from darkest to brightest.</summary>
+    public int WaterfallRangeDb { get; set; } = Core.Spectrum.WaterfallLevels.DefaultRangeDb;
+
+    /// <summary>Waterfall colours: "wsjtx" (WSJT-X's Default palette) or "costas" (blue to red).</summary>
+    public string WaterfallPalette { get; set; } = "wsjtx";
+
     /// <summary>Views popped out into their own windows, by view name ("Raw decodes", "Reach", "Log", "Awards").</summary>
     public Dictionary<string, PanelWindowOptions> Panels { get; set; } = [];
 

@@ -1,0 +1,30 @@
+<!-- The waterfall colours, opened from the Levels button over the waterfall. Levels are dB relative to the noise floor. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Ft8Client.App.Views.WaterfallLevelsPanel">
+  <StackPanel Width="260" Spacing="6" Margin="4">
+    <TextBlock Text="Waterfall levels" FontWeight="SemiBold" />
+    <TextBlock Text="Measured from the noise floor, so they hold whatever the audio level." TextWrapping="Wrap" FontSize="11"
+               Opacity="0.75" />
+    <DockPanel>
+      <TextBlock Text="Colours" VerticalAlignment="Center" Margin="0,0,8,0" />
+      <ComboBox x:Name="PaletteBox" HorizontalAlignment="Stretch" AutomationProperties.Name="Waterfall colours" />
+    </DockPanel>
+    <DockPanel>
+      <TextBlock x:Name="FloorValue" DockPanel.Dock="Right" VerticalAlignment="Center" />
+      <TextBlock Text="Darkest" VerticalAlignment="Center" />
+    </DockPanel>
+    <Slider x:Name="FloorSlider" TickFrequency="1" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="5"
+            ToolTip.Tip="The level shown darkest. Raise it to hide more of the noise."
+            AutomationProperties.Name="Waterfall darkest level, dB relative to the noise floor" />
+    <DockPanel>
+      <TextBlock x:Name="RangeValue" DockPanel.Dock="Right" VerticalAlignment="Center" />
+      <TextBlock Text="Range" VerticalAlignment="Center" />
+    </DockPanel>
+    <Slider x:Name="RangeSlider" TickFrequency="1" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="5"
+            ToolTip.Tip="dB from darkest to brightest. Narrow it for more contrast between weak signals."
+            AutomationProperties.Name="Waterfall range from darkest to brightest, dB" />
+    <Button x:Name="ResetButton" Content="Reset" HorizontalAlignment="Right"
+            ToolTip.Tip="Back to darkest −5 dB, range 35 dB. The colours are kept." />
+  </StackPanel>
+</UserControl>

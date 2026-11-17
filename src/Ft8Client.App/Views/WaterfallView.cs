@@ -14,6 +14,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Ft8Client.Core.Spectrum;
 
 namespace Ft8Client.App.Views;
 
@@ -29,14 +30,6 @@ public sealed class WaterfallView : Control
     private const double PixelsPerRow = 1.6;
     private const double ScaleHeight = 18;
 
-    private static readonly int[] Palette = Enumerable.Range(0, 64).Select(i =>
-    {
-        var t = i / 63.0;
-        var r = (int)(255 * Math.Clamp((t - 0.55) / 0.45, 0, 1));
-        var g = (int)(220 * Math.Clamp(t * 1.6, 0, 1));
-        var b = (int)(25 + 180 * Math.Sin(t * Math.PI));
-        return unchecked((int)0xFF000000) | (r << 16) | (g << 8) | b;
-    }).ToArray();
     private static readonly IBrush TagBackground = new SolidColorBrush(Color.FromArgb(170, 7, 18, 30));
     private static readonly IBrush ContactTag = new SolidColorBrush(Color.FromRgb(196, 43, 28));
     private static readonly IBrush Background = new SolidColorBrush(Color.Parse("#07121E"));
@@ -45,8 +38,14 @@ public sealed class WaterfallView : Control
     private static readonly IBrush FilteredOut = new SolidColorBrush(Color.FromArgb(150, 7, 18, 30));
     private static readonly IPen FilterEdgePen = new Pen(new SolidColorBrush(Color.FromArgb(200, 230, 200, 120)), 1, DashStyle.Dash);
 
-    // Newest row first in display order; stored as a ring of BGRA pixels.
+    // Newest row first in display order; stored as a ring of BGRA pixels, with each bin's level relative to the noise
+    // floor alongside so a change of scale recolours the history.
     private int[] _pixels = [];
+    private float[] _levels = [];
+    private readonly NoiseFloorTracker _floor = new();
+    private WaterfallLevels _scale = WaterfallLevels.Default;
+    private string _palette = WaterfallPalette.Wsjtx;
+    private int[] _colours = WaterfallPalette.Colours(WaterfallPalette.Wsjtx);
     private readonly bool[] _slotStart = new bool[MaxRows];
     private int _bins;
     private int _head;
@@ -102,15 +101,23 @@ public sealed class WaterfallView : Control
             {
                 _bins = row.Length;
                 _pixels = new int[_bins * MaxRows];
+                _levels = new float[_bins * MaxRows];
                 _head = 0;
                 _count = 0;
+                _floor.Reset();
                 _bitmap?.Dispose();
                 _bitmap = null;
             }
             _head = (_head + MaxRows - 1) % MaxRows;
             var start = _head * _bins;
+            var (first, last) = NoiseRange(_bins, _passband);
+            var floor = _floor.Update(row, first, last);
             for (var bin = 0; bin < _bins; bin++)
-                _pixels[start + bin] = Palette[Math.Clamp((int)((row[bin] + 100) / 80 * 63), 0, 63)];
+            {
+                var level = (float)(row[bin] - floor);
+                _levels[start + bin] = level;
+                _pixels[start + bin] = WaterfallPalette.For(_colours, _scale, level);
+            }
             _slotStart[_head] = slotStart;
             _count = Math.Min(MaxRows, _count + 1);
             _dirty = true;
@@ -118,9 +125,52 @@ public sealed class WaterfallView : Control
         InvalidateVisual();
     }
 
+    /// <summary>The colour scale in use.</summary>
+    public WaterfallLevels Levels => _scale;
+
+    /// <summary>Sets the colour scale and recolours the history with it.</summary>
+    public void SetLevels(WaterfallLevels levels)
+    {
+        levels = levels.Clamped();
+        if (levels == _scale) return;
+        _scale = levels;
+        Recolour();
+    }
+
+    /// <summary>The palette in use (<see cref="WaterfallPalette.Choices"/>).</summary>
+    public string Palette => _palette;
+
+    /// <summary>Sets the palette and recolours the history with it.</summary>
+    public void SetPalette(string? palette)
+    {
+        palette = WaterfallPalette.Known(palette);
+        if (palette == _palette) return;
+        _palette = palette;
+        _colours = WaterfallPalette.Colours(palette);
+        Recolour();
+    }
+
+    private void Recolour()
+    {
+        for (var i = 0; i < _levels.Length; i++) _pixels[i] = WaterfallPalette.For(_colours, _scale, _levels[i]);
+        _dirty = true;
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// The bins the noise floor is taken from: 200 to 2900 Hz, the receive range, stopping 100 Hz short of a narrower
+    /// radio filter, whose skirt would pull the floor down.
+    /// </summary>
+    public static (int First, int Last) NoiseRange(int bins, int? passbandHz)
+    {
+        var topHz = FilterEdge(passbandHz) is { } edge ? Math.Max(300, Math.Min(2900, edge - 100)) : 2900;
+        return (200 * bins / 3000, Math.Max(200 * bins / 3000, topHz * bins / 3000 - 1));
+    }
+
     /// <summary>Clears history when changing bands or receive devices.</summary>
     public void Clear()
     {
+        _floor.Reset();
         _count = 0;
         _dirty = true;
         InvalidateVisual();
@@ -130,7 +180,13 @@ public sealed class WaterfallView : Control
     public void CopyFrom(WaterfallView other)
     {
         _bins = other._bins;
-        _pixels = (int[])other._pixels.Clone();
+        _levels = (float[])other._levels.Clone();
+        _pixels = new int[_levels.Length];
+        _scale = other._scale;
+        _palette = other._palette;
+        _colours = other._colours;
+        for (var i = 0; i < _levels.Length; i++) _pixels[i] = WaterfallPalette.For(_colours, _scale, _levels[i]);
+        _floor.CopyFrom(other._floor);
         Array.Copy(other._slotStart, _slotStart, MaxRows);
         _head = other._head;
         _count = other._count;

@@ -6,9 +6,19 @@
         Title="Costas waterfall" Width="1000" Height="320" MinWidth="420" MinHeight="120" ShowInTaskbar="False">
   <!-- The popped-out waterfall. Closing it, or Pop in, puts the strip back in the main window. -->
   <Grid Margin="6">
-    <v:WaterfallView x:Name="Waterfall" Cursor="Cross" LabelInset="64"
+    <v:WaterfallView x:Name="Waterfall" Cursor="Cross" LabelInset="118"
                      AutomationProperties.Name="Receive waterfall; click to select transmit channel" />
-    <Button x:Name="PopInButton" Classes="wfoverlay" Content="Pop in" HorizontalAlignment="Right" VerticalAlignment="Top"
-            ToolTip.Tip="Put the waterfall back in the main window" AutomationProperties.Name="Pop the waterfall back in" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+      <Button x:Name="LevelsButton" Classes="wfoverlay" Content="Levels"
+              ToolTip.Tip="Waterfall contrast: the darkest level and the range" AutomationProperties.Name="Waterfall levels">
+        <Button.Flyout>
+          <Flyout Placement="BottomEdgeAlignedRight">
+            <v:WaterfallLevelsPanel x:Name="LevelsPanel" />
+          </Flyout>
+        </Button.Flyout>
+      </Button>
+      <Button x:Name="PopInButton" Classes="wfoverlay" Content="Pop in"
+              ToolTip.Tip="Put the waterfall back in the main window" AutomationProperties.Name="Pop the waterfall back in" />
+    </StackPanel>
   </Grid>
 </Window>
