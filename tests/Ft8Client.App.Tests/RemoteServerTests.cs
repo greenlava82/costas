@@ -83,6 +83,20 @@ public sealed class RemoteServerTests : IAsyncLifetime
         }
     }
 
+    [Theory]
+    [InlineData("/favicon.svg", "image/svg+xml")]
+    [InlineData("/favicon.ico", "image/x-icon")]
+    public async Task Get_Favicon_LinkedAndServed(string path, string type)
+    {
+        var page = await (await _http.GetAsync("/", TestContext.Current.CancellationToken)).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        page.Should().Contain($"rel=\"icon\" href=\"{path}\"");
+
+        var r = await _http.GetAsync(path, TestContext.Current.CancellationToken);
+        r.StatusCode.Should().Be(HttpStatusCode.OK);
+        r.Content.Headers.ContentType!.MediaType.Should().Be(type);
+        (await r.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)).Should().NotBeEmpty();
+    }
+
     [Fact]
     public async Task Pair_NoCode_EachPhoneGetsItsOwnToken()
     {

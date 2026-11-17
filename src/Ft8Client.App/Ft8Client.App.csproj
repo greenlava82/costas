@@ -24,6 +24,9 @@
     <!-- Home-screen app: the manifest and icons (drawn by scripts/make-icon.py). -->
     <EmbeddedResource Include="Remote\manifest.webmanifest" LogicalName="Ft8Client.App.Remote.manifest.webmanifest" />
     <EmbeddedResource Include="Remote\icon-*.png" LogicalName="Ft8Client.App.Remote.%(Filename)%(Extension)" />
+    <!-- Browser tab icon: the app icon itself, the master artwork and the .ico drawn from it. -->
+    <EmbeddedResource Include="Assets\costas.svg" LogicalName="Ft8Client.App.Remote.favicon.svg" />
+    <EmbeddedResource Include="Assets\costas.ico" LogicalName="Ft8Client.App.Remote.favicon.ico" />
   </ItemGroup>
   <ItemGroup>
     <!-- Kestrel serves the remote page; HttpListener would need an admin URL reservation to listen beyond localhost. -->
