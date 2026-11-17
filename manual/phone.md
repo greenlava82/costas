@@ -91,8 +91,73 @@ Tailscale is on in the phone.
 The phone page and all its safety rules work exactly as they do at home: transmit stops 15 seconds after the phone
 loses touch, and the watchdog is at most 3 minutes. You do not hear the radio's audio, which FT8 and FT4 do not need.
 
-Do not forward port 8073 on your router instead. Costas refuses addresses from the open internet on purpose: the page
-has no password, so anyone who found it could transmit.
+Do not forward port 8073 on your router instead. Costas refuses addresses from the open internet on purpose: unless
+you turn on sign-in (below), the page has no password, so anyone who found it could transmit.
+
+## Requiring a username and password
+
+You do not need this at home or with Tailscale: leave it off and phones connect as described above. It is for putting
+Costas behind a reverse proxy such as nginx with your own https address, or for a station several people share.
+
+Turn it on in **Settings › Mobile connection** under **Sign-in**:
+
+1. Press **Add a user**, type a username and a password (10 characters or more, one you use nowhere else), and leave
+   **Allowed to sign in** ticked. Add one user for each person.
+2. Tick **Require a username and password**. Costas will not save it until at least one allowed user has a password.
+3. Press **Save**. It takes effect then: every phone already connected is signed out and has to sign in.
+
+The phone page then shows a sign-in form. A sign-in lasts 30 days from the last time that phone used it, and **Sign
+out** at the top of the page ends it. After five wrong passwords Costas makes you wait, starting at 30 seconds and
+growing to 15 minutes.
+
+!!! warning "A password is only accepted where it travels encrypted"
+    The page itself is plain HTTP, so Costas takes a password only through Tailscale or through your proxy over
+    https. **A phone on plain home Wi-Fi cannot sign in**: open the Tailscale address instead (it works at home too,
+    as long as Tailscale is on in the phone). A phone that has signed in once keeps working on home Wi-Fi with
+    Tailscale off.
+
+Managing users, in the list under **Sign-in**:
+
+- **Edit** opens a user to change the name or password. Changing a password signs that user out on every device.
+- Untick **Allowed to sign in** to keep a user but let none of their devices in.
+- **Sign out everywhere** ends all of that user's sign-ins; they can sign in again.
+- **Delete** takes the user off the list.
+
+Changes take effect when you press **Save**. Passwords are never stored: Costas keeps only a scrambled check value
+(a PBKDF2 hash) in the Windows credential store, so a forgotten password cannot be shown, only replaced.
+
+### Behind a reverse proxy
+
+While sign-in is off, Costas refuses every request that comes through a proxy, so a proxy can never put the station on
+the internet without a password. Set the proxy to use https and to send the `X-Forwarded-For`, `X-Forwarded-Proto` and
+`X-Forwarded-Host` headers; Costas refuses passwords sent through a proxy over plain http. If the proxy runs on another
+computer, enter that computer's address in **Proxy address**; leave it empty when the proxy runs on the station
+computer. A minimal nginx site:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name radio.example.org;
+    # ssl_certificate ...; ssl_certificate_key ...;
+
+    location / {
+        proxy_pass http://127.0.0.1:8073;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_read_timeout 60s;
+    }
+}
+```
+
+If **Settings › Mobile connection** warns that a request came from this computer itself while sign-in is off, and you
+run a proxy on the station computer, turn on sign-in: the proxy may not be sending its headers, which would let anyone
+who reaches it in with no password. If you only opened the page in a browser on the station computer, you can ignore
+the warning.
 
 ## What the phone can do
 
@@ -230,9 +295,10 @@ as it does when you are at the desk.
 
 ## Security
 
-- The page only answers addresses on your home network and your Tailscale network. Do not forward the port on your
-  router.
+- The page only answers addresses on your home network and your Tailscale network, and a reverse proxy only with
+  sign-in on. Do not forward the port on your router.
 - Anyone you share the station computer with in Tailscale can operate the station too, so do not share it.
-- There is no pairing code: any device on your home network can open the page and operate the station. Turn the
-  mobile connection off when you are not using it if you share your network.
+- With sign-in off (the default) there is no pairing code: any device on your home network can open the page and
+  operate the station. Turn the mobile connection off when you are not using it if you share your network, or turn on
+  [a username and password](#requiring-a-username-and-password).
 - The page uses plain HTTP inside your network, like most home devices. Use it on a network you trust.

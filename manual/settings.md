@@ -184,6 +184,13 @@ The page is called **PSK Reporter and RBN** in Settings.
 - **Let a phone on this network operate the station**: off by default. Takes effect at once and shows the address
   to open on the phone. There is no code: any phone on your home network can connect.
 - **Port**: `8073`, applied when you save.
+- **Require a username and password** (under **Sign-in**): off by default. With it on, every device signs in with a
+  user from the list below, a password is accepted only through Tailscale or a reverse proxy over https (not on plain
+  home Wi-Fi), and Costas allows a reverse proxy such as nginx. Takes effect when you save.
+- **Proxy address**: leave empty when the proxy runs on this computer; otherwise the address of the computer that runs
+  it.
+- **Add a user**, **Edit**, **Allowed to sign in**, **Sign out everywhere**, **Delete**: who may sign in. See
+  [Requiring a username and password](phone.md#requiring-a-username-and-password).
 
 See [Operating from a phone](phone.md).
 
