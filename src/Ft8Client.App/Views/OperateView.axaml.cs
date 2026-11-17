@@ -358,7 +358,23 @@ public partial class OperateView : UserControl
     // On a big window the idle band summary is pinned under the card only while both fit whole. Otherwise it moves to
     // the top of the call list and scrolls with it, so it is never cut off inside a box with a scroll bar of its own.
     // The pinned area itself only scrolls when the contact card alone is taller than the room left.
+    private bool _fitQueued;
+
+    // Size changes are raised during the layout pass, while a panel may be arranging its children: moving the summary
+    // card out of that panel then threw in StackPanel.ArrangeOverride, and layout stopped for good (the window froze
+    // when a contact card appeared; owner report 2026-11-14). So the fit runs once the pass is over, once per pass.
     private void FitPinned()
+    {
+        if (_fitQueued) return;
+        _fitQueued = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _fitQueued = false;
+            FitPinnedNow();
+        }, DispatcherPriority.Loaded);
+    }
+
+    private void FitPinnedNow()
     {
         const double listRoom = 220;
         var calling = CallingYou.IsVisible ? CallingYou.Bounds.Height + CallingYou.Margin.Bottom : 0;
