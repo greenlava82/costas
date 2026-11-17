@@ -161,13 +161,15 @@ public sealed class RemoteServer : IAsyncDisposable
         }
     }
 
-    // What a phone needs to add the page to its home screen as an app.
+    // What a phone needs to add the page to its home screen as an app, and the browser tab icon.
     private static readonly (string Path, string Type)[] Files =
     [
         ("manifest.webmanifest", "application/manifest+json"),
         ("icon-180.png", "image/png"),
         ("icon-192.png", "image/png"),
         ("icon-512.png", "image/png"),
+        ("favicon.svg", "image/svg+xml"),
+        ("favicon.ico", "image/x-icon"),
     ];
 
     private static IResult ServeFile(string path, string type)
