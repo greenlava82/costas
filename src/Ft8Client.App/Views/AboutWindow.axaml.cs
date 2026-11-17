@@ -6,9 +6,11 @@
 // License, or (at your option) any later version. This program is distributed WITHOUT ANY WARRANTY;
 // see the GNU General Public License in LICENSE for details.
 
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Ft8Client.App.Services;
+using Ft8Client.App.ViewModels;
 using Ft8Client.Core;
 
 namespace Ft8Client.App.Views;
@@ -19,27 +21,66 @@ public partial class AboutWindow : Window
     private const int TapsToToggle = 7;
     private readonly AppSettingsAccessor? _settings;
     private readonly UpdateService? _updates;
+    private readonly UpdateBarViewModel? _bar;
     private int _taps;
     private DateTime _lastTap;
 
     /// <summary>Creates the window (for the designer).</summary>
     public AboutWindow()
-        : this(null, null)
+        : this(null, null, null)
     {
     }
 
     /// <summary>
     /// Creates the window. Clicking the product name seven times in a row toggles developer mode (the easter egg).
+    /// <paramref name="bar"/> is the main window's update bar: its Update is offered here too, because this window is a
+    /// dialog and the bar can't be clicked until it closes.
     /// </summary>
-    public AboutWindow(AppSettingsAccessor? settings, UpdateService? updates)
+    public AboutWindow(AppSettingsAccessor? settings, UpdateService? updates, UpdateBarViewModel? bar)
     {
         InitializeComponent();
         _settings = settings;
         _updates = updates;
+        _bar = bar;
         Product.Text = $"{AppInfo.ProductName} {AppInfo.Version}";
         Product.PointerPressed += OnProductPressed;
         CheckUpdates.IsEnabled = updates is not null;
         CheckUpdates.Click += OnCheckUpdates;
+        InstallUpdate.Click += OnInstallUpdate;
+        if (bar is not null)
+        {
+            bar.PropertyChanged += OnBarChanged;
+            if (bar.Visible) UpdateStatus.Text = bar.Detail.Length > 0 ? bar.Detail : bar.Text;
+        }
+        RefreshInstall();
+    }
+
+    /// <inheritdoc />
+    protected override void OnClosed(EventArgs e)
+    {
+        if (_bar is not null) _bar.PropertyChanged -= OnBarChanged;
+        base.OnClosed(e);
+    }
+
+    // Same as the bar's Update: download, verify, then close and reopen on the new build (refused mid-contact).
+    private void OnInstallUpdate(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_bar?.InstallCommand.CanExecute(null) == true) _bar.InstallCommand.Execute(null);
+    }
+
+    private void OnBarChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_bar is null) return;
+        if (e.PropertyName == nameof(UpdateBarViewModel.Detail) && _bar.Detail.Length > 0) UpdateStatus.Text = _bar.Detail;
+        RefreshInstall();
+    }
+
+    private void RefreshInstall()
+    {
+        var busy = _bar?.Busy == true;
+        InstallUpdate.IsVisible = _bar?.Visible == true;
+        InstallUpdate.IsEnabled = !busy;
+        CheckUpdates.IsEnabled = _updates is not null && !busy;
     }
 
     // Checks even when the daily check is off, and offers a build that was skipped before: the operator asked.
@@ -50,10 +91,14 @@ public partial class AboutWindow : Window
         UpdateStatus.Text = "Checking…";
         _settings?.Update(s => s.Updates.SkippedTag = null);
         var r = await _updates.CheckAsync(CancellationToken.None, manual: true);
-        UpdateStatus.Text = r is not null ? $"{AppInfo.ProductName} {r.Version} is available: see the bar at the top of the main window."
+        UpdateStatus.Text = r is not null ? (_bar is not null ? UpdateBarViewModel.BarText(r, AppInfo.Version, UpdateBarViewModel.DownloadSize(r.InstallerSize))
+                                             : $"{AppInfo.ProductName} {r.Version} is available: see the bar at the top of the main window.")
             : _updates.LastError is { } err ? $"Could not check: {err}"
             : $"You have the latest build ({AppInfo.Version}).";
         CheckUpdates.IsEnabled = true;
+        // The bar learns of the release through a posted refresh; show Update now rather than wait for it.
+        if (r is not null && _bar is not null) InstallUpdate.IsVisible = true;
+        RefreshInstall();
     }
 
     private void OnProductPressed(object? sender, PointerPressedEventArgs e)

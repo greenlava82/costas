@@ -145,7 +145,7 @@ The message goes away by itself five seconds after the audio is good again. A qu
 
 ### Everyone shows as "New call"
 
-Costas does not know your log yet. Add your QRZ logbook API key in [Settings › QRZ](settings.md#qrz) and press
+Costas does not know your log yet. Add your QRZ logbook API key in [Settings › Logbooks › QRZ](settings.md#qrz) and press
 **Sync with QRZ now** in the Log view, or import an ADIF file from your previous logger.
 
 ## Transmitting is refused
@@ -171,7 +171,7 @@ Costas works fine without QRZ: the list then ranks by signal only.
 
 ## eQSL
 
-**Sync inbox now / test login** in Settings › eQSL shows what eQSL itself answered, in quotes.
+**Sync inbox now / test login** in Settings › Logbooks › eQSL shows what eQSL itself answered, in quotes.
 
 | Problem | Fix |
 | --- | --- |

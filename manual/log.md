@@ -55,7 +55,7 @@ are what decide *New park* or *Park* on the Operate screen, and imported park fi
 ## QRZ logbook
 
 With a QRZ logbook API key (set in [setup](setup.md#6-qrz-and-psk-reporter) or
-[Settings › QRZ](settings.md#qrz)):
+[Settings › Logbooks › QRZ](settings.md#qrz)):
 
 - **Sync down.** Costas reads your whole QRZ logbook, including confirmations, and keeps checking for changes
   (every 15 minutes by default). This is what makes *New DXCC*, *New DXCC 20 m* and the log totals right. Without it,
@@ -69,7 +69,7 @@ With a QRZ logbook API key (set in [setup](setup.md#6-qrz-and-psk-reporter) or
 
 ## LoTW
 
-ARRL's Logbook of the World is where DXCC and WAS credit comes from. Set it up in [Settings › LoTW](settings.md#lotw).
+ARRL's Logbook of the World is where DXCC and WAS credit comes from. Set it up in [Settings › Logbooks › LoTW](settings.md#lotw).
 
 - **Confirmations.** With your LoTW website login, Costas downloads new LoTW confirmations every 12 hours, and
   when you choose **LoTW ▾ › Download new confirmations** in the Log view. Each one marks the matching contact
@@ -107,7 +107,7 @@ With the address left at `127.0.0.1`, only programs on this computer can do this
 
 ## Club Log
 
-To send each contact to [Club Log](https://clublog.org) as you make it, open [Settings › Club Log](settings.md),
+To send each contact to [Club Log](https://clublog.org) as you make it, open [Settings › Logbooks › Club Log](settings.md#club-log),
 enter the email your Club Log account uses and an **Application Password** (make one in Club Log under Settings ›
 API; it is not your Club Log password), and tick **Upload each new contact**. The Club Log light in the bottom bar
 shows how uploads are going. If Club Log refuses the login, Costas stops sending until you change the email or

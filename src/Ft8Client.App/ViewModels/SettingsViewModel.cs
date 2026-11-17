@@ -166,11 +166,16 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Raised when the window should close.</summary>
     public event Action? Close;
 
+    // Page numbers follow the order of the pages in SettingsWindow.axaml.
+
+    /// <summary>Index of the Contacts page (what is sent, when Costas gives up, logging).</summary>
+    public const int ContactsPage = 2;
+
     /// <summary>Index of the PSK and RTTY page.</summary>
-    public const int KeyboardPage = 2;
+    public const int KeyboardPage = 3;
 
     /// <summary>Index of the Who to call page (after PSK and RTTY).</summary>
-    public const int WhoToCallPage = 3;
+    public const int WhoToCallPage = 4;
 
     /// <summary>The page shown when the window opens (Who to call when opened from "Change").</summary>
     [ObservableProperty]
@@ -1025,7 +1030,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     public ObservableCollection<RemoteUserEditViewModel> RemoteUsers { get; } = [];
 
     /// <summary>Index of the Mobile connection page.</summary>
-    public const int MobilePage = 9;
+    public const int MobilePage = 8;
 
     [RelayCommand]
     private void AddRemoteUser()
@@ -1359,7 +1364,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (MessageProblem is { Length: > 0 } problem)
         {
             Message = problem;
-            SelectedPage = 1;
+            SelectedPage = ContactsPage;
             return;
         }
         var oldHamlibDir = _host.Settings.Current.Paths.HamlibDir;
