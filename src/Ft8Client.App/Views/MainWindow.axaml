@@ -223,11 +223,20 @@
         </DockPanel>
       </DockPanel>
     </Border>
-    <!-- One slim line (owner decision 2026-11-14): on a laptop a full-height bar cost a row of the call list. -->
-    <Border x:Name="UpdateBar" IsVisible="{Binding Update.Visible}" Margin="16,0,16,6" Padding="10,2" CornerRadius="6"
+    <!-- On a small window it is one slim line (owner decision 2026-11-14): on a laptop a full-height bar cost a row of the
+         call list. Big windows keep the full bar (owner request 2026-11-16). -->
+    <Border x:Name="UpdateBar" IsVisible="{Binding Update.Visible}" Classes.slim="{Binding Operate.Compact}" CornerRadius="6"
             Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
       <Border.Styles>
-        <Style Selector="Button">
+        <Style Selector="Border#UpdateBar">
+          <Setter Property="Margin" Value="16,0,16,8" />
+          <Setter Property="Padding" Value="12,8" />
+        </Style>
+        <Style Selector="Border#UpdateBar.slim">
+          <Setter Property="Margin" Value="16,0,16,6" />
+          <Setter Property="Padding" Value="10,2" />
+        </Style>
+        <Style Selector="Border#UpdateBar.slim Button">
           <Setter Property="Padding" Value="9,1" />
           <Setter Property="MinHeight" Value="24" />
           <Setter Property="FontSize" Value="12" />

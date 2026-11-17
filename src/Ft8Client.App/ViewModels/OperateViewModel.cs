@@ -180,6 +180,66 @@ public sealed partial class OperateViewModel : ObservableObject
     [ObservableProperty]
     public partial SummaryViewModel? Summary { get; set; }
 
+    /// <summary>Windows narrower than this get the compact layout.</summary>
+    public const double CompactBelowWidth = 1280;
+
+    /// <summary>Windows shorter than this get the compact layout (a 13-inch laptop gives about 720, a 1080p monitor about 1000).</summary>
+    public const double CompactBelowHeight = 900;
+
+    /// <summary>
+    /// True when a window of this size (in device-independent pixels) gets the compact layout. Owner request 2026-11-16:
+    /// the compact layout is for small screens only; big monitors keep the roomy layout from before 2026-11-14.
+    /// </summary>
+    public static bool IsCompactSize(double width, double height) =>
+        width > 0 && height > 0 && (width < CompactBelowWidth || height < CompactBelowHeight);
+
+    /// <summary>The layout choices in Settings › Appearance: automatic follows the window's size.</summary>
+    public static IReadOnlyList<string> Layouts { get; } = ["automatic", "roomy", "compact"];
+
+    /// <summary>The operator's layout choice (<c>Appearance.Layout</c>): automatic, roomy or compact.</summary>
+    [ObservableProperty]
+    public partial string Layout { get; set; } = "automatic";
+
+    partial void OnLayoutChanged(string value) => UpdateCompact();
+
+    private bool _smallWindow;
+
+    /// <summary>Tells the view model its window's client size, for the automatic layout.</summary>
+    public void FitWindow(double width, double height)
+    {
+        if (width <= 0 || height <= 0) return;
+        _smallWindow = IsCompactSize(width, height);
+        UpdateCompact();
+    }
+
+    private void UpdateCompact() => Compact = Layout switch
+    {
+        "compact" => true,
+        "roomy" => false,
+        _ => _smallWindow,
+    };
+
+    /// <summary>
+    /// True on a small window: the idle contact card folds to one line with the band strip under it, and the side column
+    /// is one card with tabs that folds to a rail. False on a big one: the full idle card with the band summary under it,
+    /// and the side column's cards stacked. Follows <see cref="Layout"/>, and the window's size when that is automatic.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowStrip), nameof(FoldIdleCard), nameof(ShowSummaryCard), nameof(ShowSideTabs), nameof(ShowSideRail))]
+    public partial bool Compact { get; set; }
+
+    /// <summary>True when the contact card folds to one line: compact layout, no contact.</summary>
+    public bool FoldIdleCard => Compact && Panel.IsIdle;
+
+    /// <summary>True when the full band summary card shows under the idle contact card: roomy layout, no contact.</summary>
+    public bool ShowSummaryCard => !Compact && !InContact;
+
+    /// <summary>True when the side column shows as one card with tabs: compact layout, not folded.</summary>
+    public bool ShowSideTabs => Compact && !SideCollapsed;
+
+    /// <summary>True when the side column is folded to its rail: compact layout only.</summary>
+    public bool ShowSideRail => Compact && SideCollapsed;
+
     /// <summary>Side column tabs, in order.</summary>
     public const int BandTab = 0, HeardTab = 1, SignalTab = 2, SessionTab = 3;
 
@@ -190,14 +250,14 @@ public sealed partial class OperateViewModel : ObservableObject
 
     /// <summary>True when the side column is folded to a thin rail, so the call list has the full width.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowStrip))]
+    [NotifyPropertyChangedFor(nameof(ShowStrip), nameof(ShowSideTabs), nameof(ShowSideRail))]
     public partial bool SideCollapsed { get; set; }
 
     /// <summary>
-    /// True when the one-line band strip shows under the idle contact card: no contact, and the full band summary
-    /// is not already on screen in the side column's Band tab (nothing is shown twice).
+    /// True when the one-line band strip shows under the idle contact card: compact layout, no contact, and the full
+    /// band summary is not already on screen in the side column's Band tab (nothing is shown twice).
     /// </summary>
-    public bool ShowStrip => !InContact && Summary is not null && (SideCollapsed || SideTab != BandTab);
+    public bool ShowStrip => Compact && !InContact && Summary is not null && (SideCollapsed || SideTab != BandTab);
 
     /// <summary>The band on the folded side column's rail: "20 m · 198 you need".</summary>
     [ObservableProperty]
@@ -536,6 +596,8 @@ public sealed partial class OperateViewModel : ObservableObject
         Contact = s.Contact is null ? null : ContactPanelViewModel.For(s.Contact, s, now, Units, QrzName?.Invoke(s.Contact.DxCall));
         OnPropertyChanged(nameof(InContact));
         OnPropertyChanged(nameof(ShowStrip));
+        OnPropertyChanged(nameof(ShowSummaryCard));
+        OnPropertyChanged(nameof(FoldIdleCard));
         RailBand = s.Summary is null ? "Band" : $"{BandPlan.Display(s.Summary.Band)} · {s.Summary.YouNeed} you need";
         OnPropertyChanged(nameof(Panel));
         Calling = s.Contact is null ? null : DetailsFor(s.Contact.DxCall, s, now);

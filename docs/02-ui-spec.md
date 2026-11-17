@@ -55,11 +55,20 @@ One window, minimum 1100 × 720, default 1440 × 900, remembers size and positio
 
 ## Operate view
 
+### Big and small windows
+
+Owner request 2026-11-16: the compact layout (owner decision 2026-11-14) is for small screens only. The Operate view picks its layout from its window's client size in device-independent pixels (`OperateViewModel.IsCompactSize`) and switches live as the window is resized:
+
+- **Compact** when the window is narrower than 1280 or shorter than 900 (a 13-inch laptop at about 1280 × 720, a 1080p laptop at 125% at 1536 × 864, a 1600 × 900 screen maximised): the one-line idle card with the band strip, the right column as one tabbed card with the fold rail, and the slim update bar.
+- **Roomy** otherwise (the 1440 × 900 default window, a maximised 1080p or larger monitor): the full idle card with the band summary card under it, the right column's cards stacked in a scrolling column (no tabs, no fold), and the full-height update bar. This is the layout from before 2026-11-14.
+
+The operator can override it in Settings › Appearance › **Operate layout** (`Appearance.Layout`): automatic (default, by window size as above), roomy or compact. It follows the window, not the view, so a taller waterfall or a faceplate skin never flips it. `Window.SideTab` and `Window.SideCollapsed` are kept while roomy and apply again when the window is small.
+
 ### Top slot, idle: band summary
 
-Mockup: `main-idle`. Three groups, shown on the **Band** tab of the right column (owner decision 2026-11-14, compact layout for small screens; before that it was a card below the idle contact card, which pushed Next in line off a 13-inch laptop screen). The tab is available in a contact too.
+Mockup: `main-idle`. Three groups. Roomy layout: a card below the idle contact card, the three groups side by side (Heard from drops under the other two on a card narrower than 1000 px); pinned with the card while both fit whole, otherwise it moves to the top of the call list and scrolls with it. Compact layout: shown on the **Band** tab of the right column (owner decision 2026-11-14; as a card it pushed Next in line off a 13-inch laptop screen). The tab is available in a contact too.
 
-**Band strip.** While idle, the contact card carries the summary in one line under its own: "20 m now", the four counts ("212 heard", "14 countries", "31 CQ", "198 you need" in accent), a 14 px bar per continent labelled NA, EU, AS, OC, SA, AF (tooltip "Europe: 8 stations"), the log line "19 countries · 46/50 states · 142 grids" (trimmed when short of room; tooltip gives the full log rows with the states still needed) and a **More ▾** link that opens the Band tab. The strip is hidden while the Band tab is open and showing, so nothing is on screen twice; it shows again when the right column is folded or on another tab.
+**Band strip** (compact layout only). While idle, the contact card carries the summary in one line under its own: "20 m now", the four counts ("212 heard", "14 countries", "31 CQ", "198 you need" in accent), a 14 px bar per continent labelled NA, EU, AS, OC, SA, AF (tooltip "Europe: 8 stations"), the log line "19 countries · 46/50 states · 142 grids" (trimmed when short of room; tooltip gives the full log rows with the states still needed) and a **More ▾** link that opens the Band tab. The strip is hidden while the Band tab is open and showing, so nothing is on screen twice; it shows again when the right column is folded or on another tab.
 
 **"20 m right now"** (title uses the current band)
 
@@ -86,7 +95,7 @@ Mockup: `main-idle`. Three groups, shown on the **Band** tab of the right column
 
 Mockup: `main-in-contact`. Always the first card on the Operate view, so the on-air panel (countdown and Call CQ) is always in the same place. It is pinned above the scrolling area (owner request 2026-10-26): only Next in line, Repeats and Watching scroll. On a short window the pinned cards give way and scroll on their own so the call list keeps at least 220 px. From the moment the operator calls a station or answers a caller until the contact is logged or abandoned, it shows the contact and the band summary is hidden. After logging it stays for one slot showing "Logged", then goes idle.
 
-Idle (no contact): caption "Not in a contact" (or "Calling CQ" with the subline "Waiting for a station to answer." while CQ is running), "—" in place of the call, the subline "Call a station in Next in line, or call CQ.", reports "--", no conversation strip, and Resend, Log now and Abandon disabled. Owner decision 2026-11-14: idle, the card folds to one line: the caption in semibold with the subline under it, and on the right the slot countdown, Call CQ, the CQ picker and Auto-call in a row; the "—", the two empty reports, the on-air panel's border and the Resend, Log now and Abandon buttons are hidden (they have nothing to act on). The band strip sits under it in the same card. The full card returns the moment a contact starts.
+Idle (no contact): caption "Not in a contact" (or "Calling CQ" with the subline "Waiting for a station to answer." while CQ is running), "—" in place of the call, the subline "Call a station in Next in line, or call CQ.", reports "--", no conversation strip, and Resend, Log now and Abandon disabled. The band summary card shows below it (roomy layout). Owner decision 2026-11-14, compact layout only: idle, the card folds to one line: the caption in semibold with the subline under it, and on the right the slot countdown, Call CQ, the CQ picker and Auto-call in a row; the "—", the two empty reports, the on-air panel's border and the Resend, Log now and Abandon buttons are hidden (they have nothing to act on). The band strip sits under it in the same card. The full card returns the moment a contact starts.
 
 | Element | Content |
 | --- | --- |
@@ -163,7 +172,7 @@ Directly under Next in line. Stations heard now that are already worked (tier 5:
 
 ### Right column
 
-Owner decision 2026-11-14: one card with four tabs, **Band** (the band summary above), **Heard** (Heard here and Band activity), **Signal** (Your signal) and **Session** (Worked this session), one showing at a time, each scrolling on its own. It opens on Heard the first time; the tab is remembered (`Window.SideTab`). A **»** button at the top right folds the column to a 36 px rail (`Window.SideCollapsed`, remembered) so the call list takes the full width and the columns shed on a laptop come back. The rail has **«** to open it, and two labels read bottom to top that open their tab: "20 m · 198 you need" (Band) and "Your signal · 146 heard you" (Signal; "Your signal" with no reports). Below 1100 px, where the column lies under the list, the folded rail is one line.
+Roomy layout: a column that scrolls, with two cards: Heard here (map, then Band activity) with Your signal under a divider, then Worked this session. Compact layout (owner decision 2026-11-14): one card with four tabs, **Band** (the band summary above), **Heard** (Heard here and Band activity), **Signal** (Your signal) and **Session** (Worked this session), one showing at a time, each scrolling on its own. It opens on Heard the first time; the tab is remembered (`Window.SideTab`). A **»** button at the top right folds the column to a 36 px rail (`Window.SideCollapsed`, remembered) so the call list takes the full width and the columns shed on a laptop come back. The rail has **«** to open it, and two labels read bottom to top that open their tab: "20 m · 198 you need" (Band) and "Your signal · 146 heard you" (Signal; "Your signal" with no reports). Below 1100 px, where the column lies under the list, the folded rail is one line.
 
 **Heard here** (first card): a map of the stations I decoded in the last 15 minutes, with choices that are remembered in settings (`Map`):
 

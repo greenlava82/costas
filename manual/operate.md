@@ -60,10 +60,34 @@ Two banners can appear under the top bar:
 A **Hunt list** bar appears below them when a station on your [Hunt list](hunt.md) is heard, with **Go to** *band*
 and **Dismiss**.
 
-## The top slot: idle card and band strip
+## Big and small windows
 
-When you are not in a contact, the card at the top folds to two short lines so the call list gets the room, which
-matters most on a laptop.
+Costas picks one of two layouts for the Operate view from the size of its window, and switches as you resize it:
+
+- **Big window** (1280 pixels wide and 900 tall or more, such as a maximised window on a 1080p or larger monitor):
+  the full idle card with the band summary card under it, and the side column's cards stacked one above the other.
+- **Small window** (narrower or shorter than that, such as a 13-inch laptop): a compact layout that gives the call
+  list the room. The idle card folds to two short lines with a band strip, the side column becomes one card with tabs
+  that you can fold to a thin rail, and the update bar is one slim line.
+
+Sizes are in Windows' scaled pixels, so a 1920 × 1080 laptop screen at 125% scaling counts as 1536 × 864 and gets the
+compact layout.
+
+To keep one layout whatever the window size, pick **Roomy** or **Compact** in
+[Settings › Appearance › Operate layout](settings.md#appearance). **Automatic** (the default) switches as above.
+
+## The top slot: idle card and band summary
+
+On a big window, the idle card has the same shape as the contact panel: **Not in a contact**, the empty reports, the
+slot countdown, **Call CQ**, the CQ picker, **Auto-call**, and **Resend**, **Log now** and **Abandon** (greyed out
+until a contact starts). Under it is the **band summary**, the same numbers as the side column's **Band** tab
+described [below](#side-column), laid out across the width. If the window is too short for both, the band summary
+moves to the top of the call list and scrolls with it, so the card is never cut off.
+
+### Small window: idle card and band strip
+
+On a small window, the card at the top folds to two short lines when you are not in a contact, so the call list gets
+the room.
 
 The first line says **Not in a contact** (or *Calling CQ*, or *Auto-call on*) with the slot countdown, **Call CQ**,
 the CQ picker and **Auto-call**. **Resend**, **Log now** and **Abandon** come back with the full card when a contact
@@ -245,7 +269,11 @@ free is called first. A marked station is never folded away, even past the first
 
 ## Side column
 
-The column at the right has four tabs, one showing at a time. Costas remembers the tab you left it on.
+On a big window the column at the right shows two cards, one above the other, and scrolls: **Heard here** with
+**Band activity** and **Your signal** under it, then **Worked this session**. The band summary is on the left, under
+the idle card.
+
+On a small window it is one card with four tabs, one showing at a time. Costas remembers the tab you left it on.
 
 - **Band**: the full band summary. **20 m right now** has stations heard in the last 5 minutes, countries, how many
   are calling CQ and **You need**, with decodes in the last slot and the average per slot over the past hour.
@@ -266,10 +294,11 @@ The column at the right has four tabs, one showing at a time. Costas remembers t
 
 ### Folding the side column
 
-Press **»** at the top right of the column to fold it to a thin rail. The call list then takes the full width of the
+On a small window, press **»** at the top right of the column to fold it to a thin rail. The call list then takes the full width of the
 window, so on a laptop the columns that were trimmed or hidden to keep the **Call** buttons on screen come back. The
 rail still says what matters, such as *20 m · 198 you need* and *Your signal · 146 heard you*. Click either to open
-the column on that tab, or **«** to open it where you left it. Costas remembers whether the column is folded.
+the column on that tab, or **«** to open it where you left it. Costas remembers whether the column is folded. On a
+big window there is no fold; the column comes back folded the next time the window is small.
 
 ![The folded side column](images/side-column-folded.png){ width="400" }
 

@@ -1197,6 +1197,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         var s = _host.Settings.Current;
         Operate.ShowRttyReverse(s.Operating.RttyReverse);
         Operate.ShowKeyboardAfc(s.Operating.KeyboardAfc);
+        Operate.Layout = OperateViewModel.Layouts.Contains(s.Appearance.Layout) ? s.Appearance.Layout : "automatic";
         _updatingBand = true;
         SelectedMode = s.Operating.Mode;
         ModeInfo.TryParse(s.Operating.Mode, out var mode);

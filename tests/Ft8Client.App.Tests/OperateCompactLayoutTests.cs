@@ -25,7 +25,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Ft8Client.App.Tests;
 
-/// <summary>The compact Operate layout for small screens: the idle strip, the side column's tabs and its fold.</summary>
+/// <summary>The compact Operate layout for small screens (the idle strip, the side column's tabs and its fold) and the roomy one for big screens.</summary>
 public class OperateCompactLayoutTests
 {
     private static readonly DateTime Slot = new(2026, 11, 14, 20, 23, 15, DateTimeKind.Utc);
@@ -124,6 +124,7 @@ public class OperateCompactLayoutTests
     public void ShowStrip_Idle_ShowsUnlessTheBandTabAlreadyShowsTheSummary()
     {
         var vm = Vm();
+        vm.Compact = true;
 
         vm.SideTab.Should().Be(OperateViewModel.HeardTab, "the map is the tab a new install opens on");
         vm.ShowStrip.Should().BeTrue();
@@ -142,6 +143,85 @@ public class OperateCompactLayoutTests
         var vm = new OperateViewModel(DispatchProxy.Create<IOperateCommands, NoCommands>(), () => Slot);
         vm.Apply(new SessionSnapshot { Mode = Mode.Ft8 }, [], 0);
         vm.ShowStrip.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(1100, 700, true)]
+    [InlineData(1280, 720, true)]
+    [InlineData(1536, 864, true)]
+    [InlineData(1440, 860, true)]
+    [InlineData(1200, 1000, true)]
+    [InlineData(1440, 900, false)]
+    [InlineData(1920, 1009, false)]
+    [InlineData(1920, 1080, false)]
+    [InlineData(2560, 1440, false)]
+    [InlineData(0, 0, false)]
+    public void IsCompactSize_SmallWindowsOnly(double width, double height, bool compact) =>
+        OperateViewModel.IsCompactSize(width, height).Should().Be(compact);
+
+    [Theory]
+    [InlineData("automatic", 1280, 720, true)]
+    [InlineData("automatic", 1920, 1080, false)]
+    [InlineData("roomy", 1280, 720, false)]
+    [InlineData("compact", 1920, 1080, true)]
+    public void Layout_ChoiceOverridesTheWindowSize(string layout, double width, double height, bool compact)
+    {
+        var vm = Vm();
+        vm.FitWindow(width, height);
+        vm.Layout = layout;
+        vm.Compact.Should().Be(compact);
+    }
+
+    [Fact]
+    public void Layout_BackToAutomatic_FollowsTheWindowAgain()
+    {
+        var vm = Vm();
+        vm.Layout = "roomy";
+        vm.FitWindow(1280, 720);
+        vm.Compact.Should().BeFalse();
+
+        vm.Layout = "automatic";
+        vm.Compact.Should().BeTrue();
+        vm.FitWindow(2560, 1440);
+        vm.Compact.Should().BeFalse();
+    }
+
+    [Fact]
+    public Task View_RoomyChosen_StaysRoomyOnALaptop()
+    {
+        var vm = Vm();
+        vm.Layout = "roomy";
+        return InWindow(vm, 1280, 720, (window, _) =>
+        {
+            vm.Compact.Should().BeFalse();
+            Named<Border>(window, "SummaryCard").IsEffectivelyVisible.Should().BeTrue();
+            Named<ScrollViewer>(window, "SideStacked").IsEffectivelyVisible.Should().BeTrue();
+        });
+    }
+
+    [Fact]
+    public void Roomy_IdleCardIsWholeWithTheSummaryCardAndNoStripTabsOrRail()
+    {
+        var vm = Vm();
+        vm.SideCollapsed = true;
+
+        vm.Compact.Should().BeFalse("the roomy layout is the default until the view measures a small window");
+        vm.FoldIdleCard.Should().BeFalse();
+        vm.ShowSummaryCard.Should().BeTrue();
+        vm.ShowStrip.Should().BeFalse();
+        vm.ShowSideTabs.Should().BeFalse();
+        vm.ShowSideRail.Should().BeFalse("the fold is a small-window control");
+
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        vm.Compact = true;
+
+        changed.Should().Contain([nameof(OperateViewModel.FoldIdleCard), nameof(OperateViewModel.ShowSummaryCard), nameof(OperateViewModel.ShowStrip),
+            nameof(OperateViewModel.ShowSideTabs), nameof(OperateViewModel.ShowSideRail)]);
+        vm.FoldIdleCard.Should().BeTrue();
+        vm.ShowSummaryCard.Should().BeFalse();
+        vm.ShowSideRail.Should().BeTrue();
+        Vm(inContact: true).ShowSummaryCard.Should().BeFalse();
     }
 
     [Fact]
@@ -193,6 +273,64 @@ public class OperateCompactLayoutTests
             Named<StackPanel>(window, "CallRow").IsEffectivelyVisible.Should().BeFalse();
             window.GetVisualDescendants().OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Auto-call").IsEffectivelyVisible.Should().BeTrue();
             list.Bounds.Height.Should().BeGreaterThanOrEqualTo(height - 130, "the call list has nearly the whole height");
+        });
+
+    [Theory]
+    [InlineData(1440, 900)]
+    [InlineData(1920, 1080)]
+    [InlineData(2560, 1440)]
+    public Task View_IdleOnABigMonitor_RoomyLayoutAsBeforeTheCompactOne(double width, double height) =>
+        InWindow(Vm(), width, height, (window, _) =>
+        {
+            var vm = (OperateViewModel)window.GetVisualDescendants().OfType<OperateView>().Single().DataContext!;
+            vm.Compact.Should().BeFalse();
+            Named<StackPanel>(window, "CallRow").IsEffectivelyVisible.Should().BeTrue("the full idle card keeps its call row");
+            Named<StackPanel>(window, "ContactButtons").IsEffectivelyVisible.Should().BeTrue();
+            Named<Border>(window, "OnAir").BorderThickness.Should().Be(new Thickness(1));
+            Named<Border>(window, "BandStrip").IsEffectivelyVisible.Should().BeFalse();
+            var summary = Named<Border>(window, "SummaryCard");
+            summary.IsEffectivelyVisible.Should().BeTrue();
+            summary.GetVisualAncestors().Should().Contain(Named<ScrollViewer>(window, "PinnedScroll"), "there is room to pin it under the card");
+
+            var stacked = Named<ScrollViewer>(window, "SideStacked");
+            stacked.IsEffectivelyVisible.Should().BeTrue();
+            Named<Border>(window, "SideCard").IsEffectivelyVisible.Should().BeFalse();
+            Named<Border>(window, "SideRail").IsEffectivelyVisible.Should().BeFalse();
+            foreach (var name in new[] { "HeardPanel", "SignalPanel", "SessionPanel" })
+                Named<StackPanel>(window, name).GetVisualAncestors().Should().Contain(stacked, $"{name} sits in the stacked column");
+            Named<Panel>(window, "RightColumn").Bounds.Width.Should().Be(width >= 1600 ? 460 : 300);
+        });
+
+    [Fact]
+    public Task View_ResizedSmallerAndBack_SwitchesLayout() =>
+        InWindow(Vm(), 1920, 1080, (window, settle) =>
+        {
+            var vm = (OperateViewModel)window.GetVisualDescendants().OfType<OperateView>().Single().DataContext!;
+            vm.SideCollapsed = true;
+            settle();
+            Named<Panel>(window, "RightColumn").Bounds.Width.Should().Be(460, "folding only applies to the compact layout");
+
+            window.Width = 1280;
+            window.Height = 720;
+            settle();
+            vm.Compact.Should().BeTrue();
+            Named<Border>(window, "SideRail").IsEffectivelyVisible.Should().BeTrue("the fold left set on the laptop comes back with the compact layout");
+            Named<Panel>(window, "RightColumn").Bounds.Width.Should().Be(OperateView.RailWidth);
+            Named<Border>(window, "SummaryCard").IsEffectivelyVisible.Should().BeFalse();
+            Named<Border>(window, "BandStrip").IsEffectivelyVisible.Should().BeTrue();
+
+            vm.SideCollapsed = false;
+            vm.SideTab = OperateViewModel.HeardTab;
+            settle();
+            Named<StackPanel>(window, "HeardPanel").GetVisualAncestors().Should().Contain(Named<TabControl>(window, "SideTabs"));
+            Named<StackPanel>(window, "HeardPanel").IsEffectivelyVisible.Should().BeTrue();
+
+            window.Width = 1920;
+            window.Height = 1080;
+            settle();
+            vm.Compact.Should().BeFalse();
+            Named<StackPanel>(window, "HeardPanel").GetVisualAncestors().Should().Contain(Named<ScrollViewer>(window, "SideStacked"));
+            Named<Border>(window, "SummaryCard").IsEffectivelyVisible.Should().BeTrue();
         });
 
     [Fact]
@@ -310,6 +448,19 @@ public class OperateCompactLayoutTests
                     var bar = Named<Border>(window, "UpdateBar");
                     bar.IsEffectivelyVisible.Should().BeTrue();
                     bar.Bounds.Height.Should().BeLessThanOrEqualTo(32, "the update bar is one slim line");
+
+                    window.Width = 1920;
+                    window.Height = 1080;
+                    window.UpdateLayout();
+                    Dispatcher.UIThread.RunJobs();
+                    window.UpdateLayout();
+                    vm.Operate.Compact.Should().BeFalse();
+                    bar.Bounds.Height.Should().BeGreaterThan(36, "a big window keeps the full update bar");
+
+                    host.Settings.Update(s => s.Appearance.Layout = "compact");
+                    Dispatcher.UIThread.RunJobs();
+                    vm.Operate.Layout.Should().Be("compact", "the choice in Settings › Appearance reaches the Operate view");
+                    vm.Operate.Compact.Should().BeTrue("compact chosen is compact on a big window too");
                 }
                 finally
                 {
