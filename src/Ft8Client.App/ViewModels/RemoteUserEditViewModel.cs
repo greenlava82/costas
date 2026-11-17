@@ -7,6 +7,7 @@
 // see the GNU General Public License in LICENSE for details.
 
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace Ft8Client.App.ViewModels;
 
@@ -51,4 +52,16 @@ public sealed partial class RemoteUserEditViewModel : ObservableObject
     /// <summary>Said after "Sign out everywhere".</summary>
     [ObservableProperty]
     public partial string Status { get; set; } = string.Empty;
+
+    /// <summary>Takes this row out of the list (the user goes when Settings is saved).</summary>
+    public Action<RemoteUserEditViewModel>? OnRemove { get; init; }
+
+    /// <summary>Ends this user's sign-ins on every device, at once.</summary>
+    public Action<RemoteUserEditViewModel>? OnSignOut { get; init; }
+
+    [RelayCommand]
+    private void Remove() => OnRemove?.Invoke(this);
+
+    [RelayCommand]
+    private void SignOut() => OnSignOut?.Invoke(this);
 }

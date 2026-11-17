@@ -1,0 +1,33 @@
+<!-- One person who may sign in to the remote page, in Settings > Mobile connection. Stacked so it fits the settings
+     column at the narrowest window: fields above, Allowed and the buttons on their own line. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Ft8Client.App.ViewModels"
+             x:Class="Ft8Client.App.Views.RemoteUserCard"
+             x:DataType="vm:RemoteUserEditViewModel">
+  <Border Padding="12,10" CornerRadius="6" BorderThickness="1" Margin="0,0,0,8"
+          BorderBrush="{DynamicResource CardBorderBrush}" Background="{DynamicResource CardBackgroundBrush}">
+    <StackPanel Spacing="8">
+      <Grid ColumnDefinitions="80,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+        <TextBlock Text="Username" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Text="{Binding Username}" MaxLength="64" Width="240" HorizontalAlignment="Left"
+                 AutomationProperties.Name="Username" />
+        <TextBlock Grid.Row="1" Text="Password" VerticalAlignment="Center" />
+        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding NewPassword}" PasswordChar="●" Width="240" HorizontalAlignment="Left"
+                 PlaceholderText="{Binding PasswordPlaceholder}"
+                 AutomationProperties.Name="{Binding Username, StringFormat='New password for {0}'}" />
+      </Grid>
+      <WrapPanel>
+        <CheckBox Content="Allowed to sign in" IsChecked="{Binding Enabled}" Margin="0,0,16,4" />
+        <Button Content="Sign out everywhere" Command="{Binding SignOutCommand}" IsEnabled="{Binding HasPassword}" Margin="0,0,8,4"
+                ToolTip.Tip="Ends this user's sign-in on every phone and browser now. They can sign in again."
+                AutomationProperties.Name="{Binding Username, StringFormat='Sign {0} out on every device'}" />
+        <Button Content="Remove user" Command="{Binding RemoveCommand}" Margin="0,0,0,4"
+                ToolTip.Tip="Takes the user off the list when you save. Cancel keeps them."
+                AutomationProperties.Name="{Binding Username, StringFormat='Remove the user {0}'}" />
+      </WrapPanel>
+      <TextBlock Text="{Binding Status}" FontSize="12" Opacity="0.75" TextWrapping="Wrap"
+                 IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </StackPanel>
+  </Border>
+</UserControl>

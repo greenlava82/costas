@@ -138,7 +138,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         RemotePort = s.Remote.Port.ToString(CultureInfo.InvariantCulture);
         RemoteSignIn = s.Remote.RequireSignIn;
         foreach (var u in s.Remote.Users)
-            RemoteUsers.Add(new RemoteUserEditViewModel(u.Id, u.Username, u.Enabled, host.Remote.Control.Users?.HasPassword(u.Id) == true));
+            RemoteUsers.Add(RemoteUserRow(u.Id, u.Username, u.Enabled, host.Remote.Control.Users?.HasPassword(u.Id) == true));
         RefreshRemote();
         host.Remote.Changed += OnRemoteChanged;
         _remoteLoaded = true;
@@ -1008,19 +1008,15 @@ public sealed partial class SettingsViewModel : ObservableObject
     public const int MobilePage = 9;
 
     [RelayCommand]
-    private void AddRemoteUser() => RemoteUsers.Add(new RemoteUserEditViewModel(Guid.NewGuid().ToString("N"), string.Empty, true, false));
+    private void AddRemoteUser() => RemoteUsers.Add(RemoteUserRow(Guid.NewGuid().ToString("N"), string.Empty, true, false));
 
-    [RelayCommand]
-    private void RemoveRemoteUser(RemoteUserEditViewModel? row)
-    {
-        if (row is not null) RemoteUsers.Remove(row);
-    }
+    private RemoteUserEditViewModel RemoteUserRow(string id, string username, bool enabled, bool hasPassword) =>
+        new(id, username, enabled, hasPassword) { OnRemove = r => RemoteUsers.Remove(r), OnSignOut = SignOutRemoteUser };
 
     // Takes effect at once: a lost or borrowed phone must be cut off without waiting for Save.
-    [RelayCommand]
-    private void SignOutRemoteUser(RemoteUserEditViewModel? row)
+    private void SignOutRemoteUser(RemoteUserEditViewModel row)
     {
-        if (row is null || _host.Remote.Control.Users is not { } users) return;
+        if (_host.Remote.Control.Users is not { } users) return;
         try
         {
             users.SignOutEverywhere(row.Id);

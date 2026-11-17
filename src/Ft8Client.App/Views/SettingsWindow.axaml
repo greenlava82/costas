@@ -704,27 +704,13 @@
                 <ItemsControl ItemsSource="{Binding RemoteUsers}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:RemoteUserEditViewModel">
-                      <StackPanel Spacing="2" Margin="0,0,0,8">
-                        <Grid ColumnDefinitions="150,*,Auto,Auto,Auto" ColumnSpacing="8">
-                          <TextBox Text="{Binding Username}" PlaceholderText="Username" MaxLength="64" AutomationProperties.Name="Username" />
-                          <TextBox Grid.Column="1" Text="{Binding NewPassword}" PasswordChar="●" PlaceholderText="{Binding PasswordPlaceholder}"
-                                   AutomationProperties.Name="{Binding Username, StringFormat='New password for {0}'}" />
-                          <CheckBox Grid.Column="2" Content="Allowed" IsChecked="{Binding Enabled}" />
-                          <Button Grid.Column="3" Content="Sign out everywhere" CommandParameter="{Binding}" IsEnabled="{Binding HasPassword}"
-                                  Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).SignOutRemoteUserCommand}"
-                                  AutomationProperties.Name="{Binding Username, StringFormat='Sign {0} out on every device'}" />
-                          <Button Grid.Column="4" Content="Remove" CommandParameter="{Binding}"
-                                  Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).RemoveRemoteUserCommand}"
-                                  AutomationProperties.Name="{Binding Username, StringFormat='Remove the user {0}'}" />
-                        </Grid>
-                        <TextBlock Classes="help" Text="{Binding Status}" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                      </StackPanel>
+                      <v:RemoteUserCard />
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <Button Content="Add a user" Command="{Binding AddRemoteUserCommand}" HorizontalAlignment="Left" />
                 <TextBlock Classes="help" TextWrapping="Wrap"
-                           Text="Use a password of 10 characters or more that you use nowhere else. Changing a password signs that user out on every device. Unticking Allowed keeps the user but lets no device of theirs in." />
+                           Text="Use a password of 10 characters or more that you use nowhere else. Changing a password signs that user out on every device. Untick Allowed to keep a user but let no device of theirs in; Remove user takes them off the list. Both take effect when you save." />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
