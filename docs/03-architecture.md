@@ -130,6 +130,40 @@ It also serves `manifest.webmanifest` and three icons (`icon-180/192/512.png`, d
 
 The page's extra data (log, QRZ lookups, country file, most-wanted list, bands) reaches `RemoteStateBuilder` through `RemoteContext`, which `AppHost` fills in. Band and Tx offset changes go through `IRemoteTuning` (`HostTuning` calls `AppHost.SetBandAsync` and `Session.SetTxOffset` and saves settings, as the desk does). Each phone's open station sheet is a view-only `show` command kept per device in `RemoteControl`; it does not take the control lease.
 
+### Sign-in (optional)
+
+Off by default (`RemoteOptions.RequireSignIn`, D25). When on, every device signs in with a username and password from `RemoteOptions.Users`, at home too, and `POST /api/pair` answers 403; paired phones' tokens stop counting, so they are cut off at the next broadcast. `GET /api/config` tells the page which to show. `POST /api/login {username, password}` returns `{token, username}`, 401 for a wrong name or password (an unknown name is checked against a decoy hash, so it takes as long), or 429 with `Retry-After` from `LoginThrottle` (5 free failures per username and per client address, then 30 s doubling to 15 min). `POST /api/logout {token}` ends one sign-in. The token goes in the WebSocket `hello` as before; the first message back is `{type: "user", username}`.
+
+`RemoteUsers` keeps, per user id, the password hash (`PasswordHash`: PBKDF2-SHA256, 210,000 rounds, random salt) and the signed-in devices (`UserSessions`: SHA-256 of each token and the day it was last used; a sign-in unused for 30 days ends) in the OS credential store, never in `settings.json`. Changing a password, Remove and "Sign out everywhere" in Settings end that user's sign-ins; unticking Allowed refuses them without ending them. `RemoteControl.SignIn` returns a `RemoteIdentity` (device id, user id, username); the control lease still holds the device id.
+
+Users are keyed by a random id, not the name, so a later station profile per user (another licensed operator working under their own callsign) can hang off `RemoteUser` and `RemoteIdentity.UserId` without moving any stored data. What that changes on the air needs owner decisions first (D25).
+
+### Behind a reverse proxy
+
+A request carrying `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` or `Forwarded` from a local address counts as proxied (`ProxyHeaders`; such headers from any other address are not believed, and those requests are refused anyway). While sign-in is off a proxied request gets 403 with a line saying to turn it on: the proxy arrives from a local address, so the local-only check alone would put the station on the internet. A proxied login is refused unless `X-Forwarded-Proto` is `https`. The client address for the log and `LoginThrottle` is the last `X-Forwarded-For` entry, the one the nearest proxy added. A WebSocket's `Origin` may match `X-Forwarded-Host` as well as `Host`.
+
+A minimal nginx site, with TLS set up as usual (for example by certbot):
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name radio.example.org;
+    # ssl_certificate ...; ssl_certificate_key ...;
+
+    location / {
+        proxy_pass http://127.0.0.1:8073;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;     # the /ws WebSocket
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_read_timeout 60s;                     # the page pings every 5 s
+    }
+}
+```
+
 ## Configuration and storage
 
 Per-user data lives in `%LOCALAPPDATA%\Costas\` (on other platforms, the equivalent app-data folder): `costas.db`, `settings.json`, `logs\`, `wav\`, `cache\`. See `06-data-model.md`.
