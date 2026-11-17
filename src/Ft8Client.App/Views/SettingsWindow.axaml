@@ -710,7 +710,7 @@
                 </ItemsControl>
                 <Button Content="Add a user" Command="{Binding AddRemoteUserCommand}" HorizontalAlignment="Left" />
                 <TextBlock Classes="help" TextWrapping="Wrap"
-                           Text="Use a password of 10 characters or more that you use nowhere else. Changing a password signs that user out on every device. Untick Allowed to keep a user but let no device of theirs in; Remove user takes them off the list. Both take effect when you save." />
+                           Text="Use a password of 10 characters or more that you use nowhere else. Changing a password signs that user out on every device. Edit opens a user. Untick Allowed to keep a user but let no device of theirs in; Delete takes them off the list. Both take effect when you save." />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">

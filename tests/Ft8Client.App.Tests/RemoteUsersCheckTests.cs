@@ -17,6 +17,31 @@ public class RemoteUsersCheckTests
         new(Guid.NewGuid().ToString("N"), name, enabled, hasPassword) { NewPassword = newPassword };
 
     [Fact]
+    public void Summary_Collapsed_SaysAllowedAndPassword()
+    {
+        Row("dan").Summary.Should().Be("Allowed · password set");
+        Row("dan", enabled: false, hasPassword: false).Summary.Should().Be("Not allowed · no password yet");
+        Row("", hasPassword: false, newPassword: "correct horse battery").Summary.Should().Be("Allowed · new password when you save");
+        Row("").DisplayName.Should().Be("New user");
+    }
+
+    [Fact]
+    public void EditCommand_Opened_OthersToldToClose()
+    {
+        RemoteUserEditViewModel? opened = null;
+        var row = new RemoteUserEditViewModel("a", "dan", true, true) { OnEdit = r => opened = r };
+        row.EditLabel.Should().Be("Edit");
+        row.EditCommand.Execute(null);
+        row.IsEditing.Should().BeTrue();
+        row.EditLabel.Should().Be("Done");
+        opened.Should().BeSameAs(row);
+        opened = null;
+        row.EditCommand.Execute(null);
+        row.IsEditing.Should().BeFalse();
+        opened.Should().BeNull("closing does not close the others");
+    }
+
+    [Fact]
     public void RemoteUsersCheck_SignInOffNoUsers_Fine()
     {
         SettingsViewModel.RemoteUsersCheck(false, []).Should().BeNull();

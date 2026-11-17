@@ -1008,10 +1008,25 @@ public sealed partial class SettingsViewModel : ObservableObject
     public const int MobilePage = 9;
 
     [RelayCommand]
-    private void AddRemoteUser() => RemoteUsers.Add(RemoteUserRow(Guid.NewGuid().ToString("N"), string.Empty, true, false));
+    private void AddRemoteUser()
+    {
+        // A new user opens ready to fill in.
+        var row = RemoteUserRow(Guid.NewGuid().ToString("N"), string.Empty, true, false);
+        RemoteUsers.Add(row);
+        row.EditCommand.Execute(null);
+    }
 
     private RemoteUserEditViewModel RemoteUserRow(string id, string username, bool enabled, bool hasPassword) =>
-        new(id, username, enabled, hasPassword) { OnRemove = r => RemoteUsers.Remove(r), OnSignOut = SignOutRemoteUser };
+        new(id, username, enabled, hasPassword)
+        {
+            OnRemove = r => RemoteUsers.Remove(r),
+            OnSignOut = SignOutRemoteUser,
+            // One editor open at a time keeps the list short.
+            OnEdit = r =>
+            {
+                foreach (var other in RemoteUsers.Where(o => !ReferenceEquals(o, r))) other.IsEditing = false;
+            },
+        };
 
     // Takes effect at once: a lost or borrowed phone must be cut off without waiting for Save.
     private void SignOutRemoteUser(RemoteUserEditViewModel row)
