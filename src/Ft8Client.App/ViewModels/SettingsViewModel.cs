@@ -137,6 +137,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         RemoteEnabled = s.Remote.Enabled;
         RemotePort = s.Remote.Port.ToString(CultureInfo.InvariantCulture);
         RemoteSignIn = s.Remote.RequireSignIn;
+        RemoteProxyAddress = s.Remote.TrustedProxy ?? string.Empty;
         foreach (var u in s.Remote.Users)
             RemoteUsers.Add(RemoteUserRow(u.Id, u.Username, u.Enabled, host.Remote.Control.Users?.HasPassword(u.Id) == true));
         RefreshRemote();
@@ -1001,6 +1002,25 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool RemoteSignIn { get; set; }
 
+    /// <summary>The address of a reverse proxy on another computer; empty for one on this computer or none.</summary>
+    [ObservableProperty]
+    public partial string RemoteProxyAddress { get; set; } = string.Empty;
+
+    /// <summary>Said when a request came from this computer itself while sign-in is off; empty otherwise.</summary>
+    [ObservableProperty]
+    public partial string RemoteLoopbackWarning { get; set; } = string.Empty;
+
+    /// <summary>Why the proxy address cannot be used, or null.</summary>
+    internal static string? ProxyAddressCheck(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (!System.Net.IPAddress.TryParse(text.Trim(), out var a))
+            return $"The proxy address {text.Trim()} is not an IP address such as 192.168.1.10 (Mobile connection page).";
+        if (!Core.Remote.LocalNetwork.Contains(a) || System.Net.IPAddress.IsLoopback(a))
+            return "The proxy address must be another computer on your home network; a proxy on this computer needs no address.";
+        return null;
+    }
+
     /// <summary>Who may sign in to the remote page.</summary>
     public ObservableCollection<RemoteUserEditViewModel> RemoteUsers { get; } = [];
 
@@ -1153,6 +1173,11 @@ public sealed partial class SettingsViewModel : ObservableObject
             : string.Empty;
         PhoneUrl = urls.Count > 0 ? urls[0] : $"this computer's address, port {_host.Settings.Current.Remote.Port}";
         PhoneOtherUrls = urls.Count > 1 ? "If that does not open, try " + string.Join(" or ", urls.Skip(1)) : string.Empty;
+        RemoteLoopbackWarning = r.LoopbackWarning
+            ? "A connection came from this computer itself while sign-in is off. If that was a reverse proxy such as nginx, "
+              + "turn on \"Require a username and password\" now: the station may be reachable from the internet with no password. "
+              + "If it was a browser on this computer, all is well."
+            : string.Empty;
         RemoteStatus = r.Problem is { } p ? p
             : !r.Running ? (RemoteEnabled ? "Starting…" : "Off.")
             : urls.Count == 0 ? "On, but this computer has no address on a home network."
@@ -1354,7 +1379,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             SelectedPage = KeyboardPage;
             return;
         }
-        if (RemoteUsersCheck(RemoteSignIn, RemoteUsers) is { } remoteProblem)
+        if ((RemoteUsersCheck(RemoteSignIn, RemoteUsers) ?? ProxyAddressCheck(RemoteProxyAddress)) is { } remoteProblem)
         {
             Message = remoteProblem;
             SelectedPage = MobilePage;
@@ -1456,6 +1481,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Remote.Enabled = RemoteEnabled;
             s.Remote.Port = Int(RemotePort, 1024, 65535, 8073);
             s.Remote.RequireSignIn = RemoteSignIn;
+            s.Remote.TrustedProxy = string.IsNullOrWhiteSpace(RemoteProxyAddress) ? null : RemoteProxyAddress.Trim();
             s.Remote.Users = [.. RemoteUsers.Select(r => new RemoteUser { Id = r.Id, Username = r.Username.Trim(), Enabled = r.Enabled })];
             s.Files.SaveWav = SaveWav;
             s.Files.RetentionDays = Int(Retention, 1, 3650, 30);

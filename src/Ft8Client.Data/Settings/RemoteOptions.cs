@@ -23,6 +23,12 @@ public sealed class RemoteOptions
     /// </summary>
     public bool RequireSignIn { get; set; }
 
+    /// <summary>
+    /// The address of a reverse proxy on another computer, whose proxy headers are believed (those from this computer
+    /// always are). Empty when the proxy runs on this computer or there is none.
+    /// </summary>
+    public string? TrustedProxy { get; set; }
+
     /// <summary>Who may sign in. Their password hashes and sign-ins are in the secret store.</summary>
     public List<RemoteUser> Users { get; set; } = [];
 }

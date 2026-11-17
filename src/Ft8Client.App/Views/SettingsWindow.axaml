@@ -652,6 +652,10 @@
               <StackPanel Grid.Column="1" Spacing="6">
                 <CheckBox Content="Let a phone on this network operate the station" IsChecked="{Binding RemoteEnabled}" />
                 <TextBlock Classes="help" Text="{Binding RemoteStatus}" />
+                <Border IsVisible="{Binding RemoteLoopbackWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                        BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2" CornerRadius="6" Padding="10,8">
+                  <TextBlock Text="{Binding RemoteLoopbackWarning}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                </Border>
                 <TextBlock Classes="help" IsVisible="{Binding RemoteEnabled}"
                            Text="If Windows asks whether Costas may use the network, choose Allow for private networks. Phones cannot connect until you do. Addresses outside your home network are always refused." />
                 <Button Content="Check why a phone can't connect" Command="{Binding CheckPhoneCommand}" HorizontalAlignment="Left" Margin="0,4,0,0" />
@@ -700,7 +704,13 @@
               <StackPanel Grid.Column="1" Spacing="6">
                 <CheckBox Content="Require a username and password" IsChecked="{Binding RemoteSignIn}" />
                 <TextBlock Classes="help" TextWrapping="Wrap"
-                           Text="Turn this on before putting Costas behind a reverse proxy such as nginx: every device, at home too, must then sign in. Leave it off if phones connect only on your home network or through Tailscale. Through a proxy Costas accepts a password only over https, and refuses the proxy altogether while this is off. A sign-in lasts 30 days from its last use. Takes effect when you save; phones already connected must then sign in." />
+                           Text="Turn this on before putting Costas behind a reverse proxy such as nginx; Costas refuses the proxy while it is off. Leave it off if phones connect only on your home network or through Tailscale. With it on, every device must sign in, and a password is accepted only where it travels encrypted: through Tailscale, or through the proxy over https. A phone on plain home Wi-Fi cannot sign in. A sign-in lasts 30 days from its last use. Takes effect when you save; phones already connected must then sign in." />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                  <TextBlock Text="Proxy address" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding RemoteProxyAddress}" Width="160" PlaceholderText="this computer" AutomationProperties.Name="Proxy address" />
+                </StackPanel>
+                <TextBlock Classes="help" TextWrapping="Wrap"
+                           Text="Leave empty when the proxy runs on this computer. If it runs on another computer on your network, enter that computer's address: Costas believes the proxy's headers (which address and scheme the browser used) only from there." />
                 <ItemsControl ItemsSource="{Binding RemoteUsers}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:RemoteUserEditViewModel">

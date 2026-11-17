@@ -293,6 +293,36 @@ public sealed class RemoteServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Login_FromThisComputerWithoutProxyHeaders_Refused()
+    {
+        // A browser here, or nginx here without its headers: no telling whether the password crossed a network in the clear.
+        AddUser("dan", "correct horse battery");
+        var r = await _http.PostAsJsonAsync("/api/login", new { username = "dan", password = "correct horse battery" }, TestContext.Current.CancellationToken);
+        r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await r.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("error").GetString().Should().Contain("X-Forwarded-Proto");
+    }
+
+    [Fact]
+    public async Task Get_FromThisComputerWithSignInOff_ServedButNoticed()
+    {
+        var noticed = 0;
+        _server.LoopbackNoticed += () => noticed++;
+        _server.LoopbackSeen.Should().BeFalse();
+        (await _http.GetAsync("/", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await _http.GetAsync("/", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
+        _server.LoopbackSeen.Should().BeTrue();
+        noticed.Should().Be(1, "Settings is told once");
+    }
+
+    [Fact]
+    public async Task Get_FromThisComputerWithSignInOn_NotNoticed()
+    {
+        AddUser("dan", "correct horse battery");
+        await _http.GetAsync("/", TestContext.Current.CancellationToken);
+        _server.LoopbackSeen.Should().BeFalse("with sign-in on a password protects the station anyway");
+    }
+
+    [Fact]
     public async Task Request_ThroughProxyWithSignInOff_Refused()
     {
         using var req = new HttpRequestMessage(HttpMethod.Get, "/");
@@ -348,8 +378,14 @@ public sealed class RemoteServerTests : IAsyncLifetime
         _users.SetPassword(user.Id, password);
     }
 
-    private Task<HttpResponseMessage> PostLoginAsync(string username, string password) =>
-        _http.PostAsJsonAsync("/api/login", new { username, password }, TestContext.Current.CancellationToken);
+    // The test talks to 127.0.0.1, so it signs in the way nginx on this computer would pass a browser's https sign-in.
+    private Task<HttpResponseMessage> PostLoginAsync(string username, string password)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/login") { Content = JsonContent.Create(new { username, password }) };
+        req.Headers.Add("X-Forwarded-For", "203.0.113.7");
+        req.Headers.Add("X-Forwarded-Proto", "https");
+        return _http.SendAsync(req, TestContext.Current.CancellationToken);
+    }
 
     private async Task<string> LoginAsync(string username, string password)
     {

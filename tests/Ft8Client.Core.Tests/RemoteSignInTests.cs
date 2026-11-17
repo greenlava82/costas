@@ -152,39 +152,91 @@ public class RemoteSignInTests
         t.Wait("DAN", "10.0.0.2", T0).Should().Be(TimeSpan.Zero);
     }
 
+    private static readonly IPAddress Phone = IPAddress.Parse("192.168.1.20");
+    private static readonly IPAddress OtherProxy = IPAddress.Parse("192.168.1.10");
+    private static readonly IPAddress HomeLan = IPAddress.Parse("192.168.1.5");
+    private static readonly IPAddress TailscaleHere = IPAddress.Parse("100.101.102.103");
+
     [Fact]
     public void Read_NoHeaders_Direct()
     {
-        var p = ProxyHeaders.Read(IPAddress.Parse("192.168.1.20"), null, null, null, null);
+        var p = ProxyHeaders.Read(Phone, null, null, null, null, null);
         p.Proxied.Should().BeFalse();
-        p.Client.Should().Be(IPAddress.Parse("192.168.1.20"));
+        p.Trusted.Should().BeFalse();
+        p.Client.Should().Be(Phone);
     }
 
     [Fact]
-    public void Read_LocalProxy_TakesNearestAddressSchemeAndHost()
+    public void Read_ProxyOnThisComputer_TakesNearestAddressSchemeAndHost()
     {
-        var p = ProxyHeaders.Read(IPAddress.Loopback, "1.2.3.4, 203.0.113.7", "https", "radio.example.org", null);
+        var p = ProxyHeaders.Read(IPAddress.Loopback, null, "1.2.3.4, 203.0.113.7", "https", "radio.example.org", null);
         p.Proxied.Should().BeTrue();
+        p.Trusted.Should().BeTrue();
         p.Client.Should().Be(IPAddress.Parse("203.0.113.7"), "the first address can be made up by the browser");
         p.Proto.Should().Be("https");
         p.Host.Should().Be("radio.example.org");
     }
 
     [Fact]
-    public void Read_ForwardedHeader_Parsed()
+    public void Read_ConfiguredProxyOnAnotherComputer_Believed()
     {
-        var p = ProxyHeaders.Read(IPAddress.Parse("10.0.0.5"), null, null, null, "for=\"[2001:db8::1]:4711\";proto=HTTPS;host=radio.example.org");
+        var p = ProxyHeaders.Read(OtherProxy, OtherProxy, null, null, null, "for=\"[2001:db8::1]:4711\";proto=HTTPS;host=radio.example.org");
+        p.Trusted.Should().BeTrue();
         p.Client.Should().Be(IPAddress.Parse("2001:db8::1"));
         p.Proto.Should().Be("https");
         p.Host.Should().Be("radio.example.org");
     }
 
     [Fact]
-    public void Read_HeadersFromOutsideNetwork_NotBelieved()
+    public void Read_HeadersFromAnyOtherDevice_NotBelieved()
     {
-        var p = ProxyHeaders.Read(IPAddress.Parse("203.0.113.7"), "192.168.1.2", "https", "radio.example.org", null);
+        // Another phone on the Wi-Fi could claim https and any address it likes.
+        var p = ProxyHeaders.Read(Phone, OtherProxy, "203.0.113.7", "https", "radio.example.org", null);
         p.Proxied.Should().BeTrue();
-        p.Client.Should().Be(IPAddress.Parse("203.0.113.7"));
+        p.Trusted.Should().BeFalse();
+        p.Client.Should().Be(Phone);
         p.Proto.Should().BeNull();
+        p.Host.Should().BeNull();
+    }
+
+    [Fact]
+    public void RequestRefusal_SignInOff_AnyProxyHeadersRefused()
+    {
+        SignInPolicy.RequestRefusal(false, ProxyHeaders.Read(IPAddress.Loopback, null, "203.0.113.7", "https", null, null)).Should().NotBeNull();
+        SignInPolicy.RequestRefusal(false, ProxyHeaders.Read(Phone, null, "203.0.113.7", null, null, null)).Should().NotBeNull();
+        SignInPolicy.RequestRefusal(false, ProxyHeaders.Direct(Phone)).Should().BeNull();
+        SignInPolicy.RequestRefusal(true, ProxyHeaders.Read(IPAddress.Loopback, null, "203.0.113.7", "https", null, null)).Should().BeNull();
+    }
+
+    [Fact]
+    public void SuspectLoopback_ThisComputerWithoutHeadersWhileSignInOff_Flagged()
+    {
+        SignInPolicy.SuspectLoopback(false, IPAddress.Loopback, ProxyHeaders.Direct(IPAddress.Loopback)).Should().BeTrue();
+        SignInPolicy.SuspectLoopback(false, IPAddress.IPv6Loopback, ProxyHeaders.Direct(IPAddress.IPv6Loopback)).Should().BeTrue();
+        SignInPolicy.SuspectLoopback(true, IPAddress.Loopback, ProxyHeaders.Direct(IPAddress.Loopback)).Should().BeFalse();
+        SignInPolicy.SuspectLoopback(false, Phone, ProxyHeaders.Direct(Phone)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void PasswordRefusal_EachRoute_TakenOnlyWhereEncrypted()
+    {
+        // Through a believed proxy: only when it says https.
+        SignInPolicy.PasswordRefusal(IPAddress.Loopback, IPAddress.Loopback, ProxyHeaders.Read(IPAddress.Loopback, null, "203.0.113.7", "https", null, null))
+            .Should().BeNull();
+        SignInPolicy.PasswordRefusal(IPAddress.Loopback, IPAddress.Loopback, ProxyHeaders.Read(IPAddress.Loopback, null, "203.0.113.7", "http", null, null))
+            .Should().Contain("https");
+        SignInPolicy.PasswordRefusal(IPAddress.Loopback, IPAddress.Loopback, ProxyHeaders.Read(IPAddress.Loopback, null, "203.0.113.7", null, null, null))
+            .Should().Contain("https");
+        SignInPolicy.PasswordRefusal(OtherProxy, HomeLan, ProxyHeaders.Read(OtherProxy, OtherProxy, "203.0.113.7", "https", null, null)).Should().BeNull();
+
+        // Tailscale encrypts: from a Tailscale address, or to this computer's Tailscale address.
+        SignInPolicy.PasswordRefusal(IPAddress.Parse("100.64.0.9"), TailscaleHere, ProxyHeaders.Direct(IPAddress.Parse("100.64.0.9"))).Should().BeNull();
+
+        // This computer with no headers: a browser here, or a proxy here without its headers.
+        SignInPolicy.PasswordRefusal(IPAddress.Loopback, IPAddress.Loopback, ProxyHeaders.Direct(IPAddress.Loopback)).Should().Contain("X-Forwarded-Proto");
+
+        // Home Wi-Fi, even when the phone claims https itself.
+        SignInPolicy.PasswordRefusal(Phone, HomeLan, ProxyHeaders.Direct(Phone)).Should().Contain("unencrypted");
+        SignInPolicy.PasswordRefusal(Phone, HomeLan, ProxyHeaders.Read(Phone, OtherProxy, "203.0.113.7", "https", null, null)).Should().Contain("unencrypted");
     }
 }

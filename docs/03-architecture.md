@@ -140,7 +140,20 @@ Users are keyed by a random id, not the name, so a later station profile per use
 
 ### Behind a reverse proxy
 
-A request carrying `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` or `Forwarded` from a local address counts as proxied (`ProxyHeaders`; such headers from any other address are not believed, and those requests are refused anyway). While sign-in is off a proxied request gets 403 with a line saying to turn it on: the proxy arrives from a local address, so the local-only check alone would put the station on the internet. A proxied login is refused unless `X-Forwarded-Proto` is `https`. The client address for the log and `LoginThrottle` is the last `X-Forwarded-For` entry, the one the nearest proxy added. A WebSocket's `Origin` may match `X-Forwarded-Host` as well as `Host`.
+A request carrying `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` or `Forwarded` counts as proxied (`ProxyHeaders`). The headers are believed only from this computer (loopback) or the address in `RemoteOptions.TrustedProxy` (Settings, Proxy address, for nginx on another computer); from any other device they could be made up, so they are ignored and the request is treated as coming straight from that device. When believed, the client address for the log and `LoginThrottle` is the last `X-Forwarded-For` entry (the one the nearest proxy added), and a WebSocket's `Origin` may match `X-Forwarded-Host` as well as `Host`.
+
+The rules (`SignInPolicy`):
+
+| Request | Sign-in off | Sign-in on |
+|---|---|---|
+| Phone on home Wi-Fi | Served (pairing) | Served; password refused: it would cross the Wi-Fi unencrypted |
+| Tailscale (from or to a 100.64/10 address) | Served | Password accepted (WireGuard encrypts it) |
+| This computer, no proxy headers | Served; Settings warns (a proxy here without its headers would let the internet in with no password) | Password refused: no telling how it got here |
+| Believed proxy saying `https` | Refused (403, "turn on sign-in") | Password accepted |
+| Believed proxy saying `http` or nothing | Refused | Password refused: needs https |
+| Proxy headers from any other device | Refused | Headers ignored |
+
+The page and the WebSocket are served wherever the request is; the password rule applies to `POST /api/login`. A token, once issued, is accepted on any route, so a phone that signed in over Tailscale keeps working on home Wi-Fi with Tailscale off (its token then crosses the Wi-Fi unencrypted, a known limit).
 
 A minimal nginx site, with TLS set up as usual (for example by certbot):
 

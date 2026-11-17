@@ -41,6 +41,20 @@ public class RemoteUsersCheckTests
         opened.Should().BeNull("closing does not close the others");
     }
 
+    [Theory]
+    [InlineData("", null)]
+    [InlineData(" 192.168.1.10 ", null)]
+    [InlineData("fd00::10", null)]
+    [InlineData("nginx.local", "not an IP address")]
+    [InlineData("127.0.0.1", "needs no address")]
+    [InlineData("203.0.113.7", "home network")]
+    public void ProxyAddressCheck_Address_OnlyAnotherLocalComputer(string text, string? problem)
+    {
+        var why = SettingsViewModel.ProxyAddressCheck(text);
+        if (problem is null) why.Should().BeNull();
+        else why.Should().Contain(problem);
+    }
+
     [Fact]
     public void RemoteUsersCheck_SignInOffNoUsers_Fine()
     {

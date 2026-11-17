@@ -32,25 +32,36 @@ public sealed class RemoteServer : IAsyncDisposable
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan HelloTimeout = TimeSpan.FromSeconds(10);
     private const string ProxyKey = "costas-proxy";
-    private const string ProxyRefused =
-        "Costas refuses connections through a proxy while sign-in is off. Turn on \"Require a username and password\" in Settings, Mobile connection.";
 
     private readonly RemoteControl _control;
     private readonly Func<string, RemoteState> _state;
+    private readonly Func<IPAddress?> _trustedProxy;
     private readonly ConcurrentDictionary<Guid, Client> _clients = new();
     private WebApplication? _app;
+    private int _loopbackSeen;
 
     /// <summary>Creates the server.</summary>
     /// <param name="control">The rules.</param>
     /// <param name="state">Builds the state for a phone, by device id.</param>
-    public RemoteServer(RemoteControl control, Func<string, RemoteState> state)
+    /// <param name="trustedProxy">The proxy address set in Settings, whose proxy headers are believed besides this computer's.</param>
+    public RemoteServer(RemoteControl control, Func<string, RemoteState> state, Func<IPAddress?>? trustedProxy = null)
     {
         _control = control;
         _state = state;
+        _trustedProxy = trustedProxy ?? (() => null);
     }
 
     /// <summary>Number of phones connected and signed in.</summary>
     public int Connected => _clients.Count;
+
+    /// <summary>
+    /// True once a request came from this computer itself with no proxy headers while sign-in was off: perhaps a proxy
+    /// here without its headers, which would let the internet in with no password. Settings warns.
+    /// </summary>
+    public bool LoopbackSeen => Volatile.Read(ref _loopbackSeen) != 0;
+
+    /// <summary>Raised the first time <see cref="LoopbackSeen"/> becomes true.</summary>
+    public event Action? LoopbackNoticed;
 
     /// <summary>Starts listening on <paramref name="port"/> on every interface. Throws IOException when the port is taken.</summary>
     public async Task StartAsync(int port)
@@ -77,12 +88,18 @@ public sealed class RemoteServer : IAsyncDisposable
             // sign-in on.
             var proxy = Proxy(ctx);
             ctx.Items[ProxyKey] = proxy;
-            if (proxy.Proxied && !_control.SignInRequired)
+            var signIn = _control.SignInRequired;
+            if (SignInPolicy.RequestRefusal(signIn, proxy) is { } refusal)
             {
-                Log.Warning("Remote page refused a request through a proxy from {Address}: sign-in is off", proxy.Client);
+                Log.Warning("Remote page refused a request through a proxy from {Address}: sign-in is off", ctx.Connection.RemoteIpAddress);
                 ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await ctx.Response.WriteAsync(ProxyRefused).ConfigureAwait(false);
+                await ctx.Response.WriteAsync(refusal).ConfigureAwait(false);
                 return;
+            }
+            if (SignInPolicy.SuspectLoopback(signIn, ctx.Connection.RemoteIpAddress, proxy) && Interlocked.Exchange(ref _loopbackSeen, 1) == 0)
+            {
+                Log.Warning("Remote page: a request came from this computer itself while sign-in is off. If a reverse proxy runs here, turn on sign-in");
+                LoopbackNoticed?.Invoke();
             }
             ctx.Response.Headers["Cache-Control"] = "no-store";
             ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
@@ -188,11 +205,11 @@ public sealed class RemoteServer : IAsyncDisposable
         if (_control.Users is not { Required: true } users)
             return Results.Json(new { error = "Sign-in is off at the station." }, statusCode: StatusCodes.Status400BadRequest);
         var proxy = (ProxyHeaders)ctx.Items[ProxyKey]!;
-        // Through a proxy the password crosses the internet: only over https.
-        if (proxy.Proxied && proxy.Proto != "https")
+        // A password only over https through a believed proxy, or over Tailscale: never in the clear.
+        if (SignInPolicy.PasswordRefusal(ctx.Connection.RemoteIpAddress, ctx.Connection.LocalIpAddress, proxy) is { } why)
         {
-            Log.Warning("Remote sign-in from {Address} refused: the proxy forwarded plain http", proxy.Client);
-            return Results.Json(new { error = "Sign in over https: the proxy in front of Costas must use TLS." }, statusCode: StatusCodes.Status403Forbidden);
+            Log.Warning("Remote sign-in from {Address} refused: {Reason}", proxy.Client, why);
+            return Results.Json(new { error = why }, statusCode: StatusCodes.Status403Forbidden);
         }
         var body = await ReadAsync<LoginMessage>(ctx).ConfigureAwait(false);
         var address = proxy.Client?.ToString() ?? "unknown";
@@ -231,10 +248,10 @@ public sealed class RemoteServer : IAsyncDisposable
         }
     }
 
-    private static ProxyHeaders Proxy(HttpContext ctx)
+    private ProxyHeaders Proxy(HttpContext ctx)
     {
         var h = ctx.Request.Headers;
-        return ProxyHeaders.Read(ctx.Connection.RemoteIpAddress, h["X-Forwarded-For"].ToString(), h["X-Forwarded-Proto"].ToString(),
+        return ProxyHeaders.Read(ctx.Connection.RemoteIpAddress, _trustedProxy(), h["X-Forwarded-For"].ToString(), h["X-Forwarded-Proto"].ToString(),
             h["X-Forwarded-Host"].ToString(), h["Forwarded"].ToString());
     }
 
