@@ -136,6 +136,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         UdpPort = s.Udp.Port.ToString(CultureInfo.InvariantCulture);
         RemoteEnabled = s.Remote.Enabled;
         RemotePort = s.Remote.Port.ToString(CultureInfo.InvariantCulture);
+        RemoteSignIn = s.Remote.RequireSignIn;
+        foreach (var u in s.Remote.Users)
+            RemoteUsers.Add(new RemoteUserEditViewModel(u.Id, u.Username, u.Enabled, host.Remote.Control.Users?.HasPassword(u.Id) == true));
         RefreshRemote();
         host.Remote.Changed += OnRemoteChanged;
         _remoteLoaded = true;
@@ -994,6 +997,63 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial string RemotePort { get; set; }
 
+    /// <summary>Every device must sign in with a username and password.</summary>
+    [ObservableProperty]
+    public partial bool RemoteSignIn { get; set; }
+
+    /// <summary>Who may sign in to the remote page.</summary>
+    public ObservableCollection<RemoteUserEditViewModel> RemoteUsers { get; } = [];
+
+    /// <summary>Index of the Mobile connection page.</summary>
+    public const int MobilePage = 9;
+
+    [RelayCommand]
+    private void AddRemoteUser() => RemoteUsers.Add(new RemoteUserEditViewModel(Guid.NewGuid().ToString("N"), string.Empty, true, false));
+
+    [RelayCommand]
+    private void RemoveRemoteUser(RemoteUserEditViewModel? row)
+    {
+        if (row is not null) RemoteUsers.Remove(row);
+    }
+
+    // Takes effect at once: a lost or borrowed phone must be cut off without waiting for Save.
+    [RelayCommand]
+    private void SignOutRemoteUser(RemoteUserEditViewModel? row)
+    {
+        if (row is null || _host.Remote.Control.Users is not { } users) return;
+        try
+        {
+            users.SignOutEverywhere(row.Id);
+            row.Status = "Signed out on every device.";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            row.Status = SecretStoreProblem.Describe(ex.Message);
+        }
+    }
+
+    /// <summary>Why the mobile users cannot be saved as they are, or null.</summary>
+    internal static string? RemoteUsersCheck(bool signIn, IEnumerable<RemoteUserEditViewModel> rows)
+    {
+        var list = rows.ToList();
+        if (list.FirstOrDefault(r => string.IsNullOrWhiteSpace(r.Username)) is not null)
+            return "Enter a username for every mobile user, or remove the row (Mobile connection page).";
+        if (list.FirstOrDefault(r => r.Username.Trim().Length > 64) is { } longName)
+            return $"The username {longName.Username.Trim()[..20]}… is too long: 64 characters at most.";
+        if (list.GroupBy(r => r.Username.Trim(), StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1) is { } twice)
+            return $"Two mobile users are both called {twice.Key}.";
+        foreach (var r in list)
+        {
+            if (r.NewPassword.Length > 0 && Core.Remote.PasswordHash.Problem(r.NewPassword) is { } why)
+                return $"Password for {r.Username.Trim()}: {why}";
+            if (r.NewPassword.Length == 0 && !r.HasPassword && r.Enabled)
+                return $"Set a password for {r.Username.Trim()}.";
+        }
+        if (signIn && !list.Any(r => r.Enabled && (r.HasPassword || r.NewPassword.Length > 0)))
+            return "Add a user with a password before requiring sign-in: otherwise no phone could connect.";
+        return null;
+    }
+
     /// <summary>Where to point the phone, or why the page is not served.</summary>
     [ObservableProperty]
     public partial string RemoteStatus { get; set; } = string.Empty;
@@ -1283,6 +1343,28 @@ public sealed partial class SettingsViewModel : ObservableObject
             SelectedPage = KeyboardPage;
             return;
         }
+        if (RemoteUsersCheck(RemoteSignIn, RemoteUsers) is { } remoteProblem)
+        {
+            Message = remoteProblem;
+            SelectedPage = MobilePage;
+            return;
+        }
+        // Passwords first, so sign-in never comes on before the password that lets a phone in is stored.
+        var remoteUsers = _host.Remote.Control.Users;
+        foreach (var r in RemoteUsers.Where(r => r.NewPassword.Length > 0))
+        {
+            try
+            {
+                remoteUsers?.SetPassword(r.Id, r.NewPassword);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                Message = SecretStoreProblem.Describe(ex.Message);
+                SelectedPage = MobilePage;
+                return;
+            }
+        }
+        var removedRemote = _host.Settings.Current.Remote.Users.Select(u => u.Id).Where(id => RemoteUsers.All(r => r.Id != id)).ToList();
         var activeId = (SelectedProfile ?? Profiles[0]).Id;
         var removed = _host.Settings.Current.Profiles.Select(p => p.Id).Where(id => Profiles.All(d => d.Id != id)).ToList();
         _host.Settings.Update(s =>
@@ -1362,6 +1444,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Udp.Port = Int(UdpPort, 1, 65535, 2237);
             s.Remote.Enabled = RemoteEnabled;
             s.Remote.Port = Int(RemotePort, 1024, 65535, 8073);
+            s.Remote.RequireSignIn = RemoteSignIn;
+            s.Remote.Users = [.. RemoteUsers.Select(r => new RemoteUser { Id = r.Id, Username = r.Username.Trim(), Enabled = r.Enabled })];
             s.Files.SaveWav = SaveWav;
             s.Files.RetentionDays = Int(Retention, 1, 3650, 30);
             s.Appearance.Theme = Theme;
@@ -1387,6 +1471,17 @@ public sealed partial class SettingsViewModel : ObservableObject
             Set(SecretNames.EqslPassword(d.Id), d.EqslPassword);
             Set(SecretNames.CloudlogKey(d.Id), d.CloudlogKey.Trim());
             Set(SecretNames.ClubLogPassword(d.Id), d.ClubLogPassword.Trim());
+        }
+        foreach (var id in removedRemote)
+        {
+            try
+            {
+                remoteUsers?.Forget(id);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                _secretProblem ??= ex.Message;
+            }
         }
         foreach (var id in removed)
         {

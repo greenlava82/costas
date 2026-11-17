@@ -667,7 +667,8 @@
                 <TextBlock Text="On the phone, open" FontSize="18" FontWeight="SemiBold" />
                 <SelectableTextBlock Text="{Binding PhoneUrl}" FontSize="22" FontWeight="SemiBold" />
                 <TextBlock Classes="help" Text="{Binding PhoneOtherUrls}" IsVisible="{Binding PhoneOtherUrls, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                <TextBlock Classes="help" Text="No code to type: any phone or tablet on your home network can open it and operate the station." />
+                <TextBlock Classes="help" IsVisible="{Binding !RemoteSignIn}" Text="No code to type: any phone or tablet on your home network can open it and operate the station." />
+                <TextBlock Classes="help" IsVisible="{Binding RemoteSignIn}" Text="Each phone or tablet signs in once with a username and password from the list below." />
               </StackPanel>
             </Border>
 
@@ -683,7 +684,7 @@
                   <SelectableTextBlock Text="{Binding OneIconCommand}" FontFamily="Consolas,Menlo,monospace" />
                 </StackPanel>
                 <TextBlock Classes="help" IsVisible="{Binding AwayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}"
-                           Text="To operate from anywhere, install Tailscale (free, tailscale.com) on this computer and on your phone and sign both in to the same account. Its address then appears here. Do not forward the port on your router: Costas refuses addresses from the open internet." />
+                           Text="To operate from anywhere, install Tailscale (free, tailscale.com) on this computer and on your phone and sign both in to the same account. Its address then appears here. Do not forward the port on your router: Costas refuses addresses from the open internet. To use a reverse proxy such as nginx instead, turn on sign-in below." />
                 <TextBlock Classes="help" Text="Leave this computer on with sleep turned off and Costas running. Every safety rule below applies away from home too." />
               </StackPanel>
             </Grid>
@@ -692,6 +693,38 @@
               <StackPanel Grid.Column="1" Spacing="6">
                 <TextBox Text="{Binding RemotePort}" Width="80" HorizontalAlignment="Left" />
                 <TextBlock Classes="help" Text="Change it only if another program uses 8073. A new port takes effect when you save." />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Sign-in" />
+              <StackPanel Grid.Column="1" Spacing="6">
+                <CheckBox Content="Require a username and password" IsChecked="{Binding RemoteSignIn}" />
+                <TextBlock Classes="help" TextWrapping="Wrap"
+                           Text="Turn this on before putting Costas behind a reverse proxy such as nginx: every device, at home too, must then sign in. Leave it off if phones connect only on your home network or through Tailscale. Through a proxy Costas accepts a password only over https, and refuses the proxy altogether while this is off. A sign-in lasts 30 days from its last use. Takes effect when you save; phones already connected must then sign in." />
+                <ItemsControl ItemsSource="{Binding RemoteUsers}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:RemoteUserEditViewModel">
+                      <StackPanel Spacing="2" Margin="0,0,0,8">
+                        <Grid ColumnDefinitions="150,*,Auto,Auto,Auto" ColumnSpacing="8">
+                          <TextBox Text="{Binding Username}" PlaceholderText="Username" MaxLength="64" AutomationProperties.Name="Username" />
+                          <TextBox Grid.Column="1" Text="{Binding NewPassword}" PasswordChar="●" PlaceholderText="{Binding PasswordPlaceholder}"
+                                   AutomationProperties.Name="{Binding Username, StringFormat='New password for {0}'}" />
+                          <CheckBox Grid.Column="2" Content="Allowed" IsChecked="{Binding Enabled}" />
+                          <Button Grid.Column="3" Content="Sign out everywhere" CommandParameter="{Binding}" IsEnabled="{Binding HasPassword}"
+                                  Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).SignOutRemoteUserCommand}"
+                                  AutomationProperties.Name="{Binding Username, StringFormat='Sign {0} out on every device'}" />
+                          <Button Grid.Column="4" Content="Remove" CommandParameter="{Binding}"
+                                  Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).RemoveRemoteUserCommand}"
+                                  AutomationProperties.Name="{Binding Username, StringFormat='Remove the user {0}'}" />
+                        </Grid>
+                        <TextBlock Classes="help" Text="{Binding Status}" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="Add a user" Command="{Binding AddRemoteUserCommand}" HorizontalAlignment="Left" />
+                <TextBlock Classes="help" TextWrapping="Wrap"
+                           Text="Use a password of 10 characters or more that you use nowhere else. Changing a password signs that user out on every device. Unticking Allowed keeps the user but lets no device of theirs in." />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
