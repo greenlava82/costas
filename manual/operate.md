@@ -168,7 +168,7 @@ it is heard working someone else, and moves to Watching once the time is up.
 | **#** | Rank |
 | **Call** | Callsign. A small amber tag under it, such as *3 calling*, means you can hear other stations calling them right now, so you know it is a pileup before you click **Call**. Hover the tag to see who, with their signal at your station |
 | **Where** | Country (or state for the USA, province for Canada) and distance |
-| **Why** | Why you need them: **New DXCC** (a DXCC entity not in your log), **New DXCC 20 m** (in your log, but not on this band; hover to see which bands you already have it on), **New grid** with the grid, such as **New grid DO62**, or **New call**. A new DXCC also gets a small rarity meter, five cells from common to very rare, from Club Log's most-wanted list. Hover for its rank. A station activating a park for Parks on the Air gets a second line: **New park US-1234** when that park is not in your log yet, *Park US-1234* when it is, or *POTA* when it is calling CQ POTA but nobody has spotted it on this band yet. Hover for the park's name. A station at a new park moves up: it comes right after your first need (new DXCC, unless you changed the order), and it is listed even if you have already worked that call on this band, because a new park is a new contact for park hunters. You can turn this off in Settings › Who to call |
+| **Why** | Why you need them: **New DXCC** (a DXCC entity not in your log), **New DXCC 20 m** (in your log, but not on this band; hover to see which bands you already have it on), **New grid** with the grid, such as **New grid DO62**, or **New call**. A new DXCC also gets a small rarity meter, five cells from common to very rare, from Club Log's most-wanted list. Hover for its rank. A station activating a park for Parks on the Air gets a second line: **New park US-1234** when that park is not in your log yet, *Park US-1234* when it is, or *POTA* when it is calling CQ POTA but nobody has spotted it on this band yet. Hover for the park's name. A station at a new park moves up: it comes right after your first need (new DXCC, unless you changed the order), and it is listed even if you have already worked that call on this band, because a new park is a new contact for park hunters. You can turn this off in Settings › Who to call. With [DX cluster spots](settings.md#who-to-call) on, a station spotted on this band in the last 30 minutes shows *Spotted 4 min ago*; hover to see the band, the spotter and the comment. It does not change the order |
 | **Doing now** | *Calling CQ, 3 slots*, *Calling CQ DX*, *Calling you*, and *fading* when their signal is dropping |
 | **Last heard** | How long ago their last decoded transmission ended, counting up every second |
 | **dB** | Their signal at your station |
@@ -230,7 +230,10 @@ Selecting a row (click, or ++up++ / ++down++) outlines it. To see the station's 
 row or press ++i++: a details strip opens under the row (in Repeats too). It shows the station's name (from QRZ lookups),
 location, grid, bearing and your past contacts with that call. While the strip is open it follows the row you select;
 close it by clicking the row again, with **✕**, ++esc++ or ++i++. A double-click calls the station and never opens the strip. For a station at a park it adds the park, such as
-*New park US-1234 · Example Lake State Park, US-WI*:
+*New park US-1234 · Example Lake State Park, US-WI*, and for a station spotted on the DX cluster its newest spot, such
+as *Spotted 2 min ago on 20 m by DL1NCH · FT8 -03dB from JN18 1197Hz*:
+
+![A spotted station's row and details](images/cluster-spotted-row.png)
 
 ![Station details](images/station-details.png)
 

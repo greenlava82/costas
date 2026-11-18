@@ -52,6 +52,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
             MostWanted = host.MostWanted.Current,
             Parks = host.Pota.Current,
             Dxpeditions = host.Dxpeditions.Current,
+            ClusterSpots = host.Cluster.Current,
         };
         host.MostWanted.Changed += list => Dispatch(() => Operate.MostWanted = list);
         host.Pota.Changed += parks => Dispatch(() => Operate.Parks = parks);
@@ -82,7 +83,18 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         Awards = new AwardsViewModel(() => host.Session.LogIndex, host.Countries, heard, () => host.Clock.UtcNow, a => Dispatch(a))
         {
             HeardNow = () => (host.Session.Snapshot.Band, host.Session.Snapshot.Stations),
+            Working = () => (host.Session.Config.Band, host.Session.Config.Mode),
+            Frequencies = host.Frequencies,
+            ConfirmedOnly = () => host.Settings.Current.Ranking.ConfirmedOnly,
+            GoToBand = (band, mode) => GoToBand(band, mode, "cluster_go"),
         };
+        Awards.SetClusterSpots(host.Cluster.Current, ClusterOn);
+        host.Settings.Changed += _ => Dispatch(() => Awards.SetClusterSpots(host.Cluster.Current, ClusterOn));
+        host.Cluster.Changed += spots => Dispatch(() =>
+        {
+            Operate.ClusterSpots = spots;
+            Awards.SetClusterSpots(spots, ClusterOn);
+        });
         Awards.SetDxpeditions(host.Dxpeditions.Current);
         host.Dxpeditions.Changed += cal => Dispatch(() => Awards.SetDxpeditions(cal));
         Contest = new ContestViewModel(this, () => host.Clock.UtcNow);
@@ -590,6 +602,15 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         Indicators.Add(Indicator("PSK Reporter", s, ServiceNames.Psk));
         Indicators.Add(Indicator("RBN", s, ServiceNames.Rbn));
         Indicators.Add(Indicator("POTA", s, ServiceNames.Pota));
+        // Shown only once turned on: the cluster is off until the operator picks a node.
+        if (s.Services.TryGetValue(ServiceNames.Cluster, out var cluster) && cluster.Health != ServiceHealth.Off)
+            Indicators.Add(Indicator("DX cluster", s, ServiceNames.Cluster));
+        // The band or mode changed (or a minute passed): the cluster list's Go to buttons and ages follow.
+        if (s.Band != _clusterBand || s.Mode != _clusterMode || _host.Clock.UtcNow - _clusterFilled > TimeSpan.FromSeconds(30))
+        {
+            (_clusterBand, _clusterMode, _clusterFilled) = (s.Band, s.Mode, _host.Clock.UtcNow);
+            if (Showing(4)) Awards.FillClusterSpots();
+        }
         var offset = s.ClockOffsetSeconds;
         ClockKind = offset is { } o && Math.Abs(o) > _host.Settings.Current.Operating.ClockBlockSeconds ? TextKind.Critical
             : offset is { } o2 && Math.Abs(o2) > ClockEstimate.WarnSeconds ? TextKind.Caution : TextKind.Normal;
@@ -875,30 +896,45 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     [RelayCommand]
     private void HuntGo()
     {
-        if (_hunt is not { } h || !CanChangeBand || !ModeInfo.TryParse(h.Heard.ModeKey, out var mode)) return;
+        if (_hunt is not { } h || !ModeInfo.TryParse(h.Heard.ModeKey, out var mode)) return;
+        if (GoToBand(h.Heard.Band, mode, "hunt_go")) HuntCanGo = false;
+    }
+
+    // The explicit "Go to" buttons (a Hunt alert, a cluster spot) change band, and mode if needed, through the band
+    // menu's path: never under a transmission, only to a band in the band list. Nothing is sent and nobody is called.
+    private bool GoToBand(string band, Mode mode, string usage)
+    {
         // The button can be a tick behind the radio: never change band under a transmission.
-        if (_host.Session.Snapshot.Transmitting)
+        if (!CanChangeBand || _host.Session.Snapshot.Transmitting)
         {
             StatusText = "Wait until this transmission ends to change band.";
-            return;
+            return false;
         }
         Activity();
-        if (_host.Frequencies.Find(h.Heard.Band, mode) is null)
+        var modeKey = ModeInfo.Name(mode);
+        if (_host.Frequencies.Find(band, mode) is null)
         {
-            StatusText = $"{BandPlan.Display(h.Heard.Band)} {h.Heard.ModeKey} is not in the band list.";
-            return;
+            StatusText = $"{BandPlan.Display(band)} {modeKey} is not in the band list.";
+            return false;
         }
-        if (h.Heard.ModeKey != SelectedMode)
+        if (modeKey != SelectedMode)
         {
             _updatingBand = true;
-            SelectedMode = h.Heard.ModeKey;
+            SelectedMode = modeKey;
             RefreshBands(mode);
             _updatingBand = false;
         }
-        _ = _host.SetBandAsync(h.Heard.Band, mode);
-        _host.Usage.Track("hunt_go");
-        HuntCanGo = false;
+        _ = _host.SetBandAsync(band, mode);
+        _host.Usage.Track(usage);
+        return true;
     }
+
+    // The cluster is set up (on, with a node), so its list says what it found rather than how to turn it on.
+    private bool ClusterOn => _host.Settings.Current.DxCluster is { Enabled: true } c && c.Host.Trim().Length > 0;
+
+    private string _clusterBand = string.Empty;
+    private Mode _clusterMode;
+    private DateTime _clusterFilled;
 
     // The line belongs to the Operate view only; it follows the snapshot, so it goes the moment anything decodes.
     private void RefreshQuiet()

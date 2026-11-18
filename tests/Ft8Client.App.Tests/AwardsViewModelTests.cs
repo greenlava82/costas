@@ -115,6 +115,51 @@ public sealed class AwardsViewModelTests : IDisposable
         }
     }
 
+    [Fact]
+    public void FillClusterSpots_NeededSpotOnOtherBand_ListedWithGoTo_AndOnlyAClickChangesBand()
+    {
+        var log = LogIndex.Build([new LogContact("JA1AAA", "20m", "FT8", "PM95", "JA", null, false, Now)]);
+        var goes = new List<(string Band, Mode Mode)>();
+        var vm = new AwardsViewModel(() => log, ReferenceData.LoadCountries(), new HeardHistoryService(_dir, ReferenceData.LoadCountries(), new ManualClock(Now)),
+            () => Now, a => a())
+        {
+            Working = () => ("20m", Mode.Ft8),
+            Frequencies = ReferenceData.LoadFrequencies(),
+            GoToBand = (b, m) => goes.Add((b, m)),
+        };
+        var spots = Core.Cluster.ClusterSpots.Empty.With(
+        [
+            new Core.Cluster.ClusterSpot("JA1XYZ", 21_074_000, "DL1ABC", "FT8 -12dB", Now.AddMinutes(-4)),
+            new Core.Cluster.ClusterSpot("JA2XYZ", 14_074_000, "DL1ABC", "FT8", Now.AddMinutes(-2)),
+            new Core.Cluster.ClusterSpot("VK2XYZ", 21_025_000, "DL1ABC", "CW", Now.AddMinutes(-1)),
+        ], Now);
+
+        vm.SetClusterSpots(spots, on: true);
+
+        var row = vm.ClusterSpots.Should().ContainSingle("Japan is worked on 20 m and the VK spot is CW").Subject;
+        row.Call.Should().Be("JA1XYZ");
+        row.Need.Should().Be("New DXCC 15 m");
+        row.Spotted.Should().Be("21074.0 · Spotted 4 min ago on 15 m by DL1ABC · FT8 -12dB");
+        row.GoText.Should().Be("Go to 15 m");
+        goes.Should().BeEmpty("spots never change band on their own");
+
+        vm.GoToClusterCommand.Execute(row);
+
+        goes.Should().Equal(("15m", Mode.Ft8));
+    }
+
+    [Fact]
+    public void SetClusterSpots_Off_SaysHowToTurnOn()
+    {
+        var vm = new AwardsViewModel(() => LogIndex.Empty, ReferenceData.LoadCountries(),
+            new HeardHistoryService(_dir, ReferenceData.LoadCountries(), new ManualClock(Now)), () => Now, a => a());
+
+        vm.SetClusterSpots(Core.Cluster.ClusterSpots.Empty, on: false);
+
+        vm.ClusterSpots.Should().BeEmpty();
+        vm.ClusterText.Should().Contain("Settings > Who to call > DX cluster");
+    }
+
     [Theory]
     [InlineData(ConfirmationSource.Lotw, false, "1 worked · 0 confirmed")]
     [InlineData(ConfirmationSource.Lotw, true, "1 worked · 1 confirmed")]

@@ -35,6 +35,9 @@ public static class ServiceNames
     /// <summary>The Reverse Beacon Network.</summary>
     public const string Rbn = "rbn";
 
+    /// <summary>The DX cluster node.</summary>
+    public const string Cluster = "cluster";
+
     /// <summary>The POTA spot feed.</summary>
     public const string Pota = "pota";
 

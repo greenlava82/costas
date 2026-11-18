@@ -33,10 +33,13 @@ public sealed partial class StationRowViewModel : ObservableObject
     /// <param name="park">The park the station is activating (POTA), shown under Why; display only.</param>
     /// <param name="dxpedition">The announced DXpedition the station is (NG3K), shown under Why; display only.</param>
     /// <param name="band">The band heard on ("20m"), so a new band reads "New DXCC 20 m".</param>
+    /// <param name="spot">The station's newest DX cluster spot on this band, shown under Why; display only.</param>
     public StationRowViewModel(RankedStation r, int rank, DistanceUnit units, DateTime nowUtc, LogContact? last = null, int contacts = 0,
                                int? mostWantedRank = null, string whyTip = "", ParkInfo? park = null, Core.Dxpeditions.Dxpedition? dxpedition = null,
-                               string? band = null)
+                               string? band = null, Core.Cluster.ClusterSpot? spot = null)
     {
+        Spotted = Core.Cluster.ClusterText.Why(spot, nowUtc);
+        SpottedTip = Core.Cluster.ClusterText.Details(spot, nowUtc);
         Dxpedition = Core.Dxpeditions.DxpeditionText.Why(dxpedition);
         DxpeditionTip = Core.Dxpeditions.DxpeditionText.Details(dxpedition, nowUtc);
         Park = PotaText.Why(park);
@@ -159,6 +162,15 @@ public sealed partial class StationRowViewModel : ObservableObject
 
     /// <summary>The park line is shown.</summary>
     public bool HasPark => Park.Length > 0;
+
+    /// <summary>The DX cluster line under Why: "Spotted 4 min ago", or blank.</summary>
+    public string Spotted { get; }
+
+    /// <summary>Tooltip for <see cref="Spotted"/>: "Spotted 4 min ago on 15 m by DL1ABC · FT8 -12 dB".</summary>
+    public string SpottedTip { get; }
+
+    /// <summary>The DX cluster line is shown.</summary>
+    public bool HasSpotted => Spotted.Length > 0;
 
     /// <summary>Park line colour: accent for a new park, secondary otherwise.</summary>
     public TextKind ParkKind { get; }

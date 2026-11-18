@@ -1,0 +1,12 @@
+login: Hello, this is a recorded DX cluster session for Costas's --simulate mode
+DX de HA5PP:       7039.6 P3AA                                        2012Z
+DX de DL1NCH:      3573.0 OZ8BLR       FT8 -05dB from JO46 814Hz      2012Z
+DX de SV1YH:       7047.5 UX1MW        FT4 -06dB from KN98 2038Hz     2012Z
+DX de SM6FMB-#:    7011.3  DK7JI          CW    11 dB  17 WPM  CQ      2013Z
+DX de K1RA-#:    24919.0  TR8CA          FT4  -11 dB CQ 1050 Hz JJ40  2013Z
+DX de HA5PP:       7074.0 SV9CVY       FT8 -07dB                      2014Z
+DX de DL1NCH:     18100.0 HA0DU        FT8 tnx QSO                    2016Z
+DX de SV1YH:      28074.0 HI8DL        FT8 -10dB from KN98 1462Hz     2019Z
+DX de KD7HGL-#:  21074.0  A92EE        FT8  -14 dB DE 21075723 Hz     2021Z
+DX de K1RA-#:    14074.0  EA3GP          FT8   -9 dB CQ 2695 Hz JN11  2022Z
+DX de DL1NCH:     14074.0 F5RXL        FT8 -03dB from JN18 1197Hz     2023Z

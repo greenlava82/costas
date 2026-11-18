@@ -9,6 +9,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Ft8Client.App.Services;
 using Ft8Client.Core.Awards;
 using Ft8Client.Core.Bands;
@@ -16,6 +17,7 @@ using Ft8Client.Core.Geo;
 using Ft8Client.Core.Logbook;
 using Ft8Client.Core.Messages;
 using Ft8Client.Core.Neighbours;
+using Ft8Client.Core.Ranking;
 
 namespace Ft8Client.App.ViewModels;
 
@@ -58,6 +60,78 @@ public sealed partial class AwardsViewModel : ObservableObject
     {
         _dxpeditions = calendar;
         FillDxpeditions();
+    }
+
+    private Core.Cluster.ClusterSpots _clusterSpots = Core.Cluster.ClusterSpots.Empty;
+    private bool _clusterOn;
+
+    /// <summary>The band and mode being worked, for the cluster list. Set by the owner.</summary>
+    public Func<(string Band, Core.Mode Mode)>? Working { get; init; }
+
+    /// <summary>The frequency table, for which cluster spots are of the mode being worked. Set by the owner.</summary>
+    public Core.Bands.FrequencyTable? Frequencies { get; init; }
+
+    /// <summary>Count a country as worked only when confirmed (the ranking setting). Set by the owner.</summary>
+    public Func<bool>? ConfirmedOnly { get; init; }
+
+    /// <summary>
+    /// Changes band for a cluster row's Go to button (band, mode), through the same path as the band menu. Only an
+    /// operator's click calls it. Set by the owner.
+    /// </summary>
+    public Action<string, Core.Mode>? GoToBand { get; init; }
+
+    /// <summary>Needed stations spotted on the DX cluster in the mode being worked, new countries first.</summary>
+    public ObservableCollection<ClusterSpotRowViewModel> ClusterSpots { get; } = [];
+
+    /// <summary>"3 needed stations spotted in the last 30 minutes", or why there are none.</summary>
+    [ObservableProperty]
+    public partial string ClusterText { get; set; } = "DX cluster spots are off. Settings > Who to call > DX cluster turns them on.";
+
+    /// <summary>Uses new cluster spots; <paramref name="on"/> says whether the cluster is set up at all. UI thread.</summary>
+    public void SetClusterSpots(Core.Cluster.ClusterSpots spots, bool on)
+    {
+        _clusterSpots = spots;
+        _clusterOn = on;
+        FillClusterSpots();
+    }
+
+    /// <summary>Fills the cluster list from the spots, the log and the band and mode being worked. UI thread.</summary>
+    public void FillClusterSpots()
+    {
+        ClusterSpots.Clear();
+        if (!_clusterOn)
+        {
+            ClusterText = "DX cluster spots are off. Settings > Who to call > DX cluster turns them on.";
+            return;
+        }
+        var now = _now();
+        var (band, mode) = Working?.Invoke() ?? ("20m", Core.Mode.Ft8);
+        var modeName = Core.Cluster.ClusterModeFilter.ModeName(mode);
+        var needed = Frequencies is null ? []
+            : Core.Cluster.ClusterNeeds.Find(_clusterSpots, _log(), _countries, mode, Frequencies, now, ConfirmedOnly?.Invoke() ?? false);
+        foreach (var n in needed.Take(MaxClusterRows))
+        {
+            var here = string.Equals(n.Band, band, StringComparison.OrdinalIgnoreCase);
+            ClusterSpots.Add(new ClusterSpotRowViewModel(n.Spot.DxCall, n.Entity.Name, StationText.Need(n.Need, n.Band), n.Need == NeedTag.NewCountry,
+                Core.Cluster.ClusterText.Khz(n.Spot.FrequencyHz) + " · " + Core.Cluster.ClusterText.Details(n.Spot, now), n.Band,
+                here ? string.Empty : $"Go to {BandPlan.Display(n.Band)}"));
+        }
+        ClusterText = needed.Count == 0
+            ? $"No needed {modeName} stations spotted in the last {(int)Core.Cluster.ClusterSpots.MaxAge.TotalMinutes} minutes."
+            : $"{needed.Count} needed {modeName} {(needed.Count == 1 ? "station" : "stations")} spotted in the last {(int)Core.Cluster.ClusterSpots.MaxAge.TotalMinutes} minutes"
+              + (needed.Count > MaxClusterRows ? $"; the newest {MaxClusterRows} are shown." : ".")
+              + " Spots never change who is called; Go to only changes band.";
+    }
+
+    /// <summary>Most cluster rows shown.</summary>
+    public const int MaxClusterRows = 12;
+
+    /// <summary>Changes to the band of a cluster row (an operator's click). Nothing is sent and nobody is called.</summary>
+    [RelayCommand]
+    private void GoToCluster(ClusterSpotRowViewModel? row)
+    {
+        if (row is null || !row.CanGo || Working?.Invoke() is not { } w) return;
+        GoToBand?.Invoke(row.Band, w.Mode);
     }
 
     /// <summary>Days ahead the starting-soon list looks.</summary>
@@ -197,6 +271,7 @@ public sealed partial class AwardsViewModel : ObservableObject
 
         FillNeeded();
         FillDxpeditions();
+        FillClusterSpots();
         _ = _history.RefreshIfOlderThan(HeardHistoryService.MaxAge);
     }
 

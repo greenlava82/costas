@@ -45,6 +45,20 @@ weeks** lists what is coming. On the Operate screen, a station that is one of th
 country under **Why**. The calls come from the announcement: the listed call, a portable call with it (3B9/M0CFW),
 or a call the notes say the team signs. Turn the list off in **Settings › Who to call**.
 
+## Spotted on the DX cluster
+
+With [DX cluster spots](settings.md#who-to-call) turned on, **Spotted on the DX cluster** lists stations that someone
+on the cluster spotted in the last 30 minutes and that you need: a country not in your log (**New DXCC**) or not in it
+on that band (**New DXCC 15 m**). New countries come first, then the newest. Only spots for the mode you are in count:
+Costas goes by the mode the spot's comment names (FT8, FT4, PSK31, RTTY, or another such as CW or SSB), and when it
+names none, by whether the frequency is near that mode's usual frequency on the band. RTTY spots have to say RTTY.
+
+![Spotted on the DX cluster](images/awards-cluster.png)
+
+Each row gives the frequency, how long ago, the band, who spotted it and their comment. **Go to 15 m** changes band
+(and nothing else) when you click it; it is not shown for a spot on the band you are on, and it does nothing while you
+are transmitting. Spots never change Next in line, who is called or the radio's frequency on their own.
+
 ## Countries still needed
 
 The right side lists every country you have not worked yet. Choose a band to see the countries you still need on that

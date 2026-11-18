@@ -37,6 +37,7 @@
           <TextBlock Text="{Binding Qsl}" FontWeight="SemiBold" IsVisible="{Binding HasQsl}" TextWrapping="Wrap" />
           <TextBlock Text="{Binding Rarity}" Classes="secondary" FontSize="12" IsVisible="{Binding HasRarity}" TextWrapping="Wrap" />
           <TextBlock Text="{Binding Park}" Classes="secondary" FontSize="12" IsVisible="{Binding HasPark}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Spotted}" Classes="secondary" FontSize="12" IsVisible="{Binding HasSpotted}" TextWrapping="Wrap" />
         </StackPanel>
       </WrapPanel>
       <TextBlock Text="{Binding LookupNote}" Classes="secondary" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasLookupNote}" />
