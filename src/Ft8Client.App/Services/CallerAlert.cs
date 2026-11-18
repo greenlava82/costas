@@ -19,11 +19,15 @@ public sealed class CallerAlert
 {
     private readonly HashSet<string> _seen = new(StringComparer.Ordinal);
     private readonly HashSet<string> _seenAfterStop = new(StringComparer.Ordinal);
+    private readonly List<WaitingCaller> _fresh = [];
+
+    /// <summary>The callers that were new in the last <see cref="Update"/>, in list order.</summary>
+    public IReadOnlyList<WaitingCaller> Fresh => _fresh;
 
     /// <summary>Takes the current Waiting for you list; true when it has someone new since the last call.</summary>
     public bool Update(IReadOnlyList<WaitingCaller> waiting)
     {
-        var fresh = false;
+        _fresh.Clear();
         var now = new HashSet<string>(StringComparer.Ordinal);
         var nowAfterStop = new HashSet<string>(StringComparer.Ordinal);
         foreach (var w in waiting)
@@ -31,12 +35,12 @@ public sealed class CallerAlert
             var call = Callsign.Normalize(w.Call);
             now.Add(call);
             if (w.AfterStop) nowAfterStop.Add(call);
-            if (!_seen.Contains(call) || (w.AfterStop && !_seenAfterStop.Contains(call))) fresh = true;
+            if (!_seen.Contains(call) || (w.AfterStop && !_seenAfterStop.Contains(call))) _fresh.Add(w);
         }
         _seen.Clear();
         _seen.UnionWith(now);
         _seenAfterStop.Clear();
         _seenAfterStop.UnionWith(nowAfterStop);
-        return fresh;
+        return _fresh.Count > 0;
     }
 }

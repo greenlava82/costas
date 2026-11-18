@@ -495,7 +495,7 @@
         <!-- Top slot: band summary (idle, big windows only; small windows have the band strip and the Band tab).
              Three columns; on a narrow card Heard from drops under the other two (see OperateView.ReflowSummary). -->
         <Border x:Name="SummaryCard" Classes="card" Padding="18,14" IsVisible="{Binding ShowSummaryCard}" AutomationProperties.Name="Band summary">
-          <Grid x:Name="SummaryGrid" ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" DataContext="{Binding Summary}" x:DataType="vm:SummaryViewModel">
+          <Grid x:Name="SummaryGrid" ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto,Auto" DataContext="{Binding Summary}" x:DataType="vm:SummaryViewModel">
             <StackPanel Grid.Column="0" Spacing="6">
               <TextBlock Text="{Binding Title}" Classes="title" />
               <WrapPanel ItemSpacing="22" LineSpacing="6">
@@ -537,6 +537,14 @@
               <TextBlock Grid.Row="4" Text="This session" Classes="secondary" Margin="0,2,16,2" />
               <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Tonight}" Classes="num" TextWrapping="Wrap" Margin="0,2" />
             </Grid>
+            <!-- Band advice (docs/02-ui-spec.md, "Band advice"): one line when the evidence supports it, the evidence in the tooltip.
+                 Display only. -->
+            <StackPanel Grid.Row="2" Grid.ColumnSpan="3" Spacing="2" Margin="0,10,0,0" IsVisible="{Binding HasAnyAdvice}" AutomationProperties.Name="Band advice">
+              <TextBlock Text="{Binding Advice}" IsVisible="{Binding HasAdvice}" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextBrush}"
+                         TextWrapping="Wrap" ToolTip.Tip="{Binding AdviceTip}" AutomationProperties.Name="{Binding Advice}" />
+              <TextBlock Text="{Binding Closing}" IsVisible="{Binding HasClosing}" Classes="secondary" TextWrapping="Wrap"
+                         ToolTip.Tip="{Binding ClosingTip}" AutomationProperties.Name="{Binding Closing}" />
+            </StackPanel>
           </Grid>
         </Border>
       </StackPanel>
@@ -830,6 +838,11 @@
                   </Grid>
                   <TextBlock Text="{Binding Caption}" Classes="secondary num" FontSize="12" TextWrapping="Wrap" />
                   <TextBlock Text="{Binding LogNotice}" IsVisible="{Binding HasLogNotice}" Foreground="{DynamicResource CautionBrush}" TextWrapping="Wrap" />
+                  <!-- Band advice, as on the big window's summary card. Display only. -->
+                  <TextBlock Text="{Binding Advice}" IsVisible="{Binding HasAdvice}" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextBrush}"
+                             TextWrapping="Wrap" ToolTip.Tip="{Binding AdviceTip}" AutomationProperties.Name="{Binding Advice}" />
+                  <TextBlock Text="{Binding Closing}" IsVisible="{Binding HasClosing}" Classes="secondary" FontSize="12" TextWrapping="Wrap"
+                             ToolTip.Tip="{Binding ClosingTip}" AutomationProperties.Name="{Binding Closing}" />
                   <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource ControlBorderBrush}" Padding="0,10,0,0">
                     <StackPanel Spacing="6">
                       <TextBlock Text="Heard from" Classes="title" />

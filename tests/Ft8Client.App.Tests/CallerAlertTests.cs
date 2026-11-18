@@ -54,6 +54,19 @@ public class CallerAlertTests
         a.Update([W("K1ABC", afterStop: true)]).Should().BeFalse();
     }
 
+    [Fact]
+    public void Update_SomeNew_FreshListsOnlyThem()
+    {
+        var a = new CallerAlert();
+        a.Update([W("K1ABC")]);
+
+        a.Update([W("K1ABC"), W("W2DEF"), W("N3GHI")]);
+
+        a.Fresh.Select(w => w.Call).Should().Equal("W2DEF", "N3GHI");
+        a.Update([W("K1ABC"), W("W2DEF"), W("N3GHI")]);
+        a.Fresh.Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData("speakers", "codec", "speakers")]
     [InlineData("codec", "codec", null)]

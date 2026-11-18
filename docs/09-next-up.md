@@ -41,12 +41,13 @@ Ordered by value to an FT8 operator against effort. Anything that changes what g
 | C2 | Club Log real-time upload | Club Log already feeds the Rarity meter; uploading closes the loop for DXCC tracking and OQRS | S |
 | C3 | Compound and portable calls (type 4 messages) | VE3/W7LIT as your own call, or answering PJ4/K1ABC, fails today | M |
 | C4 | DX cluster and RBN spots, display only, beside POTA spots | Shows rare stations on other bands before they show up on the waterfall | M |
-| C5 | Band advice line: "15 m is open to Europe for you" | Already in the spec; builds on Other bands right now and the neighbour data | S |
+| C5 | ~~Band advice line: "15 m is open to Europe for you"~~ built 2026-11-18 (`04-domain-logic.md` section 14a); next: tune the thresholds on the air (V27) | Already in the spec; builds on Other bands right now and the neighbour data | S |
 | C6 | ~~Contest exchanges (ARRL RTTY Roundup, Field Day, WW Digi)~~ FT8/FT4 contests built 2026-11-07 (Roundup, Field Day, WW Digi, ARRL Digi); next: the Roundup in real RTTY | Contest CQs are only parked in Watching today; weekends are when FT8 is busiest | L |
 | C7 | More rigs: OmniRig and TCI (SunSDR, ANAN) | In the spec's v1.x list; TCI also carries audio, so no sound-card setup | M each |
 | C8 | ~~Automatic log backup and per-profile ADIF export with QSL state~~ (done 2026-11-18, D26): daily database copies (D24), an ADIF copy of the log in the backups folder kept current, and an export split by station callsign with LoTW, eQSL and QRZ sent and received plus the paper QSL and Club Log fields an imported record carried. Left: Club Log and Wavelog / Cloudlog upload state have no column, so a contact Costas sent there itself is not marked sent | Protects the log; today's export mixes profiles and drops QSL status | S |
 | C9 | Audio device comes back after USB re-plug or sleep | Today a reconnected sound card needs a Costas restart | S |
 | C10 | ~~Linux transmit~~ (turned on 2026-10-31, D17); a Linux user checking it with a real radio | Ends the preview label | S |
+| C11 | ~~Desktop notifications for Hunt alerts and callers~~ Done 2026-11-18 (owner request): Windows toasts and Linux D-Bus, merged and rate-limited, background only by default; the Windows toast still to be checked by hand | Hunt alerts reach the operator while another program is in front | M |
 
 ## Reliability and finishing
 
@@ -62,6 +63,10 @@ These aren't new features, but each one is a known gap from the bug hunts or wor
 | R6 | Settings that fail to load don't stop start-up | A hand-edited or locked settings file means Costas won't open | S |
 
 The item codes (T3, U4, D10 and so on) refer to the main and PSK/RTTY bug-hunt reports kept in the project's shared files (`reviews/main-bug-hunt.md`, `reviews/psk-rtty-bug-hunt.md`).
+
+## Done since this list
+
+- **"Why is it quiet" readout** (owner request 2026-11-18): done 2026-11-18. After two empty slots the Operate screen and the phone say the likeliest reason (audio, dial, radio mode, decoder, clock) with a Go to button for a frequency fix. See `02-ui-spec.md` "Why it's quiet".
 
 ## Left out on purpose
 

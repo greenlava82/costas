@@ -10,6 +10,7 @@ using System.Globalization;
 using Ft8Client.App.Engine;
 using Ft8Client.App.Remote;
 using Ft8Client.App.Services;
+using Ft8Client.App.Services.Notifications;
 using Ft8Client.Audio.Backends;
 using Ft8Client.Audio.Timing;
 using Ft8Client.Core;
@@ -65,6 +66,7 @@ public sealed class AppHost : IAsyncDisposable
     private KeyboardRadio _keyboardRadio = new();
     private int _keyboardRadioBusy;
     private ChimePlayer? _chime;
+    private DesktopNotifications? _notifications;
     private SlotLoop? _loop;
     private WorkQueue? _work;
     private IRig _rig;
@@ -268,6 +270,9 @@ public sealed class AppHost : IAsyncDisposable
 
     /// <summary>The audio backend.</summary>
     public IAudioBackend AudioBackend { get; private set; } = new NullAudioBackend();
+
+    /// <summary>Desktop notifications for Hunt list alerts and callers. No backend until the app picks one.</summary>
+    public DesktopNotifications Notifications => _notifications ??= new DesktopNotifications(() => SettingsMapper.Notifications(Settings.Current), Clock);
 
     /// <summary>The new-caller chime.</summary>
     public ChimePlayer Chime => _chime ??= new ChimePlayer(() => AudioBackend, () => Settings.Current.Profile.Audio.OutputId);
@@ -1208,6 +1213,10 @@ public sealed class AppHost : IAsyncDisposable
             Transmitter?.SetOutput(_output);
         }
         _rigOpenStatus = status.Health == ServiceHealth.Ok ? status : null;
+        // The old radio's mode no longer applies; the next poll reads the new one's. No radio set up and no simulation
+        // keeps the "why is it quiet" line hidden (rule 2).
+        Session?.SetRigMode(null);
+        Session?.SetRadioSetUp(Plan.SimulatedRig || r.Mode != RigModes.None);
         Session?.SetService(ServiceNames.Radio, status);
         if (Session is not null && status.Health == ServiceHealth.Ok) _ = ApplyKeyboardRadioAsync();
         if (!ReferenceEquals(old, rig)) await old.DisposeAsync().ConfigureAwait(false);
@@ -1231,6 +1240,8 @@ public sealed class AppHost : IAsyncDisposable
                 if (BandPlan.BandChange(Session.Config.Band, st.FrequencyHz) is { } band) await FollowRadioBandAsync(band, st.FrequencyHz).ConfigureAwait(false);
                 else if (st.FrequencyHz != Session.Snapshot.DialHz) Session.SetDial(st.FrequencyHz);
                 Session.SetPassband(st.PassbandHz);
+                // A VOX setup has no CAT: its mode is a placeholder, not something the radio reported.
+                Session.SetRigMode(_rig is VoxRig ? null : st.Mode);
                 // Recovery after a fault, only for a radio that opened properly: a placeholder for a missing or
                 // failed radio answers polls too, and must not turn the indicator green (that would allow transmit).
                 if (_rigOpenStatus is { } ok && Session.Snapshot.Services[ServiceNames.Radio].Health != ServiceHealth.Ok)
@@ -1261,9 +1272,11 @@ public sealed class AppHost : IAsyncDisposable
 
     // Once a second: is receive audio arriving, and is it silent or clipping? A fault that lasts half a minute of receiving
     // goes on the status line (the radio mutes its audio while transmitting, so those seconds and two after do not count).
+    // The same readings, classified as Setup's meter does them, settle into the level the "why is it quiet" line uses.
     private async Task ReceiveLevelLoopAsync()
     {
         var watch = new ReceiveLevelWatch();
+        var trend = new InputLevelTrend();
         CapturePump? pump = null;
         long samples = 0;
         var txUntil = DateTime.MinValue;
@@ -1282,6 +1295,7 @@ public sealed class AppHost : IAsyncDisposable
                         // No input device (none configured, or it failed): the Audio indicator already says so.
                         if (watch.Problem != ReceiveLevelProblem.None) Session.SetReceiveLevelWarning(null);
                         watch = new ReceiveLevelWatch();
+                        if (trend.Clear()) Session.SetInputLevel(null, null);
                         pump = null;
                         continue;
                     }
@@ -1290,11 +1304,18 @@ public sealed class AppHost : IAsyncDisposable
                         pump = current;
                         samples = current.SamplesReceived;
                         current.TakePeakDbfs();
+                        if (trend.Clear()) Session.SetInputLevel(null, null);
                         continue;
                     }
                     var total = current.SamplesReceived;
                     var peak = current.TakePeakDbfs();
                     if (watch.Update(total - samples, peak, now < txUntil)) Session.SetReceiveLevelWarning(ReceiveLevelWatch.Text(watch.Problem));
+                    if (now >= txUntil)
+                    {
+                        var level = total == samples ? InputLevelState.NoAudio : InputLevelClassifier.Classify(current.LevelDbfs, peak);
+                        trend.Add(level, level == InputLevelState.NoAudio ? InputLevelClassifier.SilenceDbfs : current.LevelDbfs);
+                        Session.SetInputLevel(trend.State, trend.RmsDbfs);
+                    }
                     samples = total;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -1462,6 +1483,7 @@ public sealed class AppHost : IAsyncDisposable
         // Last: an update starts the new version as soon as this returns, and it must be able to take the lock.
         Instance?.Dispose();
         _decoder?.Dispose();
+        _notifications?.Dispose();
         Guard.Dispose();
         Crashes?.Dispose();
         await Log.CloseAndFlushAsync().ConfigureAwait(false);

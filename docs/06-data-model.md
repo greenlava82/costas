@@ -213,7 +213,7 @@ Import must tolerate unknown fields, junk between records and records with no ca
 
 ### ADIF files
 
-The Log view's export and the log copy use one writer (`AdifLogExport`): one file per station callsign (upper case), contacts oldest first, a header line naming the callsign, the count and the time written, records separated by a blank line. Profiles with the same callsign share a file. Export with more than one callsign in the log writes `<name>-<CALL>.adi` beside the chosen file. Plain UTF-8 without a byte order mark; lengths count UTF-8 bytes, and the reader accepts characters too (`08-open-questions.md` V27). Every file is written to `<name>.tmp`, flushed and renamed over the old one (`AtomicFile`).
+The Log view's export and the log copy use one writer (`AdifLogExport`): one file per station callsign (upper case), contacts oldest first, a header line naming the callsign, the count and the time written, records separated by a blank line. Profiles with the same callsign share a file. Export with more than one callsign in the log writes `<name>-<CALL>.adi` beside the chosen file. Plain UTF-8 without a byte order mark; lengths count UTF-8 bytes, and the reader accepts characters too (`08-open-questions.md` V29). Every file is written to `<name>.tmp`, flushed and renamed over the old one (`AtomicFile`).
 
 The log copy (`AdifLogMirror`, driven by `LogCopyService` in App) lives in `backups\`: `costas-log-W7LIT.adi`, a `/` in the call becoming `_`. A file for a callsign no longer in the log is removed; nothing else in the folder is touched. An empty log writes no file.
 
@@ -253,6 +253,7 @@ Plain text, one line per event, monthly files. Compatible in spirit with WSJT-X 
             "uploadOnComplete": false, "userList": true },
   "hunt": { "targets": [{ "kind": "country", "value": "KL", "band": "40m" }], "watchAllBands": true,
             "nearbyKm": 1000, "sound": true },
+  "notifications": { "enabled": true, "hunt": true, "callers": true, "onlyInBackground": true },
   "qrz": { "logbookEnabled": true, "lookupEnabled": true, "syncMinutes": 15, "uploadOnComplete": true },
   "pskReporter": { "feedEnabled": true, "uploadSpots": false },
   "udp": { "enabled": true, "address": "127.0.0.1", "port": 2237 },
