@@ -13,6 +13,7 @@ using CommunityToolkit.Mvvm.Input;
 using Ft8Client.App.Services;
 using Ft8Client.Audio.Backends;
 using Ft8Client.Audio.Dsp;
+using Ft8Client.Core.Decoding;
 using Ft8Client.Core.Messages;
 using Ft8Client.Data.Secrets;
 using Ft8Client.Data.Settings;
