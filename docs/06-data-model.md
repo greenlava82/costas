@@ -14,6 +14,8 @@ Root: `%LOCALAPPDATA%\Costas\` (builds before the rename used `Ft8Client\`; the 
 | `wav\YYMMDD_HHMMSS.wav` | Saved slot audio, per the Files setting, deleted after the retention period |
 | `cache\cty.dat` | Updated country file, if newer than the bundled one |
 | `tmp\` | Per-run `jt9` scratch folders, cleaned at start |
+| `backups\costas-YYYY-MM-DD.db`, `backups\settings-YYYY-MM-DD.json` | Daily copies of the database and settings (`LogBackup`), the newest 14 kept. Not taken in simulation |
+| `backups\costas-log-<CALL>.adi` | ADIF copy of the whole log, one file per station callsign (`AdifLogMirror`, below) |
 
 Secrets (QRZ logbook key per profile, QRZ username and password) are stored through an `ISecretStore`: Windows Credential Manager on Windows.
 
@@ -194,7 +196,26 @@ Writer and reader support ADIF 3.1 text (`<name:len>value`, `<eor>`, header endi
 | `app_qrzlog_logid` | On records fetched from QRZ |
 | `sig`, `sig_info`, `pota_ref` | Park fields. A local contact with a spotted POTA activator gets `sig` = `POTA` and `sig_info` = the park reference. There is no column for them: they are kept in `raw_adif` and copied from it on upload, export and UDP; imported and fetched records keep theirs the same way |
 
+QSL state, in files only (export and the log copy, `AdifMapper.ToFileAdif`); records sent to online services leave these out, as before:
+
+| ADIF field | From |
+| --- | --- |
+| `lotw_qsl_sent`, `lotw_qsl_rcvd` | `Y` when `lotw_upload_state` is `uploaded`, when `lotw_confirmed` |
+| `eqsl_qsl_sent`, `eqsl_qsl_rcvd` | `Y` when `eqsl_upload_state` is `uploaded`, when `eqsl_confirmed` |
+| `qrzcom_qso_upload_status` | `Y` when `upload_state` (QRZ) is `uploaded` |
+| `app_qrzlog_logid` | `qrz_logid` |
+| `qsl_sent`, `qsl_rcvd`, `qslsdate`, `qslrdate`, `qsl_sent_via`, `qsl_rcvd_via`, `qsl_via`, `qslmsg`, `lotw_qslsdate`, `lotw_qslrdate`, `eqsl_qslsdate`, `eqsl_qslrdate`, `clublog_qso_upload_status`, `clublog_qso_upload_date`, `qrzcom_qso_upload_date`, `app_qrzlog_status` | Copied from `raw_adif` when the original record had them (paper QSLs, dates and Club Log have no column). A received field is dropped once `confirmed` is 0, so a withdrawn QRZ confirmation is not written back |
+| `app_costas_confirmed` | `Y` when `confirmed` is 1 and no other field in the record says who confirmed it |
+
+Import reads them all back: `lotw_qsl_sent`, `eqsl_qsl_sent` and `qrzcom_qso_upload_status` `Y` set the matching upload state to `uploaded`, and `app_costas_confirmed` `Y` counts as a confirmation. The profile is the importing one; `station_callsign` comes from the file.
+
 Import must tolerate unknown fields, junk between records and records with no call (skip them and count).
+
+### ADIF files
+
+The Log view's export and the log copy use one writer (`AdifLogExport`): one file per station callsign (upper case), contacts oldest first, a header line naming the callsign, the count and the time written, records separated by a blank line. Profiles with the same callsign share a file. Export with more than one callsign in the log writes `<name>-<CALL>.adi` beside the chosen file. Plain UTF-8 without a byte order mark; lengths count UTF-8 bytes, and the reader accepts characters too (`08-open-questions.md` V27). Every file is written to `<name>.tmp`, flushed and renamed over the old one (`AtomicFile`).
+
+The log copy (`AdifLogMirror`, driven by `LogCopyService` in App) lives in `backups\`: `costas-log-W7LIT.adi`, a `/` in the call becoming `_`. A file for a callsign no longer in the log is removed; nothing else in the folder is touched. An empty log writes no file.
 
 ## Decode journal
 
