@@ -964,6 +964,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial string CloudlogKey { get; set; } = string.Empty;
 
+    /// <summary>Which API the key will be used with, shown under it; empty while no key is typed.</summary>
+    public string CloudlogApiText => string.IsNullOrWhiteSpace(CloudlogKey) ? string.Empty
+        : Ft8Client.Integrations.Cloudlog.CloudlogClient.ApiFor(CloudlogKey) == Ft8Client.Integrations.Cloudlog.WavelogApi.V2
+            ? "Using the Wavelog v2 API (token)."
+            : "Using the v1 API (Wavelog or Cloudlog key).";
+
+    partial void OnCloudlogKeyChanged(string value) => OnPropertyChanged(nameof(CloudlogApiText));
+
     /// <summary>Wavelog/Cloudlog station location id.</summary>
     [ObservableProperty]
     public partial string CloudlogStationId { get; set; } = string.Empty;
@@ -1026,7 +1034,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private async Task TestCloudlog()
     {
         CloudlogStatus = "Asking the logbook…";
-        var (message, stations) = await _host.Cloudlog.TestAsync(CloudlogUrl, CloudlogKey, CancellationToken.None);
+        var (message, stations) = await _host.Cloudlog.TestAsync(CloudlogUrl, CloudlogKey, CancellationToken.None, CloudlogUploadOnComplete);
         CloudlogStatus = message;
         CloudlogStations.Clear();
         foreach (var st in stations) CloudlogStations.Add(new CloudlogStationChoice(st.Id, st.Name, st.Callsign, st.Active));
