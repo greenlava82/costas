@@ -856,6 +856,19 @@ public sealed partial class OperateViewModel : ObservableObject
         if (d?.PhotoUrl is { } url) Services.Browser.Open(url);
     }
 
+    /// <summary>
+    /// Selects the station <paramref name="call"/> in Next in line, as a click on its row would (a clicked desktop
+    /// notification). Only selects: it never calls. False when the station is not in the list.
+    /// </summary>
+    public bool SelectCall(string call)
+    {
+        var row = Line.FirstOrDefault(r => Callsign.EqualsCall(r.Call, call));
+        if (row is null) return false;
+        _line.Clicked();
+        Select(row);
+        return true;
+    }
+
     /// <summary>Moves the selection (Up/Down).</summary>
     public void MoveSelection(int delta)
     {

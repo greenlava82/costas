@@ -115,6 +115,9 @@ public partial class MainWindow : Window
         vm.CabrilloReady += (name, text) => Dispatcher.UIThread.Post(() => SaveCabrillo(vm, name, text));
         vm.Mini.ExpandRequested += CloseMini;
         vm.AttentionRequested += () => TaskbarFlash.Flash(_mini is { } m ? m : this);
+        // Background means minimized, in mini mode, or another program active. Read on the UI thread, when an event is raised.
+        vm.Host.Notifications.InForeground = () => _mini is null && IsActive && WindowState != WindowState.Minimized;
+        vm.Host.Notifications.Activated += call => Dispatcher.UIThread.Post(() => ComeForward(vm, call));
         _timer.Tick += (_, _) =>
         {
             vm.Tick();
@@ -483,6 +486,17 @@ public partial class MainWindow : Window
     }
 
     private void CloseMini() => _mini?.Close();
+
+    // A desktop notification was clicked: out of mini mode, restored, in front, with the station selected. Nothing is sent.
+    private void ComeForward(MainViewModel vm, string call)
+    {
+        if (_closing) return;
+        CloseMini();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Show();
+        Activate();
+        vm.ShowFromNotification(call);
+    }
 
     // True for a key aimed at an open dropdown, menu or flyout, which handles it itself (Esc closes it).
     private bool InPopup(object? source) => source switch

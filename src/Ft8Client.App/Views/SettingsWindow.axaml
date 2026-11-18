@@ -1068,6 +1068,37 @@
         </ScrollViewer>
       </TabItem>
 
+      <!-- Last in the XAML so the page numbers above stay as they are; the sidebar lists it under Finding stations. -->
+      <TabItem Header="Notifications">
+        <ScrollViewer>
+          <StackPanel>
+            <TextBlock Classes="page" Text="Notifications" />
+            <TextBlock Classes="intro" Text="Costas can tell you in the system's notification centre when something needs you while you are in another program. Clicking a notification brings Costas to the front with the station selected. It never calls, transmits or changes band." />
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Desktop notifications" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <CheckBox Content="Show desktop notifications" IsChecked="{Binding NotifyEnabled}" />
+                <TextBlock Classes="help" Text="{Binding NotifyBackend}" />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*" IsEnabled="{Binding NotifyEnabled}">
+              <TextBlock Classes="label" Text="Notify me when" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <CheckBox Content="A station on my Hunt list is heard" IsChecked="{Binding NotifyHunt}" />
+                <CheckBox Content="A station calls me" IsChecked="{Binding NotifyCallers}" />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*" IsEnabled="{Binding NotifyEnabled}">
+              <TextBlock Classes="label" Text="When" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <CheckBox Content="Only when Costas is in the background" IsChecked="{Binding NotifyOnlyInBackground}" />
+                <TextBlock Classes="help" Text="Minimized, in mini mode, or behind another window. A station is notified at most once every 10 minutes, and when several arrive within a minute they are merged into one notification, so a busy band does not flood the notification centre. Notifications are silent: the chime settings decide whether Costas makes a sound." />
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
     </TabControl>
 
     <Border Grid.Row="1" Grid.ColumnSpan="2" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0">
