@@ -69,6 +69,7 @@ public sealed class LogRowViewModel(QsoRecord q)
     {
         UploadState.Uploaded => q.Source == QsoSource.Qrz ? "From QRZ" : "Uploaded",
         _ when q.Source == QsoSource.Lotw => "From LoTW",
+        _ when q.Source == QsoSource.Wavelog => "From Wavelog",
         UploadState.Queued => "Waiting to upload",
         UploadState.Failed => "Failed: " + q.UploadError,
         _ => q.QrzLogid is null ? "Not uploaded" : "In QRZ",

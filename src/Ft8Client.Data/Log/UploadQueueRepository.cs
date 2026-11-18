@@ -72,6 +72,13 @@ public sealed class UploadQueueRepository(SqliteDatabase db)
         c.Execute("DELETE FROM upload_queue WHERE id=@id", new { id });
     }
 
+    /// <summary>Removes a contact's waiting upload to one target (the contact is already there).</summary>
+    public void RemoveFor(long qsoId, string target)
+    {
+        using var c = db.Open();
+        c.Execute("DELETE FROM upload_queue WHERE qso_id=@qsoId AND target=@target", new { qsoId, target });
+    }
+
     /// <summary>
     /// Moves a contact's first upload (every target) to <paramref name="nextTryUtc"/>: later while the operator may still
     /// edit it, or now when they are done. Items already tried keep their back-off.

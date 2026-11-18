@@ -150,6 +150,19 @@ public sealed class AdifTests : IDisposable
     }
 
     [Fact]
+    public void Upsert_WavelogCopyOfDeletedContact_IsNotBroughtBack()
+    {
+        var (id, _) = _repo.Upsert(Sample());
+        _repo.Delete(id);
+
+        var fromWavelog = Sample();
+        fromWavelog.QsoDateOn = fromWavelog.QsoDateOn.AddMinutes(2);
+        fromWavelog.Source = QsoSource.Wavelog;
+        _repo.Upsert(fromWavelog).Inserted.Should().BeFalse();
+        _repo.List().Should().BeEmpty("a Wavelog download does not undo the operator's delete");
+    }
+
+    [Fact]
     public void Upsert_QrzCopyOfDeletedContact_IsNotBroughtBack()
     {
         var local = Sample();

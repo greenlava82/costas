@@ -259,7 +259,7 @@ public sealed class QsoRepository(SqliteDatabase db)
     private static (long Id, bool Inserted) Upsert(SqliteConnection c, SqliteTransaction tx, QsoRecord q)
     {
         // A contact the operator deleted is not brought back by a sync (an ADIF import or a new local contact still adds it).
-        if (q.Source is QsoSource.Qrz or QsoSource.Lotw && Deleted(c, tx, q)) return (0, false);
+        if (q.Source is QsoSource.Qrz or QsoSource.Lotw or QsoSource.Wavelog && Deleted(c, tx, q)) return (0, false);
         QsoRecord? existing = null;
         if (q.QrzLogid is not null)
             existing = c.QuerySingleOrDefault<QsoRecord>("SELECT * FROM qso WHERE qrz_logid=@QrzLogid", q, tx);

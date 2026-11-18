@@ -22,4 +22,7 @@ public static class QsoSource
 
     /// <summary>A LoTW confirmation with no matching contact in the log.</summary>
     public const string Lotw = "lotw";
+
+    /// <summary>Downloaded from the operator's Wavelog logbook (never sent back to it).</summary>
+    public const string Wavelog = "wavelog";
 }

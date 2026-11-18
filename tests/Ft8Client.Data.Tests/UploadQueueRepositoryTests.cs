@@ -100,4 +100,18 @@ public sealed class UploadQueueRepositoryTests : IDisposable
         q.EqslUploadState.Should().Be(UploadState.Queued);
         q.UploadState.Should().Be(UploadState.None);
     }
+
+    [Fact]
+    public void RemoveFor_ContactAndTarget_RemovesOnlyThatTarget()
+    {
+        var id = Contact();
+        var other = Contact();
+        _queue.Enqueue(id, "cloudlog", Now);
+        _queue.Enqueue(id, "clublog", Now);
+        _queue.Enqueue(other, "cloudlog", Now);
+
+        _queue.RemoveFor(id, "cloudlog");
+
+        _queue.All().Select(i => (i.QsoId, i.Target)).Should().BeEquivalentTo([(id, "clublog"), (other, "cloudlog")]);
+    }
 }
