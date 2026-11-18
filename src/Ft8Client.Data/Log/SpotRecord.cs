@@ -8,16 +8,20 @@
 
 namespace Ft8Client.Data.Log;
 
-/// <summary>A PSK Reporter report of my signal (<c>spot</c> table).</summary>
+/// <summary>
+/// A report of a station heard (<c>spot</c> table): a PSK Reporter or RBN report of my signal, or a DX cluster spot of
+/// another station. For a cluster spot <see cref="MyCall"/> holds the station spotted and <see cref="RxCall"/> the spotter,
+/// so "RxCall heard MyCall" reads the same for every source; readers of reports of my signal skip source <c>cluster</c>.
+/// </summary>
 public sealed class SpotRecord
 {
     /// <summary>Row id.</summary>
     public long Id { get; set; }
 
-    /// <summary>My call.</summary>
+    /// <summary>My call; for a cluster spot, the station spotted.</summary>
     public string MyCall { get; set; } = string.Empty;
 
-    /// <summary>Receiver call.</summary>
+    /// <summary>Receiver call; for a cluster spot, the spotter.</summary>
     public string RxCall { get; set; } = string.Empty;
 
     /// <summary>Receiver grid.</summary>
@@ -44,6 +48,6 @@ public sealed class SpotRecord
     /// <summary>Report time.</summary>
     public DateTime TimeUtc { get; set; }
 
-    /// <summary><c>mqtt</c> or <c>query</c> (PSK Reporter), or <c>rbn</c> (Reverse Beacon Network).</summary>
+    /// <summary><c>mqtt</c> or <c>query</c> (PSK Reporter), <c>rbn</c> (Reverse Beacon Network) or <c>cluster</c> (DX cluster).</summary>
     public string Source { get; set; } = "mqtt";
 }

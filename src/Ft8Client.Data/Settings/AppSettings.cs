@@ -44,6 +44,9 @@ public sealed class AppSettings
     /// <summary>Reverse Beacon Network.</summary>
     public ReverseBeaconOptions ReverseBeacon { get; set; } = new();
 
+    /// <summary>DX cluster spots.</summary>
+    public DxClusterOptions DxCluster { get; set; } = new();
+
     /// <summary>Parks on the Air spots.</summary>
     public PotaOptions Pota { get; set; } = new();
 
