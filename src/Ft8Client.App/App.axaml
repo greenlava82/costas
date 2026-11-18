@@ -188,6 +188,11 @@
     <Style Selector="Button.link TextBlock">
       <Setter Property="TextDecorations" Value="Underline" />
     </Style>
+    <!-- A link's flyout counts as inside the link (logical tree), but its titles and help are not links. Its root panel
+         carries the flyout class; defined after Button.link TextBlock, so it wins. -->
+    <Style Selector="StackPanel.flyout TextBlock">
+      <Setter Property="TextDecorations" Value="{x:Null}" />
+    </Style>
     <Style Selector="Button, ComboBox, TextBox">
       <Setter Property="MinHeight" Value="32" />
       <Setter Property="CornerRadius" Value="4" />

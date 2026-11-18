@@ -72,7 +72,7 @@
           <TextBlock Text="{Binding Frequency}" FontSize="24" FontWeight="SemiBold" Classes="num" TextDecorations="{x:Null}" />
           <Button.Flyout>
             <Flyout Placement="BottomEdgeAlignedLeft">
-              <StackPanel Spacing="8" Width="280">
+              <StackPanel Classes="flyout" Spacing="8" Width="280">
                 <TextBlock Text="Dial frequency" Classes="title" />
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBox Text="{Binding DialEntry}" Width="130" PlaceholderText="14.090" AutomationProperties.Name="Frequency in megahertz">
@@ -152,7 +152,7 @@
           </Button.Styles>
           <Button.Flyout>
             <Flyout Placement="BottomEdgeAlignedRight">
-              <StackPanel Spacing="4" MinWidth="220">
+              <StackPanel Classes="flyout" Spacing="4" MinWidth="220">
                 <TextBlock Text="Station profile" Classes="title" />
                 <ItemsControl ItemsSource="{Binding ProfileItems}">
                   <ItemsControl.ItemTemplate>
@@ -355,7 +355,7 @@
             <TextBlock Text="{Binding TxOffsetText}" Classes="secondary num" TextDecorations="{x:Null}" />
             <Button.Flyout>
               <Flyout>
-                <StackPanel Spacing="8" Width="220">
+                <StackPanel Classes="flyout" Spacing="8" Width="220">
                   <TextBlock Text="Transmit offset" Classes="title" />
                   <Button Content="Automatic (picks a clear spot)" Command="{Binding OffsetAutoCommand}" HorizontalAlignment="Stretch" />
                   <StackPanel Orientation="Horizontal" Spacing="6">
@@ -373,7 +373,7 @@
             <TextBlock Text="{Binding PowerText}" Classes="secondary num" TextDecorations="{x:Null}" />
             <Button.Flyout>
               <Flyout>
-                <StackPanel Spacing="8" Width="240">
+                <StackPanel Classes="flyout" Spacing="8" Width="240">
                   <TextBlock Text="Radio power" Classes="title" />
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <Button Content="−5" Command="{Binding PowerStepCommand}" CommandParameter="-5" AutomationProperties.Name="5 watts less" />
@@ -403,7 +403,7 @@
                        Foreground="{Binding Accessory.BarKind, Converter={x:Static v:Converters.KindBrush}}" />
             <Button.Flyout>
               <Flyout>
-                <StackPanel Spacing="8" Width="280">
+                <StackPanel Classes="flyout" Spacing="8" Width="280">
                   <StackPanel Spacing="6" IsVisible="{Binding Accessory.HasAmp}">
                     <DockPanel>
                       <TextBlock DockPanel.Dock="Right" Text="{Binding Accessory.AmpState}" VerticalAlignment="Center"
