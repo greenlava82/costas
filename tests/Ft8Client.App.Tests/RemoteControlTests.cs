@@ -114,6 +114,13 @@ public class RemoteControlTests
     }
 
     [Fact]
+    public async Task HandleAsync_CqStop_StopsCqAndNeverToggles()
+    {
+        await Make().HandleAsync("phone", new RemoteCommand("cqStop"));
+        _target.Calls.Should().Equal("cqStop");
+    }
+
+    [Fact]
     public async Task HandleAsync_LogNowWhenNotAllowed_Ignored()
     {
         await Make().HandleAsync("phone", new RemoteCommand("logNow"));

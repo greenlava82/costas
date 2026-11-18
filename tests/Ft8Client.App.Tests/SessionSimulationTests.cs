@@ -121,4 +121,22 @@ public class SessionSimulationTests
         // PTT was only ever asserted for our planned transmissions, each released.
         d.Rig.PttLog.Count(p => p.On).Should().Be(d.Rig.PttLog.Count(p => !p.On));
     }
+
+    [Fact]
+    public async Task StopCq_NotCallingCq_DoesNotStartIt()
+    {
+        Assert.SkipWhen(Jt9Locator.Find() is null, "jt9 is not installed.");
+        var d = new SimDriver(new SilentSource(), Config());
+        await d.RunSlotsAsync(1);
+
+        d.Session.StopCq();
+        d.Session.Snapshot.CallingCq.Should().BeFalse("a Stop CQ that lands after CQ ended must not start it again");
+
+        d.Session.ToggleCq();
+        d.Session.Snapshot.CallingCq.Should().BeTrue();
+        d.Session.StopCq();
+        d.Session.Snapshot.CallingCq.Should().BeFalse();
+        d.Session.StopCq();
+        d.Session.Snapshot.CallingCq.Should().BeFalse();
+    }
 }

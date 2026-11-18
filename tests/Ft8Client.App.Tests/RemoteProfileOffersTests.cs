@@ -6,16 +6,21 @@
 // License, or (at your option) any later version. This program is distributed WITHOUT ANY WARRANTY;
 // see the GNU General Public License in LICENSE for details.
 
+
+using Ft8Client.App.Engine;
 using Ft8Client.App.Remote;
 using Ft8Client.Data.Settings;
 
 namespace Ft8Client.App.Tests;
 
-public class RemoteProfileNoteTests
+public class RemoteProfileOffersTests
 {
+    private static readonly SessionSnapshot Idle = new() { MyCall = "K1GLV" };
+
     private static AppSettings Settings(string? linked)
     {
         var s = new AppSettings();
+        s.Profile.Name = "Home";
         s.Profile.Callsign = "K1GLV";
         s.Profiles.Add(new StationProfile { Id = "ash", Name = "Ash", Callsign = "K1UTA" });
         s.Remote.Users.Add(new RemoteUser { Id = "u1", Username = "ash", ProfileId = linked });
@@ -23,16 +28,22 @@ public class RemoteProfileNoteTests
     }
 
     [Fact]
-    public void For_LinkedToAnotherProfile_SaysWhoTheyWillOperateAs() =>
-        RemoteProfileNote.For(Settings("ash"), "u1")
-            .Should().Be("You will operate as K1UTA (Ash profile) when you take control, if the station is idle.");
+    public void For_LinkedToAnotherProfileIdle_OffersTheSwitch() =>
+        RemoteProfileOffers.For(Settings("ash"), "u1", Idle)
+            .Should().Be(new RemoteProfileOffer("K1UTA (Ash profile)", "K1UTA", "K1GLV (Home profile)", false, null));
 
     [Fact]
-    public void For_LinkedToTheProfileInUse_Null()
+    public void For_LinkedToAnotherProfileBusy_SaysWhy() =>
+        RemoteProfileOffers.For(Settings("ash"), "u1", Idle with { CallingCq = true })!.Busy
+            .Should().Be("while calling CQ as K1GLV");
+
+    [Fact]
+    public void For_LinkedToTheProfileInUse_OnMine()
     {
         var s = Settings("ash");
         s.ActiveProfile = "ash";
-        RemoteProfileNote.For(s, "u1").Should().BeNull();
+        RemoteProfileOffers.For(s, "u1", Idle with { CallingCq = true })
+            .Should().Be(new RemoteProfileOffer("K1UTA (Ash profile)", "K1UTA", "K1UTA (Ash profile)", true, null), "nothing to switch, so nothing is busy");
     }
 
     [Theory]
@@ -41,5 +52,5 @@ public class RemoteProfileNoteTests
     [InlineData("ash", "someone-else")]
     [InlineData("ash", null)]
     public void For_NotLinkedOrUnknown_Null(string? linked, string? user) =>
-        RemoteProfileNote.For(Settings(linked), user).Should().BeNull();
+        RemoteProfileOffers.For(Settings(linked), user, Idle).Should().BeNull();
 }

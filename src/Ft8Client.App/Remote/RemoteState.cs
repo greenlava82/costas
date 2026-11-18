@@ -140,8 +140,8 @@ public sealed record RemoteState
     /// <summary>Recent notices that someone else signed in or took control, newest first (not about this phone).</summary>
     public IReadOnlyList<RemoteNotice> Notices { get; init; } = [];
 
-    /// <summary>"You will operate as K1GLV (Home profile) when you take control…", or null (<see cref="RemoteProfileNote"/>).</summary>
-    public string? ProfileNote { get; init; }
+    /// <summary>The profile this phone's user is linked to, for the Operate as button, or null (<see cref="RemoteProfileOffers"/>).</summary>
+    public RemoteProfileOffer? Profile { get; init; }
 
     /// <summary>Band activity, newest first.</summary>
     public IReadOnlyList<RemoteDecode> Decodes { get; init; } = [];

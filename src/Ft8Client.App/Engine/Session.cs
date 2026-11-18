@@ -1050,6 +1050,22 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         AfterCommand();
     }
 
+    /// <summary>Stops calling CQ; does nothing when CQ is not on, so a tap that arrives late never starts it.</summary>
+    public void StopCq()
+    {
+        if (!ModeInfo.IsSlotted(Config.Mode))
+        {
+            StopKeyboardCq();
+            return;
+        }
+        lock (_gate)
+        {
+            if (!_engine.CallingCq) return;
+            _engine.StopCq(_clock.UtcNow);
+        }
+        AfterCommand();
+    }
+
     /// <summary>Answers a waiting caller now.</summary>
     public void AnswerCaller(string call)
     {

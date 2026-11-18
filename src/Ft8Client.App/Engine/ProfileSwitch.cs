@@ -39,6 +39,10 @@ public static class ProfileSwitch
     public static string? Refusal(SessionSnapshot s, string what = "the station profile") =>
         Busy(s) is { } busy ? $"Nothing was saved: {what} cannot change {busy}. Try again when the station is idle." : null;
 
+    /// <summary>Why the desk's profile menu cannot switch profiles now, or null when it can.</summary>
+    public static string? DeskRefusal(SessionSnapshot s) =>
+        Busy(s) is { } busy ? $"The station profile cannot change {busy}. Try again when the station is idle." : null;
+
     /// <summary>
     /// Why a remote user's command cannot switch to their own profile <paramref name="profileName"/> now, or null when it
     /// can. Worded for the phone: the command was not carried out, and nothing went out under another callsign.

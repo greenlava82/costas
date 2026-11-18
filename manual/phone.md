@@ -135,14 +135,18 @@ Managing users, in the list under **Sign-in**:
 **Operates as** needs sign-in: with **Require a username and password** off, Costas cannot tell who is holding a
 phone, so the links are kept but do nothing, and every phone operates as whichever profile is active at the desk.
 
-Signing in does not switch the profile, so someone can sign in just to watch. While another profile is in use, the
-linked user's page says *You will operate as K1UTA (Ash profile) when you take control, if the station is idle.*
-When a linked user's command takes control, Costas switches to their profile first, but only when the station is
-idle. While it is transmitting, in a contact, or has CQ or Auto-call on, the command is refused with the reason
-(*Not done: the station is busy during the contact with JA1AAA as K1ABC…*), so nothing goes out under someone
-else's callsign and the contact in progress is left alone. **Stop** always works and never switches. Everyone else
-sees *Now operating as AB1CD (Ash profile) for Ash.* A click at the desk takes control back but keeps that profile;
-switch it in Settings if you want your own back.
+Switching to your own profile is always a deliberate tap; nothing else switches it, so someone can sign in just to
+watch. While another profile is in use, a linked user's page says *You're operating as K1UTA (Ash profile).* with an
+**Operate as K1GLV** button. Tapping it switches Costas to your profile and takes control, but only when the station
+is idle: while it is transmitting, in a contact, or has CQ or Auto-call on, the button is greyed out with the reason
+(*The station is busy while calling CQ as K1UTA*), so the contact in progress is left alone. Everyone else sees
+*Ash switched the station to K1GLV (Home profile).*
+
+Until you have switched, anything that would go out or be logged under the profile in use (Call CQ, calling or
+answering a station, Resend, Log now, the PSK and RTTY macros) is refused with *Tap Operate as K1GLV first*, so
+nobody transmits under someone else's callsign. **Stop**, **Stop CQ**, **Abandon**, Tune, and the band, offset,
+power and radio settings work as for anyone. A click at the desk takes control back but keeps your profile; the
+callsign at the top of the desk window shows whose it is, and the desk operator switches back from there.
 
 Changes take effect when you press **Save**. Passwords are never stored: Costas keeps only a scrambled check value
 (a PBKDF2 hash) in the Windows credential store, so a forgotten password cannot be shown, only replaced.

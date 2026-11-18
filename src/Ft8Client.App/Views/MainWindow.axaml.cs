@@ -219,6 +219,9 @@ public partial class MainWindow : Window
         vm.Host.Settings.Update(s => s.Window.WaterfallHeight = height);
     }
 
+    // A choice in the callsign menu closes it; the command itself switches the profile or opens Settings.
+    private void OnProfileChosen(object? sender, RoutedEventArgs e) => ProfileButton.Flyout?.Hide();
+
     private void OnGripKey(object? sender, KeyEventArgs e)
     {
         var height = e.Key switch

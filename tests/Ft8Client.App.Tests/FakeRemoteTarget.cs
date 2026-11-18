@@ -42,6 +42,8 @@ internal sealed class FakeRemoteTarget : IRemoteTarget
 
     public void ToggleCq() => Calls.Add("cq");
 
+    public void StopCq() => Calls.Add("cqStop");
+
     public void Resend() => Calls.Add("resend");
 
     public void LogNow() => Calls.Add("logNow");

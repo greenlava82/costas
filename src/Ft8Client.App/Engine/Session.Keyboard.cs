@@ -217,6 +217,16 @@ public sealed partial class Session
         Publish();
     }
 
+    private void StopKeyboardCq()
+    {
+        lock (_gate)
+        {
+            if (!_kbd.CallingCq) return;
+            _kbd.StopCq();
+        }
+        Publish();
+    }
+
     // Under _gate.
     private string? QueueMacro(int key)
     {

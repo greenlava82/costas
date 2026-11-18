@@ -155,8 +155,60 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     [ObservableProperty]
     public partial string RemoteTip { get; set; } = string.Empty;
 
+    /// <summary>True when there is more than one station profile: the top bar then shows the callsign in use.</summary>
+    [ObservableProperty]
+    public partial bool HasProfiles { get; set; }
+
+    /// <summary>The callsign and profile in use, as "K1UTA · Ash".</summary>
+    [ObservableProperty]
+    public partial string ProfileText { get; set; } = string.Empty;
+
+    /// <summary>Tooltip for <see cref="ProfileText"/>.</summary>
+    [ObservableProperty]
+    public partial string ProfileTip { get; set; } = string.Empty;
+
+    /// <summary>True for a minute after a phone switched the profile, so the desk sees whose callsign is in use now.</summary>
+    [ObservableProperty]
+    public partial bool ProfileFlagged { get; set; }
+
+    /// <summary>The station profiles, for the callsign chip's menu.</summary>
+    public ObservableCollection<ProfileMenuItem> ProfileItems { get; } = [];
+
+    // Who is on the air is always on screen when the station has more than one operator's profile (owner request
+    // 2026-11-18): a phone can switch to its user's profile, and the desk keeps it when it takes control back.
+    private void UpdateProfile(AppSettings s)
+    {
+        var p = s.Profile;
+        HasProfiles = s.Profiles.Count > 1;
+        ProfileText = p.Callsign.Length > 0 ? $"{p.Callsign} · {p.Name}" : p.Name;
+        ProfileTip = (p.Callsign.Length > 0 ? $"Operating as {p.Callsign}, the {p.Name} profile." : $"The {p.Name} profile has no callsign yet.")
+                     + " Click to switch to another profile; it changes only while the station is idle.";
+        var items = s.Profiles.Select(x => new ProfileMenuItem(x.Id, x.Callsign.Length > 0 ? $"{x.Callsign} · {x.Name}" : x.Name, x.Id == p.Id,
+            SwitchProfileCommand)).ToList();
+        if (!items.SequenceEqual(ProfileItems))
+        {
+            ProfileItems.Clear();
+            foreach (var i in items) ProfileItems.Add(i);
+        }
+        UpdateProfileFlag();
+        OnPropertyChanged(nameof(Title));
+    }
+
+    // Amber while the desk's notice of a phone's switch shows (a minute), then plain again.
+    private void UpdateProfileFlag() =>
+        ProfileFlagged = HasProfiles && _host.RemoteProfileSwitchUtc is { } switched
+                         && _host.Clock.UtcNow - switched < Ft8Client.App.Remote.RemoteNotices.DeskLifetime;
+
+    /// <summary>Switches to another station profile from the callsign chip; refused, on the status line, while busy.</summary>
+    [RelayCommand]
+    private void SwitchProfile(string? id)
+    {
+        if (id is not null && _host.SwitchProfileAtDesk(id) is { } why) StatusText = why;
+    }
+
     private void UpdateRemote()
     {
+        UpdateProfileFlag();
         var r = _host.Remote;
         // Someone signing in or taking control shows here for a minute, so the operator at the desk knows to share.
         if (r.Running && r.Control.Notices.ForDesk(_host.Clock.UtcNow) is { } notice)
@@ -489,7 +541,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     public bool Simulating => _host.Simulating;
 
     /// <summary>Window title.</summary>
-    public string Title => Simulating ? $"{AppInfo.ProductName} · simulation" : AppInfo.ProductName;
+    public string Title => (Simulating ? $"{AppInfo.ProductName} · simulation" : AppInfo.ProductName)
+                           + (HasProfiles && _host.Settings.Current.Profile.Callsign is { Length: > 0 } call ? $" · {call}" : string.Empty);
 
     /// <summary>Mini mode: the small always-on-top strip.</summary>
     public MiniViewModel Mini { get; }
@@ -1374,6 +1427,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     private void ApplySettings()
     {
         var s = _host.Settings.Current;
+        UpdateProfile(s);
         // Another profile may be another callsign, whose log the Log view then shows (Settings' Apply leaves it on screen).
         if (Tab == 3 || IsOut(3)) LogView.Refresh();
         AskExchangeAfterProfileSwitch(s);
