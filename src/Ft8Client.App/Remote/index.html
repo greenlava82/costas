@@ -99,6 +99,9 @@ main{padding:12px 14px 120px;display:flex;flex-direction:column;gap:12px;flex:1}
 .tabs button{flex:1 1 auto;min-width:0;padding:7px 5px;font-size:13px;background:var(--card);border:1px solid var(--line)}
 .tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .mini{font-size:12px;color:var(--mut)}
+.banner.quiet{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.banner.quiet #quietText{flex:1 1 200px}
+.banner.quiet button{min-height:44px;padding:0 14px}
 .it .left{min-width:0;flex:1;cursor:pointer}
 .it > button{flex:none;max-width:48%}
 .it .left .c{overflow:hidden;text-overflow:ellipsis}
@@ -262,6 +265,7 @@ body.dashon #slot,body.dashon #onair{display:none!important}
   <main>
     <div id="fault" class="banner hidden"></div>
     <div id="hunt" class="banner hidden" aria-live="polite"></div>
+    <div id="quiet" class="banner quiet hidden" aria-live="polite"><span id="quietText"></span><span id="quietBtn"></span></div>
     <div id="meter" class="banner warnline hidden"></div>
     <div id="services" class="mini hidden"></div>
     <div id="board" class="board"><div class="col">
@@ -491,6 +495,12 @@ function render() {
   const f = $("fault");
   f.classList.toggle("hidden", !s.fault && s.radioOk);
   f.textContent = s.fault || (!s.radioOk ? "Radio: " + s.radio : "");
+
+  // Why is it quiet: the desk's line, and its Go to button when the fix is a frequency. The station tunes to the
+  // frequency in its own readout; the phone only asks.
+  $("quiet").classList.toggle("hidden", !s.quiet);
+  $("quietText").textContent = s.quiet ? "Why it's quiet · " + s.quiet : "";
+  $("quietBtn").replaceChildren(...(s.quiet && s.quietGo ? [button(s.quietGo, "", () => cmd("goTo"))] : []));
 
   const hunt = $("hunt");
   hunt.classList.toggle("hidden", !s.hunt);

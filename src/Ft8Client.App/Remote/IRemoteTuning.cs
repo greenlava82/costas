@@ -19,6 +19,12 @@ public interface IRemoteTuning
     /// <summary>Changes band and mode, and tunes the radio.</summary>
     Task SetBandAsync(string band, Mode mode);
 
+    /// <summary>
+    /// Tunes to a dial frequency the way the frequency menu does (changing band if needed, USB data). Returns why it
+    /// could not, or null.
+    /// </summary>
+    Task<string?> TuneDialAsync(long hz);
+
     /// <summary>Sets the Tx offset in hertz, or automatic with null, and saves it.</summary>
     void SetTxOffset(int? hz);
 }

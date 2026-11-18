@@ -55,6 +55,31 @@ One window, minimum 1100 × 720, default 1440 × 900, remembers size and positio
 
 ## Operate view
 
+### Why it's quiet
+
+Owner request 2026-11-18. When FT8 or FT4 has gone quiet, one line under the top bar (below the Hunt list alert, in the same caution-bordered card style) says the most likely reason and, where there is one, the fix. Operate view only; hidden on the other views and in PSK and RTTY. The rules are in `04-domain-logic.md` section 18.
+
+- **When:** after two received slots in a row with no decodes (30 s in FT8, 15 s in FT4). Two, so both an even and an odd slot have passed with nothing heard: one empty slot is common on a quiet band, or when everyone is on the other parity. Slots I transmitted in are not counted. A band, mode or dial change starts the count again. The line goes the moment anything is decoded.
+- **Never with no radio set up:** with simulation off and no radio configured nothing real is received, so nothing is shown (rule 2). With a radio set up but not connected the line defers to the yellow no-radio banner, except for an audio fault, which the banner does not cover.
+- **Advice only:** the line never changes the radio. Its one button, **Go to 14.074** (the band's actual usual frequency; never called "Tune", which sends a tone), tunes through the same path as a frequency typed in the frequency menu (`AppHost.TuneDialAsync`: changes band if needed, sets USB data), only when clicked, and is hidden while transmitting.
+
+Label "Why it's quiet" in caution colour, then the text. Causes, in the order they are checked:
+
+| Cause | Text | Button |
+| --- | --- | --- |
+| No audio arriving | No decodes: no audio is arriving from the radio's sound device. Check that it is plugged in and that no other program is holding it. | — |
+| Silence (all zero) | No decodes: the radio's sound device sends only silence. Turn up the radio's USB audio output and check that it is not muted. | — |
+| Too quiet | No decodes: the receive audio is too quiet (-52 dBFS). Turn up the radio's USB audio output or the computer's recording level. | — |
+| Clipping | No decodes: the receive audio is clipping. Turn down the radio's USB audio output or the computer's recording level. | — |
+| Dial off | No decodes: the dial is on 14.090, not the usual FT8 frequency for 20 m. | Go to 14.074 |
+| Wrong radio mode | No decodes: the radio is in LSB, and FT8 needs USB data. Change it on the radio, or Go to 14.074 sets it. | Go to 14.074 |
+| Decoder down | No decodes: the decoder (jt9) is not running: jt9 not found. Diagnostics has the details. | — |
+| Decoder failing | No decodes: the decoder (jt9) is not working: jt9 exited with code 2. Diagnostics has the details. | — |
+| Clock off | No decodes: your clock is 3.1 s off, and decodes need it within 2 s. Sync the computer's clock, or turn on Clock correction in Settings › Transmitting. | — |
+| Nothing found | No decodes in the last 4 slots. Audio, dial, radio mode, decoder and clock look right, so 20 m may just be quiet. | — |
+
+Values in the examples (14.090, LSB, -52 dBFS, the decoder's message, 3.1 s, 4 slots, 20 m, FT8) are filled in from the live state. Squelch is not checked. The phone page shows the same line and button (see Phone).
+
 ### Big and small windows
 
 Owner request 2026-11-16: the compact layout (owner decision 2026-11-14) is for small screens only. The Operate view picks its layout from its window's client size in device-independent pixels (`OperateViewModel.IsCompactSize`) and switches live as the window is resized:
@@ -273,7 +298,7 @@ Sections: Station profiles · Radio · Audio · Transmit (power, watchdog minute
 
 ## Phone (remote page)
 
-A single page served by the app to any phone on the home network (no pairing code since 2026-10-25) (owner decision 2026-10-12). Top: my call, frequency, band and mode, link state, radio dot, UTC, clock and decoder, and who has control ("You control", "Desk controls", "Another phone controls"). An ON AIR line with the message while transmitting. A yellow banner for the fault line (for example "Transmit stopped at 20:31:15: lost touch with the phone."). The contact card with the same wording and five-step strip as the desk, the messages around the current step (tap an upcoming one of mine to jump), and Resend, Log now and Abandon; when idle, Call CQ or Stop CQ. Calling you and Next in line (up to 8) with their buttons. HALT TX pinned to the bottom ("NOT TRANSMITTING" in grey when nothing is going out). The desk's bottom bar shows "Phone in control" or "Phone connected".
+A single page served by the app to any phone on the home network (no pairing code since 2026-10-25) (owner decision 2026-10-12). Top: my call, frequency, band and mode, link state, radio dot, UTC, clock and decoder, and who has control ("You control", "Desk controls", "Another phone controls"). An ON AIR line with the message while transmitting. A yellow banner for the fault line (for example "Transmit stopped at 20:31:15: lost touch with the phone."). Under it, the desk's "Why it's quiet" line with the same wording, and its Go to button when the fix is a frequency (owner request 2026-11-18); the station tunes to the frequency in its own readout, never one the phone sends, and refuses while transmitting. The contact card with the same wording and five-step strip as the desk, the messages around the current step (tap an upcoming one of mine to jump), and Resend, Log now and Abandon; when idle, Call CQ or Stop CQ. Calling you and Next in line (up to 8) with their buttons. HALT TX pinned to the bottom ("NOT TRANSMITTING" in grey when nothing is going out). The desk's bottom bar shows "Phone in control" or "Phone connected".
 
 Richer page (owner request 2026-10-12, "more feature rich"): under the top bar, a slot countdown bar (red while transmitting), the Tx meter warning after a transmission outside limits, and one line when QRZ, PSK Reporter or audio is not working. Five tabs: Operate (contact card, Calling you, Next in line with the desk's columns: doing now, where, signal, hears you, chance, last heard, last worked), Stations (band summary figures, Repeats up to 8, Watching up to 8 with the reason), Decodes (band activity, newest first, up to 60 lines, coloured as on the desk), Signal (the desk's "Your signal" panel: headline, farthest, best, nearby stations, latest reports), Log (this session's contacts). Tapping a call opens a station sheet with the content of the desk's station details and a Call or Answer button when the station can be called. Tapping the frequency opens a band sheet: mode, band (not while transmitting; confirms before ending a contact or CQ) and Tx offset (Automatic, or 200 to 2900 Hz), with the desk's wording and saved to settings. Opening details does not take control; band and offset changes do. The tab in use is remembered on the phone. Phone Operate redesign (owner pick 2026-11-01, "Widgets" variant): on a phone the Operate tab is a grid of tiles instead of the desk's layout: Contact (state, slot seconds, call, need, place, message on the air or awaited, reports, labelled five-part progress, buttons; red while transmitting), Calling you, Hearing you (15-minute count, last-hour bars, farthest), Band now (heard, countries, calling CQ, you need, logged), Next in line as a compact table (call, dB, why, pile count, Call; sort Best first / Strongest / Call, remembered) and Logged this session. Tiles for Hearing you, Band now and Logged open their tabs. The Band now tile and the Stations tab's band summary add the desk's band advice open line (the Stations tab also the closing line), with the same wording; no tooltip. The slot bar and ON AIR banner are hidden while the tiles show, since the Contact tile carries both. Tablets keep the desk-like layout.
 

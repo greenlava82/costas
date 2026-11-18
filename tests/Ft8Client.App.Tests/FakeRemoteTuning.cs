@@ -24,5 +24,11 @@ internal sealed class FakeRemoteTuning : IRemoteTuning
         return Task.CompletedTask;
     }
 
+    public Task<string?> TuneDialAsync(long hz)
+    {
+        Calls.Add($"dial {hz}");
+        return Task.FromResult<string?>(null);
+    }
+
     public void SetTxOffset(int? hz) => Calls.Add(hz is { } v ? $"offset {v}" : "offset auto");
 }
