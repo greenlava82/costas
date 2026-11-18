@@ -23,6 +23,10 @@
       <Setter Property="FontSize" Value="12" />
       <Setter Property="Margin" Value="0,4,0,0" />
     </Style>
+    <Style Selector="TextBlock.help.problem">
+      <Setter Property="Opacity" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource CautionBrush}" />
+    </Style>
     <Style Selector="TextBlock.page">
       <Setter Property="FontSize" Value="20" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -118,6 +122,13 @@
               <StackPanel Grid.Column="1"><TextBox Text="{Binding Callsign}" Width="160" HorizontalAlignment="Left" /></StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="US licence class" />
+              <StackPanel Grid.Column="1">
+                <ComboBox ItemsSource="{Binding LicenceChoices}" SelectedItem="{Binding LicenceChoice}" MinWidth="200" AutomationProperties.Name="US licence class" />
+                <TextBlock Classes="help" TextWrapping="Wrap" Text="Costas refuses to transmit outside the parts of each band where your class may send data such as FT8. General and Advanced lose the bottom 25 kHz of 80, 40, 20 and 15 m; a Technician may send data only on 28.000 to 28.300 MHz, 6 m and 2 m, so the other bands are receive only. Licensed in another country? Choose Not US: only the band limits apply." />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Grid square" />
               <StackPanel Grid.Column="1">
                 <TextBox Text="{Binding Grid}" Width="120" HorizontalAlignment="Left" />
@@ -177,8 +188,7 @@
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Where to transmit" />
               <StackPanel Grid.Column="1">
-                <CheckBox Content="US data segments only" IsChecked="{Binding UsDataSegmentsOnly}" />
-                <TextBlock Classes="help" Text="Refuses to transmit outside the parts of each band where US rules allow data modes such as FT8 (for example above 14.150 MHz on 20 m or 7.125 MHz on 40 m), and on 60 m outside the channels and 5351.5 to 5366.5 kHz. Turn it off if you are licensed in another country; the band limits still apply." TextWrapping="Wrap" />
+                <TextBlock Classes="help" Text="Set by the US licence class on the Station page: Costas keeps to that class's data segments (for example 14.025 to 14.150 MHz on 20 m for a General), or only to the band limits for Not US." TextWrapping="Wrap" />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
@@ -535,7 +545,7 @@
               <TextBlock Classes="label" Text="Alert" />
               <StackPanel Grid.Column="1">
                 <CheckBox Content="Play the chime and flash Costas in the taskbar" IsChecked="{Binding HuntSound}" />
-                <TextBlock Classes="help" Text="Each entry alerts once per band, then stays quiet there for 30 minutes. The chime plays on the computer's default speakers, never on the radio's audio device." />
+                <TextBlock Classes="help" Text="Each entry alerts once per band, then stays quiet there for 30 minutes. The chime plays on the computer's default speakers, never on the radio's audio device. Desktop notifications for alerts are set on the Notifications page." />
               </StackPanel>
             </Grid>
           </StackPanel>
@@ -547,7 +557,7 @@
         <ScrollViewer>
           <StackPanel>
             <TextBlock Classes="page" Text="Logbooks" />
-            <TextBlock Classes="intro" Text="Online logbooks Costas can read confirmations from or send contacts to. Every one is optional; open a section to set it up." />
+            <TextBlock Classes="intro" Text="Online logbooks Costas can read confirmations from or send contacts to. Every one is optional; open a section to set it up. Backups, at the end, shows where Costas keeps copies of your log." />
             <TextBlock Classes="help" Text="{Binding SecretsNote}" Margin="0,-10,0,14" />
             <Expander Classes="logbook" HorizontalAlignment="Stretch">
               <Expander.Header>
@@ -692,7 +702,12 @@
                   </StackPanel>
                 </Grid>
                 <CheckBox Content="Upload each new contact as soon as it is logged" IsChecked="{Binding ClubLogUploadOnComplete}" />
-                <TextBlock Classes="help" Text="Save to apply. Club Log real-time upload is for new contacts only; to send an old log, upload an ADIF file on the Club Log site. If Club Log refuses the login, uploads stop until you change the email or password here, as Club Log asks. Simulation never contacts Club Log." />
+                <StackPanel Spacing="6" IsVisible="{Binding ClubLogStopText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                  <TextBlock Classes="help" Foreground="{DynamicResource CautionBrush}" Text="{Binding ClubLogStopText}" TextWrapping="Wrap" />
+                  <Button Content="Resume Club Log uploads" Command="{Binding ResumeClubLogCommand}" HorizontalAlignment="Left"
+                          ToolTip.Tip="Only once the login works on the Club Log site: Club Log blocks an address that keeps sending a refused login. Save to apply." />
+                </StackPanel>
+                <TextBlock Classes="help" Text="Save to apply. Club Log real-time upload is for new contacts only; to send an old log, upload an ADIF file on the Club Log site. If Club Log refuses the login, uploads stop, even across restarts, until you change the email or password here or resume them, as Club Log asks. Simulation never contacts Club Log." />
               </StackPanel>
             </Expander>
             <Expander Classes="logbook" HorizontalAlignment="Stretch">
@@ -730,6 +745,40 @@
                 </Grid>
                 <CheckBox Content="Upload each new contact as soon as it is logged" IsChecked="{Binding CloudlogUploadOnComplete}" />
                 <TextBlock Classes="help" Text="Save to apply. A contact already in that logbook is left as it is. Simulation never contacts the site." />
+              </StackPanel>
+            </Expander>
+            <!-- Backups: the daily database copies and the ADIF log copy, both in the backups folder (C8). -->
+            <Expander Classes="logbook" HorizontalAlignment="Stretch">
+              <Expander.Header>
+                <StackPanel>
+                  <TextBlock Text="Backups" FontWeight="SemiBold" FontSize="15" />
+                  <TextBlock Text="Daily copies and a plain ADIF copy of the log" Classes="help" Margin="0" />
+                </StackPanel>
+              </Expander.Header>
+              <StackPanel>
+                <TextBlock Classes="intro service" Text="Costas keeps your log safe on this computer without any setting. Once a day it copies the log database and your settings, keeping 14 days. It also keeps an ADIF copy of the whole log, with confirmations and uploads, that any logger can import: one file per station callsign, rewritten a few seconds after a contact is logged, edited, deleted or imported." />
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Backups folder" />
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <SelectableTextBlock Text="{Binding BackupsFolder}" TextWrapping="Wrap" />
+                    <Button Content="Open folder" Command="{Binding OpenBackupsFolderCommand}" HorizontalAlignment="Left" />
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="ADIF log copy" />
+                  <StackPanel Grid.Column="1">
+                    <SelectableTextBlock Text="{Binding LogCopyFiles}" TextWrapping="Wrap" />
+                    <TextBlock Classes="help" Classes.problem="{Binding LogCopyFailed}" Text="{Binding LogCopyWritten}" />
+                    <TextBlock Classes="help" Text="Plain UTF-8 ADIF, oldest contact first. Each file is written whole and then swapped in, so it is never half written. To restore, import it in the Log view." />
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Daily copies" />
+                  <StackPanel Grid.Column="1">
+                    <TextBlock Text="{Binding DailyBackup}" TextWrapping="Wrap" />
+                    <TextBlock Classes="help" Text="costas-YYYY-MM-DD.db and settings-YYYY-MM-DD.json. To go back to one, see Backups in the manual's Log chapter." />
+                  </StackPanel>
+                </Grid>
               </StackPanel>
             </Expander>
           </StackPanel>
@@ -1069,6 +1118,37 @@
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Developer mode" />
               <CheckBox Grid.Column="1" Content="On (untick to hide this page)" IsChecked="{Binding DeveloperMode}" />
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Last in the XAML so the page numbers above stay as they are; the sidebar lists it under Finding stations. -->
+      <TabItem Header="Notifications">
+        <ScrollViewer>
+          <StackPanel>
+            <TextBlock Classes="page" Text="Notifications" />
+            <TextBlock Classes="intro" Text="Costas can tell you in the system's notification centre when something needs you while you are in another program. Clicking a notification brings Costas to the front with the station selected. It never calls, transmits or changes band." />
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Desktop notifications" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <CheckBox Content="Show desktop notifications" IsChecked="{Binding NotifyEnabled}" />
+                <TextBlock Classes="help" Text="{Binding NotifyBackend}" />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*" IsEnabled="{Binding NotifyEnabled}">
+              <TextBlock Classes="label" Text="Notify me when" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <CheckBox Content="A station on my Hunt list is heard" IsChecked="{Binding NotifyHunt}" />
+                <CheckBox Content="A station calls me" IsChecked="{Binding NotifyCallers}" />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*" IsEnabled="{Binding NotifyEnabled}">
+              <TextBlock Classes="label" Text="When" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <CheckBox Content="Only when Costas is in the background" IsChecked="{Binding NotifyOnlyInBackground}" />
+                <TextBlock Classes="help" Text="Minimized, in mini mode, or behind another window. A station is notified at most once every 10 minutes, and when several arrive within a minute they are merged into one notification, so a busy band does not flood the notification centre. Notifications are silent: the chime settings decide whether Costas makes a sound." />
+              </StackPanel>
             </Grid>
           </StackPanel>
         </ScrollViewer>

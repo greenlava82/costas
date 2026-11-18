@@ -47,7 +47,7 @@ Reference user: W7LIT, grid DN40, an Icom IC-7300 over USB, Windows 11, a QRZ su
 | Sequencing | Automatic sequencing of the standard exchange, retries, step-back on repeats, RR73 |
 | Calling CQ | Call CQ, answer the first caller, queue further callers in "Waiting for you" |
 | Transmit | Message encoding, GFSK audio, PTT, automatic clear transmit offset, power setting |
-| Safety | Tx watchdog, Tune watchdog, band-edge guard, clock guard, PTT release on any fault, ALC and SWR warnings from the radio's meters |
+| Safety | Tx watchdog, Tune watchdog, band-edge and US licence-class guard, clock guard, PTT release on any fault, ALC and SWR warnings from the radio's meters |
 | Rig | Hamlib via `rigctld`: frequency, mode, PTT, split. PTT by CAT, RTS, DTR or VOX. No-radio audio-only mode |
 | Log | Local SQLite log, ADIF import and export, edit and delete, decode journal |
 | QRZ logbook | Full sync down (history, confirmations), upload on completion, retry queue, per-contact status |
@@ -62,7 +62,7 @@ Reference user: W7LIT, grid DN40, an Icom IC-7300 over USB, Windows 11, a QRZ su
 
 ### v1.x
 
-Hound contacts (built 2026-10-12; automatic for a recognised Fox since 2026-10-13) and SuperHound (done 2026-11-14: SuperFox decoding and the Hound flow on a SuperFox, `04-domain-logic.md`; signature not checked). Alerts for wanted calls or countries (done: the Hunt list). LoTW upload through TQSL and LoTW-user flag (done). OmniRig, FLRig, TCI. Band advice ("15 m is open to Europe for you"). Awards progress page. Streaming decode (early results before the slot ends). Keyboard modes: PSK31, PSK63 and RTTY on the same Operate screen (owner decision D18, spec in `09-keyboard-modes.md`).
+Hound contacts (built 2026-10-12; automatic for a recognised Fox since 2026-10-13) and SuperHound (done 2026-11-14: SuperFox decoding and the Hound flow on a SuperFox, `04-domain-logic.md`; signature not checked). Alerts for wanted calls or countries (done: the Hunt list). LoTW upload through TQSL and LoTW-user flag (done). OmniRig, FLRig, TCI. Band advice ("15 m is open to Europe for you"; done 2026-11-18: one line under the band summary and on the phone, display only, `04-domain-logic.md` section 14a). Awards progress page. Streaming decode (early results before the slot ends). Keyboard modes: PSK31, PSK63 and RTTY on the same Operate screen (owner decision D18, spec in `09-keyboard-modes.md`).
 
 ### Later or not planned
 

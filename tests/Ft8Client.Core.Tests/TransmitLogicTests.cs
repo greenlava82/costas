@@ -57,13 +57,25 @@ public class TransmitLogicTests
 
     [Theory]
     [InlineData(0.1, 0.2, 0.1)] // they agree: SNTP
-    [InlineData(0.1, 3.1, 3.1)] // the clock stepped after the SNTP check: the live DT
-    [InlineData(3.0, 0.1, 0.1)] // the operator fixed the clock: the live DT
-    [InlineData(null, 2.5, 2.5)]
+    [InlineData(-1.9, 1.9, -1.9)] // PC clock 1.9 s fast, seen the same by both: SNTP
+    [InlineData(1.9, -2.5, 1.9)] // PC clock slow by about 2 s, seen the same by both within a second: SNTP
+    [InlineData(0.1, 3.1, -3.1)] // the clock went 3 s fast after the SNTP check: the live DT, in the SNTP sense
+    [InlineData(3.0, -0.1, 0.1)] // the operator fixed the clock: the live DT
+    [InlineData(null, 2.5, -2.5)]
     [InlineData(0.3, null, 0.3)]
     public void Offset_SntpAndLiveDt_UsesSntpUnlessTheClockMovedSince(double? sntp, double? dt, double? expected)
     {
-        ClockEstimate.Offset(sntp, dt).Should().Be(expected);
+        ClockEstimate.Offset(sntp, dt).Should().BeApproximately(expected, 1e-9);
+    }
+
+    [Fact]
+    public void Offset_SntpSlowAndDtFastBySimilarAmounts_UsesDtAndBlocksTransmit()
+    {
+        // SNTP says the PC is 1.9 s slow; the decodes say it is now 2.5 s fast. The magnitudes are close, but the clock
+        // has moved by 4.4 s since the SNTP check, and the live DT is over the 2 s limit.
+        var offset = ClockEstimate.Offset(1.9, 2.5);
+        offset.Should().BeApproximately(-2.5, 1e-9);
+        ClockEstimate.TransmitAllowed(offset, 2.0, out _).Should().BeFalse();
     }
 
     [Fact]

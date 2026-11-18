@@ -267,6 +267,8 @@ public sealed class RemoteControl
                 return null;
             case "band":
                 return await BandAsync(cmd).ConfigureAwait(false);
+            case "goTo":
+                return await GoToAsync().ConfigureAwait(false);
             case "offset" when cmd.Hz is { } hz:
                 if (_tuning is null) return "The station cannot change that from the phone.";
                 if (hz is < MinOffsetHz or > MaxOffsetHz) return $"The offset must be between {MinOffsetHz} and {MaxOffsetHz} Hz.";
@@ -299,7 +301,7 @@ public sealed class RemoteControl
 
     private static bool Understood(RemoteCommand cmd, string call) => cmd.Type switch
     {
-        "halt" or "abandon" or "cq" or "resend" or "logNow" or "band" or "offsetAuto" => true,
+        "halt" or "abandon" or "cq" or "resend" or "logNow" or "band" or "offsetAuto" or "goTo" => true,
         "call" or "answer" or "answerAfter" or "dismiss" => call.Length > 0,
         "jump" => cmd.Step is not null,
         "offset" => cmd.Hz is not null,
@@ -309,6 +311,17 @@ public sealed class RemoteControl
         "macro" => cmd.Key is not null,
         _ => false,
     };
+
+    // The "why is it quiet" line's Go to button: the frequency is the one in the station's own readout, never one the phone
+    // sends, so a tap can only do what the desk's button would.
+    private async Task<string?> GoToAsync()
+    {
+        if (_tuning is null) return "The station cannot change that from the phone.";
+        var s = _target.Snapshot;
+        if (s.Transmitting) return "Wait until this transmission ends to change frequency.";
+        if (s.Quiet?.GoToDialHz is not { } hz) return "There is no frequency to go to now.";
+        return await _tuning.TuneDialAsync(hz).ConfigureAwait(false);
+    }
 
     // As the band menu on the desk: not while transmitting, and only to a band in the frequency table.
     private async Task<string?> BandAsync(RemoteCommand cmd)

@@ -8,6 +8,7 @@
 
 
 using CommunityToolkit.Mvvm.ComponentModel;
+using Ft8Client.Core.Bands;
 
 namespace Ft8Client.App.ViewModels;
 
@@ -35,6 +36,9 @@ public sealed partial class ProfileDraft : ObservableObject
 
     /// <summary>Grid as typed.</summary>
     public string Grid { get; set; } = string.Empty;
+
+    /// <summary>The US licence class the transmit guard keeps to, or not US.</summary>
+    public UsLicenceClass Licence { get; set; } = UsLicenceClass.AmateurExtra;
 
     /// <summary>Power in watts as typed.</summary>
     public string Power { get; set; } = string.Empty;
@@ -107,6 +111,15 @@ public sealed partial class ProfileDraft : ObservableObject
 
     /// <summary>Sign and upload each contact through TQSL when it is logged.</summary>
     public bool LotwUpload { get; set; }
+
+    /// <summary>The Club Log Application Password as stored when the window opened, to notice a new one on save.</summary>
+    public string ClubLogPasswordSaved { get; init; } = string.Empty;
+
+    /// <summary>The stop in force when the window opened (Club Log refused the login), or null.</summary>
+    public Ft8Client.Data.Settings.ClubLogStop? ClubLogStop { get; init; }
+
+    /// <summary>True once the operator chose to resume Club Log uploads; saving clears the stop.</summary>
+    public bool ClubLogResume { get; set; }
 
     /// <inheritdoc />
     public override string ToString() => Name;

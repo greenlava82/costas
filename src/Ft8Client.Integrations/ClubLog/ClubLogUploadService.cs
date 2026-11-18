@@ -11,16 +11,18 @@ using Ft8Client.Core.Services;
 using Ft8Client.Core.Time;
 using Ft8Client.Data.Adif;
 using Ft8Client.Data.Log;
+using Ft8Client.Data.Settings;
 
 namespace Ft8Client.Integrations.ClubLog;
 
 /// <summary>
 /// Drains the Club Log part of the persistent upload queue, one contact every 2 seconds at most (real-time upload is
-/// for contacts as they are made, not batches). A refused login stops all uploads until the credentials change, as
-/// Club Log requires; a rejected record is dropped from the queue with the reason; faults retry with back-off.
+/// for contacts as they are made, not batches). A refused login stops all uploads until the credentials change or the
+/// operator clears the stop, as Club Log requires; the stop is kept in <paramref name="stops"/> so a restart does not
+/// send again. A rejected record is dropped from the queue with the reason; faults retry with back-off.
 /// </summary>
 public sealed class ClubLogUploadService(ClubLogRealtimeClient client, QsoRepository qsos, UploadQueueRepository queue, IClock clock,
-    Func<TimeSpan, CancellationToken, Task>? delay = null)
+    Func<TimeSpan, CancellationToken, Task>? delay = null, IClubLogStopStore? stops = null)
 {
     /// <summary>Persistent queue target.</summary>
     public const string Target = "clublog";
@@ -30,23 +32,38 @@ public sealed class ClubLogUploadService(ClubLogRealtimeClient client, QsoReposi
 
     private readonly Func<TimeSpan, CancellationToken, Task> _delay = delay ?? Task.Delay;
     private readonly Backoff _backoff = Backoff.Network();
+    private readonly IClubLogStopStore _stops = stops ?? new MemoryClubLogStopStore();
     private DateTime _lastRequest = DateTime.MinValue;
+    private string? _refusedLogin;
 
     /// <summary>Visible service status after the last run.</summary>
     public ServiceStatus Status { get; private set; } = ServiceStatus.Off("Club Log not set up");
 
-    /// <summary>
-    /// The credentials Club Log refused (a fingerprint, never the password itself), or null. While set and unchanged,
-    /// nothing is sent.
-    /// </summary>
-    public string? RefusedLogin { get; private set; }
+    /// <summary>True while uploads are stopped because Club Log refused the login.</summary>
+    public bool Stopped { get; private set; }
 
-    /// <summary>Uploads the due contacts of this profile and callsign, stopping at the first fault.</summary>
+    /// <summary>
+    /// Uploads the due contacts of this profile and callsign, stopping at the first fault. Sends nothing while a stop
+    /// recorded for this email and callsign stands. A different email or callsign clears it, as does a different
+    /// password seen by this instance (a password changed in Settings clears the stored stop there).
+    /// </summary>
     public async Task<int> ProcessDueAsync(string profileId, string callsign, string email, string password, string apiKey, CancellationToken ct)
     {
+        // Only in memory: the stored stop holds nothing derived from the password.
         var login = Fingerprint(email, password, callsign);
-        if (RefusedLogin == login) return 0;
-        RefusedLogin = null;
+        if (_stops.Load(profileId) is { } stop)
+        {
+            var passwordChanged = _refusedLogin is not null && _refusedLogin != login;
+            if (stop.Covers(email, callsign) && !passwordChanged)
+            {
+                Stopped = true;
+                Status = new(ServiceHealth.Down, Describe(stop), clock.UtcNow);
+                return 0;
+            }
+            _stops.Save(profileId, null);
+        }
+        Stopped = false;
+        _refusedLogin = null;
         var done = 0;
         foreach (var item in queue.All().Where(i => i.Target == Target && i.NextTryUtc <= clock.UtcNow))
         {
@@ -70,8 +87,11 @@ public sealed class ClubLogUploadService(ClubLogRealtimeClient client, QsoReposi
                     Status = new(ServiceHealth.Degraded, $"{q.Call}: {result.Message}", clock.UtcNow);
                     continue;
                 case ClubLogOutcome.Stop:
-                    RefusedLogin = login;
-                    Status = new(ServiceHealth.Down, result.Message, clock.UtcNow);
+                    _refusedLogin = login;
+                    Stopped = true;
+                    var refused = new ClubLogStop { Email = email, Callsign = callsign, StoppedUtc = clock.UtcNow, Reason = result.Message };
+                    _stops.Save(profileId, refused);
+                    Status = new(ServiceHealth.Down, Describe(refused), clock.UtcNow);
                     return done;
                 default:
                     queue.Retry(item.Id, result.Message, clock.UtcNow + _backoff.DelayFor(item.Attempts + 1));
@@ -81,6 +101,10 @@ public sealed class ClubLogUploadService(ClubLogRealtimeClient client, QsoReposi
         }
         return done;
     }
+
+    /// <summary>The status line for a stop: what Club Log said and how to start uploads again.</summary>
+    public static string Describe(ClubLogStop stop) =>
+        FormattableString.Invariant($"Club Log refused the login at {stop.StoppedUtc:yyyy-MM-dd HH:mm} UTC ({stop.Reason}). Uploads are stopped until you change the email or Application Password, or resume them, in Settings.");
 
     // Changes whenever the email, password or callsign does, without keeping the password in memory longer than needed.
     private static string Fingerprint(string email, string password, string callsign) =>

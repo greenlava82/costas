@@ -260,6 +260,50 @@ public sealed class QrzTests : IDisposable
     }
 
     [Fact]
+    public async Task LookupAsync_ServerError_ThrowsAndCachesNothing()
+    {
+        _server.AddLookup("ZL2RPA", "Bob Smith", "Wellington", null, "New Zealand", "RE78");
+        _server.LookupError = "Lookup limit reached";
+        var cache = new CallsignCacheRepository(Db());
+        var svc = new CallsignLookupService(new QrzXmlClient(_http, () => ("user", "pass")), cache, _clock);
+        var ct = TestContext.Current.CancellationToken;
+
+        var act = () => svc.LookupAsync("ZL2RPA", ct);
+
+        (await act.Should().ThrowAsync<QrzException>()).Which.Message.Should().Contain("Lookup limit reached");
+        cache.GetFresh("ZL2RPA", _clock.UtcNow).Should().BeNull("a server error is not a miss and must not blank the call for a week");
+        _server.LookupError = null;
+        (await svc.LookupAsync("ZL2RPA", ct))!.Name.Should().Be("Bob Smith");
+    }
+
+    [Fact]
+    public async Task LookupAsync_PortableCallServerError_ThrowsAndCachesNothing()
+    {
+        _server.LookupError = "Your subscription has expired";
+        var cache = new CallsignCacheRepository(Db());
+        var svc = new CallsignLookupService(new QrzXmlClient(_http, () => ("user", "pass")), cache, _clock);
+
+        var act = () => svc.LookupAsync("ZL2RPA/P", TestContext.Current.CancellationToken);
+
+        (await act.Should().ThrowAsync<QrzException>()).Which.IsAuth.Should().BeFalse();
+        cache.GetFresh("ZL2RPA/P", _clock.UtcNow).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task LookupAsync_WrongPassword_ThrowsAuthWithQrzReason()
+    {
+        var cache = new CallsignCacheRepository(Db());
+        var svc = new CallsignLookupService(new QrzXmlClient(_http, () => ("user", "wrong")), cache, _clock);
+
+        var act = () => svc.LookupAsync("ZL2RPA", TestContext.Current.CancellationToken);
+
+        var ex = (await act.Should().ThrowAsync<QrzException>()).Which;
+        ex.IsAuth.Should().BeTrue();
+        ex.Message.Should().Contain("Username/password incorrect").And.NotContain("wrong");
+        cache.GetFresh("ZL2RPA", _clock.UtcNow).Should().BeNull();
+    }
+
+    [Fact]
     public async Task Lookup_DetailFields_MappedAndCached()
     {
         _server.AddLookup("W9RDL", "Robert Dale", "Springfield", "IL", "United States", "EN59", new Dictionary<string, string>

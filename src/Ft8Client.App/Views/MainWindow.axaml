@@ -30,7 +30,7 @@
           </ComboBox.SelectionBoxItemTemplate>
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="vm:BandChoiceViewModel">
-              <Grid ColumnDefinitions="48,Auto,Auto,Auto,Auto" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Name}">
+              <Grid ColumnDefinitions="48,Auto,Auto,Auto,Auto,Auto" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Name}">
                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Width="150" IsVisible="{Binding HasActivity}" VerticalAlignment="Center">
                   <Border Width="60" Height="6" CornerRadius="3" Background="{DynamicResource ControlBorderBrush}" VerticalAlignment="Center">
@@ -56,6 +56,8 @@
                            Foreground="{DynamicResource CautionBrush}" IsVisible="{Binding HasActivity}" ToolTip.Tip="{Binding NeedTip}" />
                 <TextBlock Grid.Column="4" Text="{Binding HuntText}" Margin="12,0,0,0" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
                            Foreground="{DynamicResource AccentBrush}" IsVisible="{Binding HasHunt}" ToolTip.Tip="{Binding HuntTip}" />
+                <TextBlock Grid.Column="5" Text="Receive only" Classes="secondary" Margin="12,0,0,0" FontSize="12" VerticalAlignment="Center"
+                           IsVisible="{Binding ReceiveOnly}" ToolTip.Tip="Your US licence class has no data privileges on this band (Settings › Station)." />
               </Grid>
             </DataTemplate>
           </ComboBox.ItemTemplate>
@@ -220,6 +222,21 @@
           <TextBlock DockPanel.Dock="Left" Text="Hunt list" FontWeight="SemiBold" Foreground="{DynamicResource CautionBrush}" VerticalAlignment="Center"
                      Margin="0,0,12,0" />
           <TextBlock Text="{Binding HuntText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding HuntText}" />
+        </DockPanel>
+      </DockPanel>
+    </Border>
+    <!-- Why is it quiet: after two received slots with no decodes, the likeliest reason and its fix. It only advises; Go to
+         tunes the radio only when the operator clicks it. Operate view only. -->
+    <Border IsVisible="{Binding QuietVisible}" Margin="16,0,16,8" Padding="12,8" CornerRadius="6"
+            Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CautionBrush}" BorderThickness="1"
+            AutomationProperties.Name="Why it is quiet" AutomationProperties.LiveSetting="Polite">
+      <DockPanel LastChildFill="True">
+        <Button DockPanel.Dock="Right" Content="{Binding QuietGoText}" Classes="accent" Command="{Binding QuietGoCommand}" IsVisible="{Binding QuietCanGo}"
+                ToolTip.Tip="Tune the radio to this frequency in USB data. Nothing is sent." AutomationProperties.Name="{Binding QuietGoText}" />
+        <DockPanel VerticalAlignment="Center" Margin="0,0,12,0">
+          <TextBlock DockPanel.Dock="Left" Text="Why it's quiet" FontWeight="SemiBold" Foreground="{DynamicResource CautionBrush}" VerticalAlignment="Center"
+                     Margin="0,0,12,0" />
+          <TextBlock Text="{Binding QuietText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding QuietText}" />
         </DockPanel>
       </DockPanel>
     </Border>

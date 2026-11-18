@@ -6,9 +6,9 @@
 // License, or (at your option) any later version. This program is distributed WITHOUT ANY WARRANTY;
 // see the GNU General Public License in LICENSE for details.
 
-namespace Ft8Client.Audio.Dsp;
+namespace Ft8Client.Core.Decoding;
 
-/// <summary>How the receive audio level looks, for Setup's input meter.</summary>
+/// <summary>How the receive audio level looks: Setup's input meter and the Operate screen's "why is it quiet" line.</summary>
 public enum InputLevelState
 {
     /// <summary>Nothing measured yet.</summary>

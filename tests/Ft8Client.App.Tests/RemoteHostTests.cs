@@ -37,6 +37,23 @@ public class RemoteHostTests
             .Should().Be("You will operate as K1GLV (Home profile) when you take control, if the station is idle.");
     });
 
+    [Fact]
+    public Task SwitchProfileForRemoteUser_LinkedProfileHasOwnLicence_TransmitGuardTakesIt() => WithRemoteHost((host, _, _) =>
+    {
+        host.Settings.Update(s =>
+        {
+            s.Profiles.Single(p => p.Id == "home").LicenceClass = "technician";
+            s.Profiles.Single(p => p.Id == "ash").LicenceClass = "extra";
+        });
+        host.Frequencies.Licence.Should().Be(Ft8Client.Core.Bands.UsLicenceClass.AmateurExtra);
+
+        host.SwitchProfileForRemoteUser("u1").Refusal.Should().BeNull();
+
+        host.Settings.Current.Profile.Callsign.Should().Be("K1GLV");
+        host.Frequencies.Licence.Should().Be(Ft8Client.Core.Bands.UsLicenceClass.Technician, "a linked user transmits within their own profile's class");
+        return Task.CompletedTask;
+    });
+
     // A whole app with two profiles (K1UTA in use), sign-in on, and the user "dan" linked to the Home profile (K1GLV).
     internal static async Task WithRemoteHost(Func<AppHost, HttpClient, int, Task> test)
     {

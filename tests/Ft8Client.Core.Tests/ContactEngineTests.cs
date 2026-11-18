@@ -456,6 +456,62 @@ public class ContactEngineTests
     }
 
     [Fact]
+    public void AnswerAllInTurn_CallerSinceHeardCallingCq_IsNotAnsweredWithOldReport()
+    {
+        var s = new Sim(new ContactSettings { AnswerAllInTurn = true });
+        s.E.CallCq(SlotParity.Even, Sim.T0);
+        s.Step();
+        s.Step("W7LIT K1ABC FN42", "W7LIT VE7HLB -05");
+        s.Step().Should().Be("K1ABC W7LIT -12");
+        s.Step("W7LIT K1ABC R-08", "CQ VE7HLB CN89");
+        s.E.Waiting.Should().BeEmpty("VE7HLB has moved on to calling CQ");
+        s.Step().Should().Be("K1ABC W7LIT RR73");
+        s.Step();
+        s.Step().Should().Be("CQ W7LIT DN40", "nobody is waiting, so CQ resumes");
+        s.Sent.Should().NotContain(x => x.Message.StartsWith("VE7HLB", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void OnDecodes_WaitingCallerHeardWorkingAnother_LeavesWaiting()
+    {
+        var s = new Sim();
+        s.Step();
+        s.Step("W7LIT VE7HLB CN89");
+        s.E.Waiting.Should().ContainSingle();
+        s.Step();
+        s.Step("K1ABC VE7HLB -07");
+        s.E.Waiting.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void OnDecodes_WaitingCallerHeardSigningOffWithAnotherInSameSlotAsCallingMe_StaysWaiting()
+    {
+        var s = new Sim();
+        s.Step();
+        s.Step("W7LIT VE7HLB CN89");
+        s.Step();
+        s.Step("W7LIT VE7HLB CN89", "CQ K1ABC FN42");
+        s.E.Waiting.Should().ContainSingle().Which.Call.Should().Be("VE7HLB");
+    }
+
+    [Fact]
+    public void AnswerCaller_StoppedContactSinceHeardCallingCq_IsNotResumed()
+    {
+        var s = new Sim(new ContactSettings { RetryLimit = 1 });
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        s.Step();
+        s.Step("W7LIT ZL2RPA -22");
+        s.Step().Should().Be("ZL2RPA W7LIT R-19");
+        s.E.Abandon(s.Now);
+        s.Step("W7LIT ZL2RPA -22");
+        s.E.Waiting.Should().ContainSingle().Which.AfterStop.Should().BeTrue();
+        s.Step();
+        s.Step("CQ ZL2RPA RF70");
+        s.E.Waiting.Should().BeEmpty();
+        s.E.AnswerCaller("ZL2RPA", s.Now).Should().BeFalse("there is no stale report left to answer");
+    }
+
+    [Fact]
     public void Waiting_AtMostFiveOldestFirst()
     {
         var s = new Sim();
@@ -799,6 +855,46 @@ public class ContactEngineTests
         s.Steps(5);
         s.E.View!.Outcome.Should().Be(ContactOutcome.NoReply);
         s.Step("W7LIT ZL2RPA -22");
+        s.E.Waiting.Should().ContainSingle().Which.AfterStop.Should().BeTrue();
+    }
+
+    [Fact]
+    public void OnDecodes_Rr73ForLastRetryDecodedAfterSlotStart_LogsWithoutSending()
+    {
+        var s = new Sim(new ContactSettings { RetryLimit = 1 });
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        s.Step();
+        s.Step("W7LIT ZL2RPA -22");
+        s.Step().Should().Be("ZL2RPA W7LIT R-19");
+        s.Step();
+        s.Step().Should().Be("ZL2RPA W7LIT R-19", "the last attempt");
+
+        // Slot 6 starts before the quick decode of slot 5 is in: the retry limit ends the contact first.
+        s.E.PlanTransmission(s.Start(6), Mode.Ft8, s.Start(6).AddSeconds(-0.5)).Should().BeNull();
+        s.E.View!.Outcome.Should().Be(ContactOutcome.NoReply);
+        var rr73 = HeardMessage.From(new Decode(s.Start(5), -12, 0.1, 1200, "W7LIT ZL2RPA RR73", false));
+        s.E.OnDecodes(s.Start(5), Mode.Ft8, [rr73], s.Start(6).AddSeconds(2));
+
+        s.Logs.Should().ContainSingle().Which.Call.Should().Be("ZL2RPA");
+        s.E.View!.Outcome.Should().Be(ContactOutcome.Logged);
+        s.E.Waiting.Should().BeEmpty();
+        s.E.PlanTransmission(s.Start(8), Mode.Ft8, s.Start(8).AddSeconds(-0.5)).Should().BeNull("nothing is sent for a contact the retry limit ended");
+    }
+
+    [Fact]
+    public void OnDecodes_Rr73InLaterSlotAfterRetryLimit_WaitsForOperator()
+    {
+        var s = new Sim(new ContactSettings { RetryLimit = 1 });
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        s.Step();
+        s.Step("W7LIT ZL2RPA -22");
+        s.Step();
+        s.Step();
+        s.Step();
+        s.Step();
+        s.Step();
+        s.Step("W7LIT ZL2RPA RR73");
+        s.Logs.Should().BeEmpty("a sign-off after the slot that answered my last attempt is late");
         s.E.Waiting.Should().ContainSingle().Which.AfterStop.Should().BeTrue();
     }
 

@@ -12,6 +12,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Ft8Client.App.Engine;
 using Ft8Client.App.Services;
+using Ft8Client.App.Services.Notifications;
+using Ft8Client.Core.Bands;
 using Ft8Client.Core.Contacts;
 using Ft8Client.Core.Logbook;
 using Ft8Client.Core.Ranking;
@@ -40,7 +42,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             Profiles.Add(new ProfileDraft
             {
-                Id = p.Id, Name = p.Name, Callsign = p.Callsign, Grid = p.Grid, Power = p.PowerWatts.ToString(CultureInfo.InvariantCulture),
+                Id = p.Id, Name = p.Name, Callsign = p.Callsign, Grid = p.Grid, Licence = SettingsMapper.Licence(p, s.Operating), Power = p.PowerWatts.ToString(CultureInfo.InvariantCulture),
                 OperatorName = p.OperatorName, Qth = p.Qth, RigDescription = p.RigDescription, Antenna = p.Antenna,
                 MaxPower = p.Rig.MaxPowerWatts?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 LogbookKey = host.Secrets.Get(SecretNames.QrzLogbookKey(p.Id)) ?? string.Empty,
@@ -51,6 +53,8 @@ public sealed partial class SettingsViewModel : ObservableObject
                 CloudlogKey = host.Secrets.Get(SecretNames.CloudlogKey(p.Id)) ?? string.Empty,
                 ClubLogEmail = p.ClubLog.Email, ClubLogUpload = p.ClubLog.UploadOnComplete,
                 ClubLogPassword = host.Secrets.Get(SecretNames.ClubLogPassword(p.Id)) ?? string.Empty,
+                ClubLogPasswordSaved = host.Secrets.Get(SecretNames.ClubLogPassword(p.Id)) ?? string.Empty,
+                ClubLogStop = p.ClubLog.Stop,
                 LotwEnabled = p.Lotw.Enabled, LotwUser = p.Lotw.Username ?? string.Empty,
                 LotwPassword = host.Secrets.Get(SecretNames.LotwPassword(p.Id)) ?? string.Empty,
                 LotwStationLocation = p.Lotw.StationLocation ?? string.Empty, LotwUpload = p.Lotw.UploadOnComplete,
@@ -59,6 +63,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _loadedProfile = s.Profile.Id;
         var active = Profiles.First(d => d.Id == s.Profile.Id);
         (Callsign, Grid, Power, MaxPower, LogbookKey) = (active.Callsign, active.Grid, active.Power, active.MaxPower, active.LogbookKey);
+        LicenceChoice = LicenceName(active.Licence);
         _shownProfile = active;
         SelectedProfile = active;
         TxGain = _loadedTxGain = TxLevelController.LevelFor(s.Profile.Audio, s.Operating.Band, s.Operating.Mode).ToString("0.0", CultureInfo.InvariantCulture);
@@ -89,7 +94,6 @@ public sealed partial class SettingsViewModel : ObservableObject
             .ToString("0.0", CultureInfo.InvariantCulture);
         DoubleClickSwitches = s.Operating.DoubleClickSwitches;
         CorrectClock = s.Operating.CorrectClock;
-        UsDataSegmentsOnly = s.Operating.UsDataSegmentsOnly;
         foreach (var t in SettingsMapper.ToRanking(s.Ranking).TierOrder) TierOrder.Add(new TierItem(t, StationText.Need(t)));
         PreferHearsMe = s.Ranking.PreferHearsMe;
         OnlyCallingCq = s.Ranking.OnlyCallingCq;
@@ -104,6 +108,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         HuntEmpty = HuntRows.Count == 0;
         HuntAllBands = s.Hunt.WatchAllBands;
         HuntSound = s.Hunt.Sound;
+        NotifyEnabled = s.Notifications.Enabled;
+        NotifyHunt = s.Notifications.Hunt;
+        NotifyCallers = s.Notifications.Callers;
+        NotifyOnlyInBackground = s.Notifications.OnlyInBackground;
+        NotifyBackend = host.Notifications.Backend is NullDesktopNotifier
+            ? "This computer has no notification centre Costas can use, so none are shown. The Hunt bar, mini mode and the chime still tell you."
+            : "Windows Focus Assist and your desktop's Do Not Disturb hold them back, as they do for any program.";
         var km = s.Hunt.NearbyKm;
         HuntNearby = (s.Appearance.Units == "km" ? km : (int)Math.Round(GreatCircleMiles(km))).ToString(CultureInfo.InvariantCulture);
         HuntNearbyUnit = s.Appearance.Units == "km" ? "km" : "miles";
@@ -138,6 +149,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         RefreshRemote();
         host.Remote.Changed += OnRemoteChanged;
         _remoteLoaded = true;
+        if (host.LogCopy is { } copy) copy.StatusChanged += OnLogCopyChanged;
+        RefreshLogCopy();
         SaveWav = s.Files.SaveWav;
         Retention = s.Files.RetentionDays.ToString(CultureInfo.InvariantCulture);
         Theme = s.Appearance.Theme;
@@ -238,6 +251,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (value is null || ReferenceEquals(value, _shownProfile)) return;
         StoreFields();
         (Callsign, Grid, Power, MaxPower, LogbookKey) = (value.Callsign, value.Grid, value.Power, value.MaxPower, value.LogbookKey);
+        LicenceChoice = LicenceName(value.Licence);
         ShowEqsl(value);
         KeyStatus = string.Empty;
         _shownProfile = value;
@@ -252,7 +266,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         var draft = new ProfileDraft
         {
             Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, Name = NewProfileName(Profiles.Select(p => p.Name)),
-            Callsign = from.Callsign, Grid = from.Grid, Power = from.Power, MaxPower = from.MaxPower,
+            Callsign = from.Callsign, Grid = from.Grid, Licence = from.Licence, Power = from.Power, MaxPower = from.MaxPower,
             OperatorName = from.OperatorName, Qth = from.Qth, RigDescription = from.RigDescription, Antenna = from.Antenna,
         };
         Profiles.Add(draft);
@@ -312,6 +326,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (_shownProfile is null) return;
         _shownProfile.Callsign = Callsign;
         _shownProfile.Grid = Grid;
+        _shownProfile.Licence = LicenceOf(LicenceChoice);
         _shownProfile.Power = Power;
         _shownProfile.MaxPower = MaxPower;
         _shownProfile.OperatorName = OperatorName;
@@ -345,6 +360,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         CloudlogStations.Clear();
         CloudlogStatus = string.Empty;
         (ClubLogEmail, ClubLogPassword, ClubLogUploadOnComplete) = (d.ClubLogEmail, d.ClubLogPassword, d.ClubLogUpload);
+        ClubLogStopText = d.ClubLogStop is { } stop && !d.ClubLogResume ? Ft8Client.Integrations.ClubLog.ClubLogUploadService.Describe(stop) : string.Empty;
         (LotwEnabled, LotwUser, LotwPassword, StationLocation, LotwUploadOnComplete) = (d.LotwEnabled, d.LotwUser, d.LotwPassword, d.LotwStationLocation, d.LotwUpload);
         (OperatorName, Qth, RigDescription, Antenna) = (d.OperatorName, d.Qth, d.RigDescription, d.Antenna);
     }
@@ -376,6 +392,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             p.Qth = d.Qth.Trim();
             p.RigDescription = d.RigDescription.Trim();
             p.Antenna = d.Antenna.Trim();
+            p.LicenceClass = SettingsMapper.LicenceKey(d.Licence);
             p.PowerWatts = Watts(d.Power, p.PowerWatts);
             p.Rig.MaxPowerWatts = string.IsNullOrWhiteSpace(d.MaxPower) ? null : Watts(d.MaxPower, p.Rig.MaxPowerWatts ?? 100);
             p.Eqsl.SyncEnabled = d.EqslSync;
@@ -384,6 +401,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             p.Cloudlog.Url = d.CloudlogUrl.Trim();
             p.Cloudlog.StationId = d.CloudlogStationId.Trim();
             p.Cloudlog.UploadOnComplete = d.CloudlogUpload;
+            if (ClubLogStopEnds(p.ClubLog.Stop, d)) p.ClubLog.Stop = null;
             p.ClubLog.Email = d.ClubLogEmail.Trim();
             p.ClubLog.UploadOnComplete = d.ClubLogUpload;
             p.Lotw.Enabled = d.LotwEnabled;
@@ -395,6 +413,16 @@ public sealed partial class SettingsViewModel : ObservableObject
         s.Profiles = result;
         s.ActiveProfile = active;
     }
+
+    /// <summary>
+    /// True when saving this draft ends a Club Log login stop: the operator resumed uploads, or changed the email,
+    /// Application Password or callsign Club Log refused. Club Log asks for no more requests until then.
+    /// </summary>
+    public static bool ClubLogStopEnds(ClubLogStop? stop, ProfileDraft d) =>
+        stop is not null
+        && (d.ClubLogResume
+            || !string.Equals(d.ClubLogPassword.Trim(), d.ClubLogPasswordSaved.Trim(), StringComparison.Ordinal)
+            || !stop.Covers(d.ClubLogEmail, d.Callsign));
 
     /// <summary>Call.</summary>
     [ObservableProperty]
@@ -659,9 +687,19 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool CorrectClock { get; set; }
 
-    /// <summary>Transmit only inside the US data segments.</summary>
+    /// <summary>The licence classes offered on the Station page, in <see cref="SettingsMapper.LicenceKeys"/> order.</summary>
+    public IReadOnlyList<string> LicenceChoices { get; } = [.. SettingsMapper.LicenceKeys.Select(k => LicenceName(k.Class))];
+
+    /// <summary>The shown profile's licence class, as named in <see cref="LicenceChoices"/>.</summary>
     [ObservableProperty]
-    public partial bool UsDataSegmentsOnly { get; set; }
+    public partial string LicenceChoice { get; set; } = string.Empty;
+
+    /// <summary>"Amateur Extra", "General"… or "Not US / don't check".</summary>
+    public static string LicenceName(UsLicenceClass c) => c == UsLicenceClass.NotUs ? "Not US / don't check" : UsDataSegments.Name(c);
+
+    /// <summary>The class a <see cref="LicenceChoices"/> name stands for; Extra for anything else.</summary>
+    public static UsLicenceClass LicenceOf(string? name) =>
+        SettingsMapper.LicenceKeys.Select(k => k.Class).FirstOrDefault(c => LicenceName(c) == name, UsLicenceClass.AmateurExtra);
 
     /// <summary>Clock block seconds.</summary>
     [ObservableProperty]
@@ -779,6 +817,25 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Chime and taskbar flash with an alert.</summary>
     [ObservableProperty]
     public partial bool HuntSound { get; set; }
+
+    /// <summary>Desktop notifications at all.</summary>
+    [ObservableProperty]
+    public partial bool NotifyEnabled { get; set; }
+
+    /// <summary>A notification for a Hunt list alert.</summary>
+    [ObservableProperty]
+    public partial bool NotifyHunt { get; set; }
+
+    /// <summary>A notification when a station calls me.</summary>
+    [ObservableProperty]
+    public partial bool NotifyCallers { get; set; }
+
+    /// <summary>Only while Costas is minimized, in mini mode or behind another window.</summary>
+    [ObservableProperty]
+    public partial bool NotifyOnlyInBackground { get; set; }
+
+    /// <summary>What the notifications page says about this computer's notification centre.</summary>
+    public string NotifyBackend { get; }
 
     /// <summary>How near (in the display unit) a PSK Reporter receiver must be.</summary>
     [ObservableProperty]
@@ -917,6 +974,22 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Upload each new contact to Club Log.</summary>
     [ObservableProperty]
     public partial bool ClubLogUploadOnComplete { get; set; }
+
+    /// <summary>Why Club Log uploads are stopped (it refused the login), or blank.</summary>
+    [ObservableProperty]
+    public partial string ClubLogStopText { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Resumes Club Log uploads after a refused login, once saved. Only for a login fixed on the Club Log site: Club Log
+    /// firewalls an address that keeps sending a login it refused.
+    /// </summary>
+    [RelayCommand]
+    private void ResumeClubLog()
+    {
+        if (_shownProfile is null) return;
+        _shownProfile.ClubLogResume = true;
+        ClubLogStopText = string.Empty;
+    }
 
     /// <summary>Why Club Log uploads cannot run in this build, or blank.</summary>
     public string ClubLogBuildNote => AppHost.ClubLogApiKey is null
@@ -1219,8 +1292,58 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private void OnRemoteChanged() => MainViewModel.Dispatch(RefreshRemote);
 
-    /// <summary>Called when the window closes: this view model stops following the mobile connection.</summary>
-    public void Detach() => _host.Remote.Changed -= OnRemoteChanged;
+    /// <summary>Called when the window closes: this view model stops following the mobile connection and the log copy.</summary>
+    public void Detach()
+    {
+        _host.Remote.Changed -= OnRemoteChanged;
+        if (_host.LogCopy is { } copy) copy.StatusChanged -= OnLogCopyChanged;
+    }
+
+    /// <summary>The backups folder, which holds the daily copies and the ADIF log copy.</summary>
+    public string BackupsFolder => _host.Paths.Backups;
+
+    /// <summary>The ADIF log copy's file names.</summary>
+    [ObservableProperty]
+    public partial string LogCopyFiles { get; set; } = string.Empty;
+
+    /// <summary>When the ADIF log copy was last written, or why it could not be.</summary>
+    [ObservableProperty]
+    public partial string LogCopyWritten { get; set; } = string.Empty;
+
+    /// <summary>True when the last write of the ADIF log copy failed.</summary>
+    [ObservableProperty]
+    public partial bool LogCopyFailed { get; set; }
+
+    /// <summary>The newest daily database copy.</summary>
+    [ObservableProperty]
+    public partial string DailyBackup { get; set; } = string.Empty;
+
+    /// <summary>Opens the backups folder in the file manager.</summary>
+    [RelayCommand]
+    private void OpenBackupsFolder()
+    {
+        if (!FolderOpener.Open(BackupsFolder)) Message = $"Could not open {BackupsFolder}.";
+    }
+
+    private void OnLogCopyChanged(LogCopyStatus _) => MainViewModel.Dispatch(RefreshLogCopy);
+
+    private void RefreshLogCopy()
+    {
+        var st = _host.LogCopy?.Status ?? new LogCopyStatus(BackupsFolder, [], null, null, null);
+        LogCopyFiles = LogCopyText.Files(st);
+        LogCopyWritten = LogCopyText.Written(st);
+        LogCopyFailed = st.Error is not null;
+        (string, DateTime)? newest = null;
+        try
+        {
+            newest = _host.Backup?.Newest();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Shown as no copy yet.
+        }
+        DailyBackup = LogCopyText.Daily(newest, _host.Simulating);
+    }
 
     private void RefreshRemote()
     {
@@ -1512,6 +1635,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Hunt.Targets = HuntRows.Select(r => HuntService.ToEntry(r.Target)).ToList();
             s.Hunt.WatchAllBands = HuntAllBands;
             s.Hunt.Sound = HuntSound;
+            s.Notifications.Enabled = NotifyEnabled;
+            s.Notifications.Hunt = NotifyHunt;
+            s.Notifications.Callers = NotifyCallers;
+            s.Notifications.OnlyInBackground = NotifyOnlyInBackground;
             var near = Int(HuntNearby, 50, 5000, 0);
             if (near > 0) s.Hunt.NearbyKm = HuntNearbyUnit == "km" ? near : (int)Math.Round(near * Core.Geo.GreatCircle.KmPerMile);
             s.Ranking.KeepCqCallersMinutes = KeepMinutesFor(KeepCqCallers);
@@ -1547,7 +1674,6 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Operating.CommandStartLimitMs = (int)Math.Round(Dbl(CommandStartLimit, 0, SettingsMapper.MaxCommandStartLimitMs / 1000.0, 3) * 1000);
             s.Operating.DoubleClickSwitches = DoubleClickSwitches;
             s.Operating.CorrectClock = CorrectClock;
-            s.Operating.UsDataSegmentsOnly = UsDataSegmentsOnly;
             s.Qrz.LogbookEnabled = LogbookEnabled;
             s.Qrz.LookupEnabled = !string.IsNullOrWhiteSpace(QrzUser) && !string.IsNullOrEmpty(QrzPassword);
             s.Qrz.UploadOnComplete = UploadOnComplete;

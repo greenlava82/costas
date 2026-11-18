@@ -19,8 +19,12 @@ namespace Ft8Client.Core.Neighbours;
 /// Null when the band is followed all the time; otherwise how long it was listened to in the window, and the spots are
 /// scaled up from that to the whole window.
 /// </param>
+/// <param name="ReachByContinent">
+/// Distinct receivers and senders per receiver continent, never scaled; null when not counted.
+/// </param>
 public sealed record BandOpening(string Band, int Spots, int Senders, IReadOnlyDictionary<string, int> SpotsByContinent,
-                                 IReadOnlyList<string> NeededEntities, TimeSpan? SampledFor = null)
+                                 IReadOnlyList<string> NeededEntities, TimeSpan? SampledFor = null,
+                                 IReadOnlyDictionary<string, ContinentReach>? ReachByContinent = null)
 {
     /// <summary>True when the spots are estimated from samples.</summary>
     public bool Estimated => SampledFor is not null;

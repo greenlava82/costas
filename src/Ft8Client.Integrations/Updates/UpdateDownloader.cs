@@ -10,24 +10,30 @@ using System.Security.Cryptography;
 
 namespace Ft8Client.Integrations.Updates;
 
-/// <summary>Downloads a release's installer and checks it against the published SHA-256 before anything runs it.</summary>
-public sealed class UpdateDownloader(HttpClient http)
+/// <summary>
+/// Downloads a release's installer and checks it against the published SHA-256 and, when a <paramref name="verifier"/> is
+/// given (Windows), its code signature (<see cref="InstallerTrust"/>), before anything runs it.
+/// <paramref name="expectedPublisher"/> is normally <see cref="InstallerTrust.ExpectedPublisher"/>.
+/// </summary>
+public sealed class UpdateDownloader(HttpClient http, IInstallerSignatureVerifier? verifier = null, string? expectedPublisher = InstallerTrust.ExpectedPublisher)
 {
     /// <summary>
     /// Downloads to <paramref name="folder"/> and returns the installer path. Throws <see cref="InvalidDataException"/> when
-    /// the release publishes no checksum or the file does not match it; a file that fails the check is deleted.
+    /// the release publishes no checksum, the installer's address is not HTTPS, the file does not match the checksum, or its
+    /// signature is refused; a file that fails a check is deleted.
     /// </summary>
     public async Task<string> DownloadAsync(ReleaseInfo release, string folder, IProgress<double>? progress, CancellationToken ct)
     {
         if (release.Sha256 is null) throw new InvalidDataException("This release has no checksum, so the download cannot be verified.");
         if (release.InstallerName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || release.InstallerName.Contains("..", StringComparison.Ordinal))
             throw new InvalidDataException("The installer name is not a plain file name.");
+        var url = UpdateUrls.RequireHttps(release.InstallerUrl);
         Directory.CreateDirectory(folder);
         var path = Path.Combine(folder, release.InstallerName);
         var partial = path + ".partial";
         try
         {
-            using (var resp = await http.GetAsync(new Uri(release.InstallerUrl), HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
+            using (var resp = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
             {
                 resp.EnsureSuccessStatusCode();
                 var total = resp.Content.Headers.ContentLength ?? release.InstallerSize;
@@ -51,6 +57,11 @@ public sealed class UpdateDownloader(HttpClient http)
             if (!string.Equals(actual, release.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("The downloaded installer does not match the published checksum.");
             File.Move(partial, path, overwrite: true);
+            if (verifier is not null && InstallerTrust.Refusal(verifier.Check(path), release.IsDevelopment, expectedPublisher) is { } refusal)
+            {
+                File.Delete(path);
+                throw new InvalidDataException(refusal);
+            }
             return path;
         }
         finally

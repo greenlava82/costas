@@ -54,6 +54,9 @@ public sealed class FakeQrzServer : HttpMessageHandler
     /// <summary>Every form posted, in order.</summary>
     public List<Dictionary<string, string>> Requests { get; } = [];
 
+    /// <summary>When set, every XML lookup answers with this session error (a lookup limit, a lapsed subscription).</summary>
+    public string? LookupError { get; set; }
+
     /// <summary>Number of XML logins performed.</summary>
     public int XmlLogins { get; private set; }
 
@@ -217,6 +220,8 @@ public sealed class FakeQrzServer : HttpMessageHandler
         if (q.GetValueOrDefault("s") != $"key{_session}")
             return head + "<Session><Error>Session Timeout</Error></Session></QRZDatabase>";
         var call = q.GetValueOrDefault("callsign", string.Empty);
+        if (LookupError is not null)
+            return head + $"<Session><Error>{WebUtility.HtmlEncode(LookupError)}</Error><Key>key{_session}</Key></Session></QRZDatabase>";
         if (!_lookups.TryGetValue(call, out var f))
             return head + $"<Session><Error>Not found: {call}</Error><Key>key{_session}</Key></Session></QRZDatabase>";
         var sb = new StringBuilder(head).Append("<Callsign>");

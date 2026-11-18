@@ -198,7 +198,7 @@ public sealed partial class LogViewModel : ObservableObject
     [ObservableProperty]
     public partial QsoEditViewModel? Editing { get; set; }
 
-    /// <summary>True while syncing.</summary>
+    /// <summary>True while syncing, importing or exporting.</summary>
     [ObservableProperty]
     public partial bool Syncing { get; set; }
 
@@ -391,27 +391,93 @@ public sealed partial class LogViewModel : ObservableObject
     [RelayCommand]
     private void CancelEdit() => Editing = null;
 
-    /// <summary>Imports an ADIF file.</summary>
-    public void Import(string path)
+    /// <summary>
+    /// Imports an ADIF file. The file is read and parsed and the contacts written on a worker thread, so Halt and Esc
+    /// stay responsive during a large import. A file or database error is reported in <see cref="Message"/> rather than
+    /// thrown: an exception reaching the UI thread's unhandled-error handler halts transmit.
+    /// </summary>
+    public async Task ImportAsync(string path)
     {
+        if (Syncing) return;
         var (profileId, call) = _profile();
-        var r = AdifImporter.Import(_qsos, File.ReadAllText(path), profileId, call, _countries);
-        Message = $"Imported {r.Imported}, merged {r.Merged} duplicates, skipped {r.Skipped}.";
+        Syncing = true;
+        Message = $"Importing {Path.GetFileName(path)}…";
+        try
+        {
+            var r = await Task.Run(() => AdifImporter.Import(_qsos, File.ReadAllText(path), profileId, call, _countries));
+            Message = $"Imported {r.Imported}, merged {r.Merged} duplicates, skipped {r.Skipped}.";
+        }
+        catch (Exception e) when (IsFileError(e))
+        {
+            Message = $"Could not import {Path.GetFileName(path)}: {e.Message}";
+            return;
+        }
+        finally
+        {
+            Syncing = false;
+        }
         Refresh();
         _changed();
     }
 
     /// <summary>
-    /// Exports the log to an ADIF file: the contacts made as the current profile's callsign, or every station's when
-    /// <see cref="AllStations"/> is chosen (another operator's export holds only their own contacts).
+    /// Exports the log to ADIF with QSL state, one file per station callsign (<see cref="AdifLogExport"/>): the contacts
+    /// made as the current profile's callsign, or every station's when <see cref="AllStations"/> is chosen (another
+    /// operator's export holds only their own contacts). One callsign goes to <paramref name="path"/>; with several, each
+    /// goes beside it with the callsign added to the name (<c>log-W7LIT.adi</c>), so no file mixes callsigns. The work runs
+    /// on a worker thread; a file or database error is reported in <see cref="Message"/> rather than thrown.
     /// </summary>
-    public void Export(string path)
+    public async Task ExportAsync(string path)
     {
+        if (Syncing) return;
+        Syncing = true;
+        Message = $"Exporting to {Path.GetFileName(path)}…";
+        var callsign = _profile().Callsign;
         var station = Station();
-        var rows = _qsos.List(new LogFilter(StationCallsign: station));
-        File.WriteAllText(path, AdifImporter.Export(rows, DateTime.UtcNow));
-        Message = station is null ? $"Exported {rows.Count} contacts." : $"Exported {rows.Count} contacts made as {station}.";
+        try
+        {
+            Message = await Task.Run(() =>
+            {
+                var now = DateTime.UtcNow;
+                var groups = AdifLogExport.ByStation(_qsos.List(new LogFilter(StationCallsign: station)));
+                if (groups.Count <= 1)
+                {
+                    var only = groups.Count == 1 ? groups[0] : new AdifLogExport.Group(station ?? callsign, []);
+                    Ft8Client.Data.Files.AtomicFile.WriteAllText(path, AdifLogExport.Document(only, now, "ADIF export"));
+                    return station is null
+                        ? $"Exported {only.Contacts.Count} contacts."
+                        : $"Exported {only.Contacts.Count} contacts made as {station}.";
+                }
+                var folder = Path.GetDirectoryName(path) ?? ".";
+                var stem = Path.GetFileNameWithoutExtension(path);
+                var ext = Path.GetExtension(path) is { Length: > 0 } e ? e : ".adi";
+                var names = new List<string>();
+                foreach (var g in groups)
+                {
+                    var name = AdifLogExport.FileName(stem, g.StationCallsign, ext);
+                    Ft8Client.Data.Files.AtomicFile.WriteAllText(Path.Combine(folder, name), AdifLogExport.Document(g, now, "ADIF export"));
+                    names.Add(name);
+                }
+                return $"Exported {groups.Sum(g => g.Contacts.Count)} contacts to {names.Count} files, one per callsign: {string.Join(", ", names)}.";
+            });
+        }
+        catch (Exception e) when (IsFileError(e))
+        {
+            Message = $"Could not export to {Path.GetFileName(path)}: {e.Message}";
+        }
+        finally
+        {
+            Syncing = false;
+        }
     }
+
+    /// <summary>
+    /// True for the errors an import or export can meet in normal use: the file cannot be read or written, its text
+    /// cannot be parsed, or the database refuses the write (full disk, locked file). Anything else is a bug and goes to
+    /// the unexpected-error handler.
+    /// </summary>
+    public static bool IsFileError(Exception e) =>
+        e is IOException or UnauthorizedAccessException or FormatException or OverflowException or System.Data.Common.DbException;
 
     /// <summary>Syncs with QRZ now.</summary>
     [RelayCommand]

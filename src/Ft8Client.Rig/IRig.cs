@@ -19,6 +19,12 @@ public interface IRig : IAsyncDisposable
     /// <summary>Reads frequency, mode, PTT and split.</summary>
     Task<RigState> GetStateAsync(CancellationToken ct);
 
+    /// <summary>
+    /// Reads the dial frequency alone: one short command, light enough to run during a transmission so the band-edge
+    /// check sees a VFO moved on the air. By default it reads the whole state.
+    /// </summary>
+    async Task<long> GetFrequencyAsync(CancellationToken ct) => (await GetStateAsync(ct).ConfigureAwait(false)).FrequencyHz;
+
     /// <summary>Sets the dial frequency.</summary>
     Task SetFrequencyAsync(long hz, CancellationToken ct);
 

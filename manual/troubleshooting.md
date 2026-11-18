@@ -121,6 +121,23 @@ band again in Costas to put it back.
 
 ### No decodes
 
+If nothing has decoded for two slots, the [Why it's quiet](operate.md#why-its-quiet) line on the Operate screen
+already says what Costas thinks is wrong:
+
+| The line says | What to do |
+| --- | --- |
+| *no audio is arriving from the radio's sound device* | Check the USB cable and that the radio is on; close any program holding the device |
+| *the radio's sound device sends only silence* | Turn up the radio's USB audio output and check it is not muted, in the radio or in Windows |
+| *the receive audio is too quiet* | Turn up the radio's USB audio output or the computer's recording level until Setup's input meter sits in the shaded band |
+| *the receive audio is clipping* | Turn the same levels down |
+| *the dial is on 14.090, not the usual FT8 frequency* | Click **Go to 14.074**, or tune back yourself. Ignore it if you moved on purpose (a DXpedition off the usual frequency) and are waiting for it |
+| *the radio is in LSB, and FT8 needs USB data* | Set USB data (DATA-U, USB-D) on the radio, or click **Go to 14.074**, which sets it |
+| *the decoder (jt9) is not running* or *is not working* | Open Diagnostics for the decoder's state. *jt9 not found*: reinstall Costas, or set the WSJT-X folder in Settings |
+| *your clock is 3.1 s off* | Sync the computer's clock, or turn on **Clock correction** in Settings › Transmitting |
+| *Audio, dial, radio mode, decoder and clock look right* | The band may simply be quiet or closed. Try another band; the band menu shows where stations near you are heard |
+
+If there is no line, or it does not help:
+
 1. Check **Audio** is green and the input is the radio's USB audio device (Station setup › Audio). The input meter
    should sit in the shaded band.
 2. Check the radio is on an FT8 frequency (14.074 MHz on 20 m) in USB or USB-D, with a wide enough filter (about
@@ -154,9 +171,12 @@ Costas does not know your log yet. Add your QRZ logbook API key in [Settings ›
 | --- | --- |
 | *Your clock is off by 2.4 s. Transmitting is blocked above 2 s.* | Sync the Windows clock. With **Clock correction** on, Costas fixes this itself once a time server answers; if it cannot reach one, or the clock is off by more than a minute, it can't. The limit is in Settings › Transmitting › Clock limit |
 | *Stopped by watchdog* | You had not touched the app for 6 minutes (3 from the phone). Any contact being answered was finished first. Click Call or Call CQ again |
-| *… is outside the US data segments on 20 m* | US rules allow FT8 only in part of each band (below 14.150 MHz on 20 m, 7.125 MHz on 40 m, 3.600 MHz on 80 m, and so on). Tune back to an FT8 frequency. Licensed outside the US? Turn off **Settings › Transmitting › US data segments only** |
+| *Not sent: your General licence allows data on 20 m only on 14.025-14.150 MHz, and this signal would take …* | The signal (dial plus audio offset, plus its width) is outside the part of the band where your US licence class may send data. Tune or move the offset back inside the limits it gives; Costas never moves it for you. If the class is wrong, or you are licensed outside the US, change **Settings › Station › US licence class** (Not US checks only the band limits) |
+| *Not sent: your Technician licence doesn't allow data on 20 m, so the band is receive only for you* | A Technician may send FT8 and other data only on 10 m (28.000 to 28.300 MHz), 6 m and 2 m. You can listen on the band; to transmit, change band. If you hold a higher class, choose it in **Settings › Station › US licence class** |
 | *… cannot be sent …* | The message cannot be encoded exactly as shown, for example a callsign or free text FT8 cannot carry. Costas never changes a message silently; shorten or change it |
 | No radio set up | See *Radio not connected* above |
+
+![A transmission refused by the licence class](images/refused-licence-class.png)
 
 ## QRZ
 

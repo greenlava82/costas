@@ -21,6 +21,9 @@ public sealed class HostTuning(AppHost host) : IRemoteTuning
     public Task SetBandAsync(string band, Mode mode) => host.SetBandAsync(band, mode);
 
     /// <inheritdoc />
+    public Task<string?> TuneDialAsync(long hz) => host.TuneDialAsync(hz);
+
+    /// <inheritdoc />
     public void SetTxOffset(int? hz)
     {
         host.Session.SetTxOffset(hz);

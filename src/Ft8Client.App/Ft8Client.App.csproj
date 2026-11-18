@@ -20,6 +20,8 @@
   </ItemGroup>
   <ItemGroup>
     <AvaloniaResource Include="Assets\costas.ico" />
+    <!-- The icon desktop notifications show (a file: Windows' AppUserModelId registration and D-Bus both take a path). -->
+    <None Include="Assets\costas-256.png" Link="costas.png" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="Remote\index.html" LogicalName="Ft8Client.App.Remote.index.html" />
     <!-- Home-screen app: the manifest and icons (drawn by scripts/make-icon.py). -->
     <EmbeddedResource Include="Remote\manifest.webmanifest" LogicalName="Ft8Client.App.Remote.manifest.webmanifest" />
@@ -71,6 +73,8 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Serilog" Version="4.4.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <!-- Linux desktop notifications over D-Bus. The version Avalonia.FreeDesktop is built against: a newer 0.x could change the API it uses. -->
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.94.1" />
     <PackageReference Include="Velopack" Version="1.2.161" />
   </ItemGroup>
 </Project>

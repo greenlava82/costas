@@ -38,6 +38,9 @@ public sealed class AppSettings
     /// <summary>The Hunt list.</summary>
     public HuntOptions Hunt { get; set; } = new();
 
+    /// <summary>Desktop notifications for Hunt list alerts and callers.</summary>
+    public NotificationOptions Notifications { get; set; } = new();
+
     /// <summary>PSK Reporter.</summary>
     public PskReporterOptions PskReporter { get; set; } = new();
 
