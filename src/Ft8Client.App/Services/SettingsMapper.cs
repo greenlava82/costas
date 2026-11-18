@@ -51,7 +51,7 @@ public static class SettingsMapper
                 FreeTextAfter = s.Operating.FreeTextAfter,
                 AutoLog = s.Operating.AutoLog,
                 Contest = ContestOf(s.Operating.Contest),
-                ContestExchange = s.Operating.ContestExchanges.GetValueOrDefault(s.Operating.Contest) ?? string.Empty,
+                ContestExchange = s.Profile.ContestExchanges.GetValueOrDefault(s.Operating.Contest) ?? string.Empty,
                 AnswerAllInTurn = s.Operating.AnswerAllInTurn,
                 KeepCallingWhenBusy = s.Operating.KeepCallingWhenBusy,
             },

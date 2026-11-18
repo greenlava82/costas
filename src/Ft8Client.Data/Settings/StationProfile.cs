@@ -37,6 +37,12 @@ public sealed class StationProfile
     /// <summary>This station's LoTW account: confirmations and TQSL uploads.</summary>
     public LotwAccountOptions Lotw { get; set; } = new();
 
+    /// <summary>
+    /// My exchange for each contest (by <c>ContestId</c> name), as typed: <c>UT</c>, <c>DX</c>, <c>1D UT</c>. Per profile:
+    /// the state, class and section belong to the operator and where they are.
+    /// </summary>
+    public Dictionary<string, string> ContestExchanges { get; set; } = [];
+
     /// <summary>Radio control.</summary>
     public RigSettings Rig { get; set; } = new();
 

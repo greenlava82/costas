@@ -272,7 +272,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         var from = SelectedProfile ?? Profiles[0];
         var draft = new ProfileDraft
         {
-            Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, Name = NewProfileName(Profiles.Select(p => p.Name), "Operator"),
+            Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, ForAnotherOperator = true,
+            Name = NewProfileName(Profiles.Select(p => p.Name), "Operator"),
             Grid = from.Grid, Power = from.Power, MaxPower = from.MaxPower,
             Qth = from.Qth, RigDescription = from.RigDescription, Antenna = from.Antenna,
         };
@@ -366,6 +367,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             {
                 var source = old.FirstOrDefault(x => x.Id == d.CopyOf) ?? old.FirstOrDefault() ?? new StationProfile();
                 p = source.CopyAs(d.Id, d.Name);
+                if (d.ForAnotherOperator) p.ContestExchanges = [];
             }
             p.Name = string.IsNullOrWhiteSpace(d.Name) ? p.Name : d.Name.Trim();
             p.Callsign = d.Callsign.Trim().ToUpperInvariant();

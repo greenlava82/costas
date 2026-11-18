@@ -162,7 +162,8 @@ public sealed class SettingsStore(string path)
     /// <summary>
     /// Brings older files up to <see cref="AppSettings.CurrentSchema"/>. Schema 0 (pre-release) had the profile's
     /// call and grid at the top level and no schema field. Schema 1 could hold band transmit levels walked down to
-    /// silence by a misread ALC. Schema 2 had one LoTW account for every station profile.
+    /// silence by a misread ALC. Schema 2 had one LoTW account for every station profile, schema 3 one set of contest
+    /// exchanges.
     /// </summary>
     public static void Migrate(JsonObject node)
     {
@@ -197,6 +198,22 @@ public sealed class SettingsStore(string path)
             MoveLotwAccountIntoProfiles(node);
             node["schema"] = 3;
         }
+        if (schema < 4)
+        {
+            MoveContestExchangesIntoProfiles(node);
+            node["schema"] = 4;
+        }
+    }
+
+    // Schema 4: the contest exchanges (state, class, section) moved from the operating settings into each station profile.
+    // Every profile had been sending the same ones, so each gets a copy.
+    private static void MoveContestExchangesIntoProfiles(JsonObject node)
+    {
+        if (node["operating"] is not JsonObject operating || operating["contestExchanges"] is not JsonObject shared) return;
+        operating.Remove("contestExchanges");
+        if (shared.Count == 0 || node["profiles"] is not JsonArray profiles) return;
+        foreach (var p in profiles.OfType<JsonObject>())
+            p["contestExchanges"] ??= shared.DeepClone();
     }
 
     // Schema 3: the LoTW account (login, Station Location, upload on log) moved from the shared LoTW settings into each

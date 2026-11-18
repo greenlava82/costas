@@ -139,6 +139,27 @@ public class DatabaseAndSettingsTests
     }
 
     [Fact]
+    public void SettingsStore_SchemaThree_MovesContestExchangesIntoEveryProfile()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");
+        File.WriteAllText(path, """
+            { "schema": 3, "profiles": [ { "id": "home", "callsign": "W7LIT" }, { "id": "op", "callsign": "K0GST", "contestExchanges": { "FieldDay": "1D ID" } } ],
+              "operating": { "contest": "RttyRoundup", "contestExchanges": { "RttyRoundup": "ID", "FieldDay": "2A ID" } } }
+            """);
+        var store = new SettingsStore(path);
+        var s = store.Load();
+
+        s.Schema.Should().Be(AppSettings.CurrentSchema);
+        s.Profiles[0].ContestExchanges.Should().Equal(new Dictionary<string, string> { ["RttyRoundup"] = "ID", ["FieldDay"] = "2A ID" });
+        s.Profiles[1].ContestExchanges.Should().Equal(new Dictionary<string, string> { ["FieldDay"] = "1D ID" }, "a profile's own exchanges are kept");
+        s.Operating.Contest.Should().Be("RttyRoundup", "which contest is running stays shared");
+
+        store.Save(s);
+        System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!["operating"]!.AsObject().ContainsKey("contestExchanges").Should().BeFalse();
+        store.Load().Profiles[0].ContestExchanges["RttyRoundup"].Should().Be("ID");
+    }
+
+    [Fact]
     public void SettingsStore_SchemaTwoWithoutLotw_ProfilesStartWithLotwOff()
     {
         var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");

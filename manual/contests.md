@@ -29,6 +29,11 @@ An amber **CONTEST** bar now runs across the top of Operate with what you are se
 dupes. **Change exchange** opens the sheet again; **End contest** goes back to normal CQs and reports. Picking a plain
 CQ in the dropdown ends the contest too.
 
+Your exchange is kept with the station profile, so another operator using their own profile sends their own state,
+class and section. A copied profile (**New profile**) starts with the same exchanges; **New operator** starts with
+none. If you switch to a profile during a contest and it has no exchange for it, Costas asks for one at once; until
+it has one that can be sent, nothing is transmitted.
+
 Picking the same contest again within four days carries on the same contest log. After that it starts a new one.
 
 ## Working contacts

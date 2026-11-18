@@ -20,6 +20,12 @@ public sealed partial class ProfileDraft : ObservableObject
     /// <summary>For a profile added in this Settings window, the id of the profile it copies (radio and audio); else null.</summary>
     public string? CopyOf { get; init; }
 
+    /// <summary>
+    /// Added with New operator: takes only the station (radio, audio and the like) from <see cref="CopyOf"/>, not what
+    /// belongs to its operator, such as their contest exchanges.
+    /// </summary>
+    public bool ForAnotherOperator { get; init; }
+
     /// <summary>Display name.</summary>
     [ObservableProperty]
     public partial string Name { get; set; } = string.Empty;

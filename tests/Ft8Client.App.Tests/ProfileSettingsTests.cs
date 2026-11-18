@@ -76,6 +76,39 @@ public class ProfileSettingsTests
     }
 
     [Fact]
+    public void ApplyProfiles_NewProfiles_CopyKeepsExchangesNewOperatorStartsWithNone()
+    {
+        var s = Home();
+        s.Profile.ContestExchanges["FieldDay"] = "2A ID";
+        var drafts = new List<ProfileDraft>
+        {
+            new() { Id = "home", Name = "Home", Callsign = "N0CALL", Grid = "DN40", Power = "100" },
+            new() { Id = "p1", CopyOf = "home", Name = "Portable", Callsign = "N0CALL/P", Grid = "DN41", Power = "10" },
+            new() { Id = "p2", CopyOf = "home", ForAnotherOperator = true, Name = "Operator", Callsign = "K0GST", Grid = "DN40", Power = "100" },
+        };
+
+        SettingsViewModel.ApplyProfiles(s, drafts, "home");
+
+        s.Profiles[1].ContestExchanges.Should().ContainKey("FieldDay", "a portable setup is the same operator");
+        s.Profiles[2].ContestExchanges.Should().BeEmpty("another operator gives their own");
+        s.Profiles[2].Rig.Port.Should().Be("COM3");
+    }
+
+    [Theory]
+    [InlineData("", null, null)]
+    [InlineData("FieldDay", "2A ID", null)]
+    [InlineData("FieldDay", null, Core.Contests.ContestId.FieldDay)]
+    [InlineData("RttyRoundup", "ZZ", Core.Contests.ContestId.RttyRoundup)]
+    [InlineData("WwDigi", null, null)]
+    public void ExchangeMissing_ActiveProfile_OnlyWhenTheRunningContestCannotBeSent(string contest, string? exchange, Core.Contests.ContestId? missing)
+    {
+        var s = Home();
+        s.Operating.Contest = contest;
+        if (exchange is not null) s.Profile.ContestExchanges[contest] = exchange;
+        MainViewModel.ExchangeMissing(s).Should().Be(missing);
+    }
+
+    [Fact]
     public void NewProfileName_OperatorBase_NumbersFromTwo()
     {
         SettingsViewModel.NewProfileName(["Home"], "Operator").Should().Be("Operator");
