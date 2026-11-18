@@ -11,6 +11,7 @@ using Ft8Client.App.Engine;
 using Ft8Client.App.Remote;
 using Ft8Client.App.Services;
 using Ft8Client.Audio.Backends;
+using Ft8Client.Audio.Dsp;
 using Ft8Client.Audio.Timing;
 using Ft8Client.Core;
 using Ft8Client.Core.Bands;
@@ -949,7 +950,7 @@ public sealed class AppHost : IAsyncDisposable
         try
         {
             input = AudioBackend.OpenInput(id, 48_000);
-            var pump = new CapturePump(input, _recorder!);
+            var pump = NewPump(input, _recorder!, Keyboard?.Input);
             input.Stopped += OnInputStopped;
             // Current before it starts: a device that stops at once must find itself the one in use.
             (_input, _pump) = (input, pump);
@@ -966,6 +967,11 @@ public sealed class AppHost : IAsyncDisposable
             return ex.Message;
         }
     }
+
+    // Every new pump (start-up, a USB re-plug, a Setup input change) feeds the keyboard modes' continuous stream too;
+    // before the keyboard session exists it is wired up when that is made.
+    internal static CapturePump NewPump(IAudioInput input, SlotRecorder recorder, SpscRingBuffer? keyboardInput) =>
+        new(input, recorder) { Continuous = keyboardInput };
 
     private void OnInputStopped(object? sender, string why)
     {
