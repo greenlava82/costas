@@ -110,6 +110,11 @@ The phone page then shows a sign-in form. A sign-in lasts 30 days from the last 
 out** at the top of the page ends it. After five wrong passwords Costas makes you wait, starting at 30 seconds and
 growing to 15 minutes.
 
+Turning it off again also takes effect when you save: every signed-in phone is disconnected. One on your home network
+or Tailscale reconnects at once with no password, as an unnamed phone that operates as the active profile. One that
+comes through a reverse proxy is refused, because Costas never lets a proxy in without sign-in. Your users, their
+passwords and their profile links are kept for when you turn it back on, and every phone then signs in again.
+
 !!! warning "A password is only accepted where it travels encrypted"
     The page itself is plain HTTP, so Costas takes a password only through Tailscale or through your proxy over
     https. **A phone on plain home Wi-Fi cannot sign in**: open the Tailscale address instead (it works at home too,
@@ -126,6 +131,9 @@ Managing users, in the list under **Sign-in**:
   log, contest exchanges and logbook accounts (QRZ, LoTW, eQSL, Club Log, Wavelog). Make the profile first with
   **New operator** on the Station page. Leave it on **The profile in use** and the user operates as whichever
   profile is active.
+
+**Operates as** needs sign-in: with **Require a username and password** off, Costas cannot tell who is holding a
+phone, so the links are kept but do nothing, and every phone operates as whichever profile is active at the desk.
 
 Signing in does not switch the profile, so someone can sign in just to watch. While another profile is in use, the
 linked user's page says *You will operate as K1UTA (Ash profile) when you take control, if the station is idle.*
@@ -289,7 +297,8 @@ So that the station is shared knowingly, everyone already using it is told when 
   other phone shows a notice such as *Ash signed in on another device.* under the top bar, and the desk's bottom bar
   shows it for a minute.
 - **Taking control.** When someone takes control, the others see *Ash took control from Dan.* or *The desk took
-  control.*
+  control.* With sign-in off the phones have no names: *A phone took control from the desk.* or *A phone took control
+  from another phone.*
 
 The notices only inform; nothing has to be approved. Tap **✕** to dismiss one; they also go after ten minutes.
 
