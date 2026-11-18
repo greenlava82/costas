@@ -547,6 +547,7 @@ public sealed class AppHost : IAsyncDisposable
         Supervise("Audio device recovery", DeviceRecoveryLoopAsync);
         Supervise("Receive level", ReceiveLevelLoopAsync);
         if (!Simulating) Supervise("Log backup", BackupLoopAsync);
+        StartLogCopy();
         var confirmedBy = SettingsMapper.ConfirmationSource(s);
         var rttyPower = s.Operating.RttyPowerPercent;
         var correctClock = s.Operating.CorrectClock;
@@ -1335,6 +1336,21 @@ public sealed class AppHost : IAsyncDisposable
             }
             await Task.Delay(TimeSpan.FromHours(1), _cts.Token).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>The ADIF copy of the log in <see cref="AppPaths.Backups"/> (<see cref="LogCopyService"/>).</summary>
+    public LogCopyService? LogCopy { get; private set; }
+
+    // Starts the ADIF log copy. Unlike the daily database copies it also runs in simulation: it holds nothing the log
+    // does not, and the Settings page shows it. Every write to the log asks for a rewrite.
+    private void StartLogCopy()
+    {
+        var copy = LogCopy = new LogCopyService(new AdifLogMirror(() => Qsos.List(), Paths.Backups), Clock);
+        copy.StatusChanged += st => Session.SetService(ServiceNames.LogCopy, st.Error is null
+            ? new ServiceStatus(ServiceHealth.Ok, "ADIF log copy written", Clock.UtcNow)
+            : new ServiceStatus(ServiceHealth.Down, $"Could not write the ADIF log copy: {st.Error} Trying again{(st.NextTryUtc is { } t ? $" at {t.ToLocalTime():HH:mm}" : " later")}.", Clock.UtcNow));
+        Qsos.Changed += copy.Request;
+        Supervise("Log copy", () => copy.RunAsync(_cts.Token));
     }
 
     // Measures the PC clock against internet time at start and then hourly, every 15 minutes while correcting (a PC
