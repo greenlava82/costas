@@ -291,6 +291,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, ForAnotherOperator = true,
             Name = NewProfileName(Profiles.Select(p => p.Name), "Operator"),
+            // Their licence class is theirs to choose: the check stays off until they pick one.
+            Licence = UsLicenceClass.NotUs,
             Grid = from.Grid, Power = from.Power, MaxPower = from.MaxPower,
             Qth = from.Qth, RigDescription = from.RigDescription, Antenna = from.Antenna,
         };

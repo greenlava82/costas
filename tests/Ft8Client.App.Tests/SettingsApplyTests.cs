@@ -71,7 +71,7 @@ public class SettingsApplyTests
     });
 
     [Fact]
-    public Task RemoteUserProfile_LinkedThenTakesControl_SwitchesAndWindowDoesNotSwitchBack() => WithSettings((host, vm, _) =>
+    public Task RemoteUserProfile_LinkedThenOperateAs_SwitchesAndWindowDoesNotSwitchBack() => WithSettings((host, vm, _) =>
     {
         var home = vm.SelectedProfile!;
         vm.NewOperatorProfileCommand.Execute(null);
@@ -90,7 +90,7 @@ public class SettingsApplyTests
         host.Settings.Current.ActiveProfile.Should().Be(home.Id);
         host.Settings.Current.Remote.Users.Single().ProfileId.Should().Be(guest.Id);
 
-        // The guest's phone takes control while the station is idle.
+        // The guest taps Operate as on their phone while the station is idle.
         host.SwitchProfileForRemoteUser(row.Id).Should().Be(((string?)null, "K0GST (Operator profile)"));
         host.Settings.Current.Profile.Callsign.Should().Be("K0GST");
         host.SwitchProfileForRemoteUser(row.Id).Should().Be(((string?)null, (string?)null), "already in use");
@@ -114,6 +114,7 @@ public class SettingsApplyTests
     {
         vm.OperatorName = "Dan";
         vm.Qth = "Boise ID";
+        vm.LicenceChoice = SettingsViewModel.LicenceName(Ft8Client.Core.Bands.UsLicenceClass.Technician);
         vm.LotwEnabled = true;
         vm.LotwUser = "N0CALL";
         vm.EqslUser = "n0call";
@@ -132,6 +133,7 @@ public class SettingsApplyTests
         vm.LotwEnabled.Should().BeFalse();
         vm.LotwUser.Should().BeEmpty();
         vm.EqslUser.Should().BeEmpty();
+        vm.LicenceChoice.Should().Be("Not US / don't check", "the licence check is off until the new operator chooses a class");
 
         // Save asks for the new operator's callsign first.
         vm.ApplyCommand.Execute(null);
@@ -147,6 +149,7 @@ public class SettingsApplyTests
         s.Profile.OperatorName.Should().Be("Ash");
         s.Profile.Rig.Should().BeEquivalentTo(s.Profiles.Single(p => p.Id == home.Id).Rig, "the same radio");
         s.Profile.Lotw.Username.Should().BeNull();
+        s.Profile.LicenceClass.Should().Be("none");
         s.Profiles.Single(p => p.Id == home.Id).OperatorName.Should().Be("Dan", "the first operator's name stays theirs");
 
         // Each profile shows its own name again.

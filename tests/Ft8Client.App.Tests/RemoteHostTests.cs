@@ -22,19 +22,31 @@ namespace Ft8Client.App.Tests;
 public class RemoteHostTests
 {
     [Fact]
-    public Task State_LinkedUserAnotherProfileInUse_CarriesTheProfileNote() => WithRemoteHost(async (host, http, port) =>
+    public Task State_LinkedUserAnotherProfileInUse_OffersOperateAsThenSwitchesOnlyWhenTapped() => WithRemoteHost(async (host, http, port) =>
     {
         var token = await LoginAsync(http);
         using var ws = new ClientWebSocket();
         await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{port}/ws"), TestContext.Current.CancellationToken);
-        await ws.SendAsync(JsonSerializer.SerializeToUtf8Bytes(new { type = "hello", token }), WebSocketMessageType.Text, true, TestContext.Current.CancellationToken);
-        JsonElement state;
-        do state = await ReceiveAsync(ws);
-        while (state.GetProperty("type").GetString() != "state");
+        await SendAsync(ws, new { type = "hello", token });
+        var state = (await NextAsync(ws, "state")).GetProperty("state");
 
-        state.GetProperty("state").GetProperty("myCall").GetString().Should().Be("K1UTA");
-        state.GetProperty("state").GetProperty("profileNote").GetString()
-            .Should().Be("You will operate as K1GLV (Home profile) when you take control, if the station is idle.");
+        state.GetProperty("myCall").GetString().Should().Be("K1UTA");
+        var profile = state.GetProperty("profile");
+        profile.GetProperty("inUse").GetString().Should().Be("K1UTA (K1UTA profile)");
+        profile.GetProperty("mineCall").GetString().Should().Be("K1GLV");
+        profile.GetProperty("onMine").GetBoolean().Should().BeFalse();
+
+        // Calling CQ does not switch: it is refused until the user taps Operate as.
+        await SendAsync(ws, new { type = "cq" });
+        (await ReplyAsync(ws)).Should().Be("Not done: the station is on K1UTA (K1UTA profile). Tap Operate as K1GLV first.");
+        host.Settings.Current.Profile.Callsign.Should().Be("K1UTA");
+        host.Session.Snapshot.CallingCq.Should().BeFalse();
+
+        await SendAsync(ws, new { type = "switchProfile" });
+        (await ReplyAsync(ws)).Should().BeNull();
+        host.Settings.Current.Profile.Callsign.Should().Be("K1GLV");
+        host.Session.Snapshot.CallingCq.Should().BeFalse("switching sends nothing");
+        host.Remote.Control.Notices.ForDesk(host.Clock.UtcNow).Should().Be("dan switched the station to K1GLV (Home profile).");
     });
 
     [Fact]
@@ -113,6 +125,31 @@ public class RemoteHostTests
                 await Task.Delay(100, TestContext.Current.CancellationToken);
             }
         }
+    }
+
+    private static Task SendAsync(ClientWebSocket ws, object message) =>
+        ws.SendAsync(JsonSerializer.SerializeToUtf8Bytes(message), WebSocketMessageType.Text, true, TestContext.Current.CancellationToken);
+
+    // The next message of a type, skipping the others (states keep coming).
+    private static async Task<JsonElement> NextAsync(ClientWebSocket ws, string type)
+    {
+        for (var i = 0; i < 200; i++)
+        {
+            var m = await ReceiveAsync(ws);
+            if (m.GetProperty("type").GetString() == type) return m;
+        }
+        throw new TimeoutException($"No {type} message");
+    }
+
+    // The station's answer to a command: the state sent back with its note (null when it was carried out).
+    private static async Task<string?> ReplyAsync(ClientWebSocket ws)
+    {
+        for (var i = 0; i < 200; i++)
+        {
+            var m = await ReceiveAsync(ws);
+            if (m.TryGetProperty("note", out var note)) return note.ValueKind == JsonValueKind.Null ? null : note.GetString();
+        }
+        throw new TimeoutException("No reply");
     }
 
     internal static async Task<JsonElement> ReceiveAsync(ClientWebSocket ws)
