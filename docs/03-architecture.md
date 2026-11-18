@@ -31,7 +31,7 @@ A headless core owns audio, timing, the radio, station state and contact state. 
 | `Ft8Client.Decoding` | `IDecoder`, `Jt9Decoder` (process host), output parser, WAV writer | Core |
 | `Ft8Client.Rig` | `IRig`, `RigctldRig` (process host and TCP client), `SimulatedRig`, serial port scan | Core |
 | `Ft8Client.Data` | SQLite schema and migrations, repositories, ADIF reader and writer, settings, secret store, `LogIndex` | Core |
-| `Ft8Client.Integrations` | QRZ logbook client, QRZ XML lookup, PSK Reporter feed, query and uploader, WSJT-X UDP broadcaster, SNTP check | Core, Data |
+| `Ft8Client.Integrations` | QRZ logbook client, QRZ XML lookup, PSK Reporter feed, query and uploader, Reverse Beacon Network and DX cluster telnet clients, WSJT-X UDP broadcaster, SNTP check | Core, Data |
 | `Ft8Client.App` | Avalonia views and view models, `Session` composition, simulation wiring | all |
 
 ## Key interfaces (in Core unless noted)
@@ -98,7 +98,7 @@ When transmitting in a slot, nothing is recorded or decoded for that slot.
 - **Audio threads** (WASAPI callbacks, PortAudio's blocking read and write threads on Linux): copy samples to or from a single-producer single-consumer ring buffer. No allocation, locks, logging or exceptions.
 - **Slot thread**: one dedicated thread drives `SlotClock` with a high-resolution timer and schedules PTT and Tx start. It never waits on I/O.
 - **Session work queue** (`WorkQueue`): one thread that runs, in order, what follows the start of a transmission or a slot: the log write, the journal and the snapshot rebuild. The slot thread only posts to it (`Session.Defer`), so a locked database or a slow disk cannot delay PTT release or the next slot's marks.
-- **Worker tasks**: decoding, rig polling (1 s), QRZ, PSK Reporter, database writes. All async, all cancellable.
+- **Worker tasks**: decoding, rig polling (1 s), QRZ, PSK Reporter, the RBN and DX cluster telnet connections, database writes. All async, all cancellable.
 - **UI thread**: rendering only. Snapshots are immutable, so no locks are shared with the core.
 
 ## Processes
@@ -121,6 +121,7 @@ Required from Milestone 0 so that everything can be built and tested without a r
 - Audio output goes to a null sink that records what would have been sent, for assertions.
 - `--simulate-partner` adds a scripted partner: when the app transmits to a station, the simulator injects that station's next message into the following slot (by synthesising it with the encoder and mixing it into the input), so full contacts can run end to end.
 - A fake PSK Reporter feed and a fake QRZ server (in-process HTTP listener) are used in integration tests and can be enabled in simulation.
+- DX cluster spots (`DxClusterService`) are replayed from `samples/dxcluster/spots.txt`, re-timed to now; no node is contacted and nothing is stored.
 
 ## Remote page
 

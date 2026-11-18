@@ -26,6 +26,9 @@ do a state or grid on an any-band entry.
   15 minutes, so the station is likely workable from your area. Reports in FT8, FT4, PSK31, PSK63 and RTTY count. Change the distance in Settings. This needs the live
   feed turned on in [Settings › PSK Reporter](settings.md#psk-reporter).
 
+DX cluster spots do not raise Hunt alerts. With [DX cluster spots](settings.md#who-to-call) on, needed stations the
+cluster spots are listed on the [Awards](awards.md#spotted-on-the-dx-cluster) view instead.
+
 ## What an alert looks like
 
 - A bar under the top bar: *Christmas Island (VK9X): VK9XA is on 17 m, heard 300 mi from you at -14 dB.* **Go to
