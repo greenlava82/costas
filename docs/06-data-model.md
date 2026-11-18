@@ -85,7 +85,7 @@ CREATE INDEX ix_qso_date        ON qso(qso_date_on);
 CREATE TABLE upload_queue (
   id            INTEGER PRIMARY KEY,
   qso_id        INTEGER NOT NULL REFERENCES qso(id) ON DELETE CASCADE,
-  target        TEXT    NOT NULL,             -- 'qrz'
+  target        TEXT    NOT NULL,             -- 'qrz', 'eqsl', 'clublog', 'cloudlog'; only qrz and eqsl have a qso state column
   attempts      INTEGER NOT NULL DEFAULT 0,
   next_try_utc  TEXT    NOT NULL,
   last_error    TEXT

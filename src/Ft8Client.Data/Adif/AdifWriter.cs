@@ -48,6 +48,7 @@ public static class AdifWriter
         return sb.ToString();
     }
 
+    // The length is in UTF-8 bytes, as QRZ, LoTW (TQSL), Club Log and Cloudlog read it, not in UTF-16 characters.
     private static void Field(StringBuilder sb, string name, string value) =>
-        sb.Append(CultureInfo.InvariantCulture, $"<{name}:{value.Length}>{value}\n");
+        sb.Append(CultureInfo.InvariantCulture, $"<{name}:{Encoding.UTF8.GetByteCount(value)}>{value}\n");
 }

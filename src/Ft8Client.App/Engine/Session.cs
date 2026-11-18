@@ -711,10 +711,13 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         bool held;
         TxHold? hold = null;
         var stopTune = false;
+        long haltEpoch;
         var txStart = slot + TimeSpan.FromMilliseconds(ModeInfo.TxStartMilliseconds(mode));
         var pttDue = txStart - _config.PttLead;
         lock (_gate)
         {
+            // Read with the decision: a Halt after it, before the transmission is installed, refuses it.
+            haltEpoch = _tx.HaltEpoch;
             var now = _clock.UtcNow;
             // An operator command (calling a station, CQ) may still start in the current slot well after its Tx start,
             // leaving out the part already past; anything automatic only within the late-start limit.
@@ -748,9 +751,10 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 _services[ServiceNames.Radio].Health == ServiceHealth.Down ? _services[ServiceNames.Radio].Message : null, true);
         }
         // A Tune tone still on the air gives way to the message the operator just asked for.
-        if (stopTune) _ = _tx.HaltAsync();
+        if (stopTune) _ = _tx.HaltForNextAsync(ref haltEpoch);
 
-        var prepared = _tx.Prepare(plan, mode, offset, guard, out var refusal, hold);
+        var prepared = _tx.Prepare(plan, mode, offset, guard, out var refusal, hold, haltEpoch);
+        if (prepared is null && refusal is null) return; // halted since the decision above: the Halt says why
         if (prepared is null)
         {
             lock (_gate)
