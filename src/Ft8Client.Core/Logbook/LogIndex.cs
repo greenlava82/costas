@@ -137,7 +137,13 @@ public sealed class LogIndex
     public bool CallWorkedAnywhere(string call) => _byCall.ContainsKey(Callsign.Normalize(call));
 
     /// <summary>True when the contact counts as confirmed under <see cref="Source"/>.</summary>
-    public bool Counts(LogContact c) => Source == ConfirmationSource.Lotw ? c.LotwConfirmed : c.Confirmed || c.LotwConfirmed;
+    public bool Counts(LogContact c) => Counts(c, Source);
+
+    /// <summary>True when the contact counts as confirmed under <paramref name="source"/>: LoTW only, or any confirmation.</summary>
+    /// <param name="c">The contact.</param>
+    /// <param name="source">Which confirmations count.</param>
+    public static bool Counts(LogContact c, ConfirmationSource source) =>
+        source == ConfirmationSource.Lotw ? c.LotwConfirmed : c.Confirmed || c.LotwConfirmed;
 
     /// <summary>True when this call has a contact on this band and mode.</summary>
     public bool CallWorked(string call, string band, string modeKey) =>

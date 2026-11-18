@@ -15,7 +15,7 @@ public class AwardBuilderTests
 {
     private static readonly DateTime D = new(2026, 6, 1, 12, 0, 0, DateTimeKind.Utc);
 
-    private static AwardSummary Build(params LogContact[] contacts) => AwardBuilder.Build(contacts, TestData.Countries);
+    private static AwardSummary Build(params LogContact[] contacts) => AwardBuilder.Build(contacts, TestData.Countries, ConfirmationSource.Any);
 
     private static LogContact C(string call, string band, string? entity, bool confirmed = false, string? region = null, string? grid = null) =>
         new(call, band, "FT8", grid, entity, region, confirmed, D);
@@ -138,5 +138,55 @@ public class AwardBuilderTests
     public void StateOf_EntityAndRegion_ReturnsWasState(string entity, string? region, string? expected)
     {
         AwardBuilder.StateOf(entity, region).Should().Be(expected);
+    }
+
+    // How the log stores each kind of confirmation: QRZ, eQSL and a paper card set only Confirmed; LoTW sets both flags.
+    private static LogContact Confirmed(string kind, string call, string entity, string? region = null) => kind switch
+    {
+        "lotw" => new(call, "20m", "FT8", null, entity, region, true, D, LotwConfirmed: true),
+        "eqsl" or "card" or "qrz" => new(call, "20m", "FT8", null, entity, region, true, D),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+    };
+
+    [Theory]
+    [InlineData("lotw", ConfirmationSource.Lotw, 1)]
+    [InlineData("eqsl", ConfirmationSource.Lotw, 0)]
+    [InlineData("card", ConfirmationSource.Lotw, 0)]
+    [InlineData("qrz", ConfirmationSource.Lotw, 0)]
+    [InlineData("lotw", ConfirmationSource.Any, 1)]
+    [InlineData("eqsl", ConfirmationSource.Any, 1)]
+    [InlineData("card", ConfirmationSource.Any, 1)]
+    [InlineData("qrz", ConfirmationSource.Any, 1)]
+    public void Build_ConfirmationKindAndSource_DxccCountsOnlyWhatTheSourceAccepts(string kind, ConfirmationSource source, int expected)
+    {
+        var s = AwardBuilder.Build([Confirmed(kind, "JA1AAA", "JA")], TestData.Countries, source);
+
+        s.Dxcc.Worked.Should().Be(1);
+        s.Dxcc.Confirmed.Should().Be(expected);
+        s.DxccByBand.Single(b => b.Band == "20m").Confirmed.Should().Be(expected);
+        s.Waz.Confirmed.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("lotw", ConfirmationSource.Lotw, 1)]
+    [InlineData("eqsl", ConfirmationSource.Lotw, 0)]
+    [InlineData("card", ConfirmationSource.Lotw, 0)]
+    [InlineData("lotw", ConfirmationSource.Any, 1)]
+    [InlineData("eqsl", ConfirmationSource.Any, 1)]
+    [InlineData("card", ConfirmationSource.Any, 1)]
+    public void Build_ConfirmationKindAndSource_WasCountsOnlyWhatTheSourceAccepts(string kind, ConfirmationSource source, int expected)
+    {
+        var s = AwardBuilder.Build([Confirmed(kind, "K1ABC", "K", "MA")], TestData.Countries, source);
+
+        s.Was.Worked.Should().Be(1);
+        s.Was.Confirmed.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Build_LotwSourceWithEqslOnlyContact_ListsItAsUnconfirmed()
+    {
+        var s = AwardBuilder.Build([Confirmed("eqsl", "JA1AAA", "JA")], TestData.Countries, ConfirmationSource.Lotw);
+
+        s.Dxcc.Unconfirmed.Select(i => i.Key).Should().Equal("JA");
     }
 }
