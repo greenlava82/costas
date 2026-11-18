@@ -357,12 +357,40 @@ public sealed partial class LogViewModel : ObservableObject
         _changed();
     }
 
-    /// <summary>Exports the log to an ADIF file.</summary>
+    /// <summary>
+    /// Exports the log to ADIF with QSL state, one file per station callsign (<see cref="AdifLogExport"/>): a log with one
+    /// callsign goes to <paramref name="path"/>; with several, each goes beside it with the callsign added to the name
+    /// (<c>log-W7LIT.adi</c>), so no file mixes callsigns.
+    /// </summary>
     public void Export(string path)
     {
-        var rows = _qsos.List();
-        File.WriteAllText(path, AdifImporter.Export(rows, DateTime.UtcNow));
-        Message = $"Exported {rows.Count} contacts.";
+        var now = DateTime.UtcNow;
+        var groups = AdifLogExport.ByStation(_qsos.List());
+        try
+        {
+            if (groups.Count <= 1)
+            {
+                var only = groups.Count == 1 ? groups[0] : new AdifLogExport.Group(_profile().Callsign, []);
+                Ft8Client.Data.Files.AtomicFile.WriteAllText(path, AdifLogExport.Document(only, now, "ADIF export"));
+                Message = $"Exported {only.Contacts.Count} contacts.";
+                return;
+            }
+            var folder = Path.GetDirectoryName(path) ?? ".";
+            var stem = Path.GetFileNameWithoutExtension(path);
+            var ext = Path.GetExtension(path) is { Length: > 0 } e ? e : ".adi";
+            var names = new List<string>();
+            foreach (var g in groups)
+            {
+                var name = AdifLogExport.FileName(stem, g.StationCallsign, ext);
+                Ft8Client.Data.Files.AtomicFile.WriteAllText(Path.Combine(folder, name), AdifLogExport.Document(g, now, "ADIF export"));
+                names.Add(name);
+            }
+            Message = $"Exported {groups.Sum(g => g.Contacts.Count)} contacts to {names.Count} files, one per callsign: {string.Join(", ", names)}.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Message = $"Could not export: {ex.Message}";
+        }
     }
 
     /// <summary>Syncs with QRZ now.</summary>

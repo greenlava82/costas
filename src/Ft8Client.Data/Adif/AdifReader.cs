@@ -12,7 +12,9 @@ namespace Ft8Client.Data.Adif;
 
 /// <summary>
 /// Reads ADIF 3.1 text (<c>&lt;name:len[:type]&gt;value</c>, <c>&lt;eor&gt;</c>, header ending <c>&lt;eoh&gt;</c>).
-/// Tolerates unknown fields, junk between fields and records, and a missing header.
+/// Tolerates unknown fields, junk between fields and records, and a missing header. A length may count characters or
+/// UTF-8 bytes: loggers differ for non-ASCII text, which ADIF 3.1 does not allow in ADI files (see
+/// <see cref="AdifLengthUnit"/>), so both are accepted.
 /// </summary>
 public static class AdifReader
 {
@@ -54,11 +56,38 @@ public static class AdifReader
             var colon2 = lenPart.IndexOf(':');
             if (colon2 >= 0) lenPart = lenPart[..colon2];
             if (!int.TryParse(lenPart, NumberStyles.None, CultureInfo.InvariantCulture, out var len) || len < 0) continue;
-            len = Math.Min(len, text.Length - pos);
+            len = Value(text, pos, len);
             current[name] = text.Substring(pos, len);
             pos += len;
         }
         if (current.Fields.Count > 0) records.Add(current);
         return records;
+    }
+
+    // How many characters of text from pos make up a value of the given length. For ASCII the two counts agree. Otherwise
+    // the length is taken as UTF-8 bytes when that ends the value where the next field or tag starts (only white space
+    // between), and as characters when it does not.
+    private static int Value(string text, int pos, int len)
+    {
+        var chars = Math.Min(len, text.Length - pos);
+        var bytes = 0;
+        var n = 0;
+        while (n < chars && bytes < len)
+        {
+            int size;
+            if (char.IsHighSurrogate(text[pos + n]) && pos + n + 1 < text.Length && char.IsLowSurrogate(text[pos + n + 1])) size = 2;
+            else size = 1;
+            bytes += System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(pos + n, size));
+            n += size;
+        }
+        if (n == chars) return chars;
+        if (bytes == len && EndsField(text, pos + n)) return n;
+        return chars;
+    }
+
+    private static bool EndsField(string text, int at)
+    {
+        while (at < text.Length && char.IsWhiteSpace(text[at])) at++;
+        return at == text.Length || text[at] == '<';
     }
 }
