@@ -63,6 +63,10 @@ These aren't new features, but each one is a known gap from the bug hunts or wor
 
 The item codes (T3, U4, D10 and so on) refer to the main and PSK/RTTY bug-hunt reports kept in the project's shared files (`reviews/main-bug-hunt.md`, `reviews/psk-rtty-bug-hunt.md`).
 
+## Done since this list
+
+- **"Why is it quiet" readout** (owner request 2026-11-18): done 2026-11-18. After two empty slots the Operate screen and the phone say the likeliest reason (audio, dial, radio mode, decoder, clock) with a Go to button for a frequency fix. See `02-ui-spec.md` "Why it's quiet".
+
 ## Left out on purpose
 
 - **Already rejected:** the "Why it didn't finish" replay, the Ctrl+K command bar, and standalone audio-offset or waterfall panels.

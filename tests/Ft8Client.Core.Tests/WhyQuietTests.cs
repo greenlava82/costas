@@ -152,7 +152,7 @@ public class WhyQuietTests
     {
         var r = WhyQuiet.Explain(Quiet() with { ClockOffsetSeconds = offset })!;
         r.Cause.Should().Be(QuietCause.Clock);
-        r.Text.Should().Be($"No decodes: your clock is {shown} s off, and decodes need it within 2 s. Sync the computer's clock, or turn on Clock correction in Settings.");
+        r.Text.Should().Be($"No decodes: your clock is {shown} s off, and decodes need it within 2 s. Sync the computer's clock, or turn on Clock correction in Settings › Transmitting.");
     }
 
     [Fact]

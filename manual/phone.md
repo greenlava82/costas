@@ -201,6 +201,12 @@ Under the top bar the page also shows the radio's SWR or ALC warning after a tra
 a line when QRZ, PSK Reporter or the audio device is not working, and the latest [Hunt list](hunt.md) alert of the
 last 15 minutes.
 
+When nothing has decoded for two slots it also shows the desk's [Why it's quiet](operate.md#why-its-quiet) line, with
+the same **Go to 14.074** button when the fix is a frequency. Tapping it tunes the station to the frequency in the
+desk's own line (the phone cannot pick another one), and takes control, as a band change does.
+
+![The Why it's quiet line on the phone](images/phone-quiet.png){ width="320" }
+
 ### On a tablet
 
 On an iPad or other tablet (any screen 760 pixels wide or more) the same address opens a fuller layout, close to the

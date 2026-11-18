@@ -72,7 +72,7 @@ public static class WhyQuiet
         {
             var off = Math.Abs(offset).ToString("0.0", CultureInfo.InvariantCulture);
             var limit = f.ClockLimitSeconds.ToString("0.#", CultureInfo.InvariantCulture);
-            return new(QuietCause.Clock, $"No decodes: your clock is {off} s off, and decodes need it within {limit} s. Sync the computer's clock, or turn on Clock correction in Settings.");
+            return new(QuietCause.Clock, $"No decodes: your clock is {off} s off, and decodes need it within {limit} s. Sync the computer's clock, or turn on Clock correction in Settings › Transmitting.");
         }
 
         // Not connected: the no-radio banner already says so and what to do.

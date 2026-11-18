@@ -370,3 +370,19 @@ Owner request 2026-10-12, via the review ideas. The operator lists targets (`Hun
 ## 17. LoTW confirmations in ranking
 
 `LogIndex.Build` takes a `ConfirmationSource`: `Lotw` (default) counts only `lotw_confirmed`; `Any` also counts QRZ, eQSL and card confirmations. When "count only confirmed" is on, stations that uploaded to LoTW in the last year (`LotwUsers`) sort ahead of others within the same tier, after calling me and heard in the last slot. Owner to confirm both defaults.
+
+## 18. Why it's quiet
+
+Owner request 2026-11-18. `WhyQuiet.Explain` (Core, pure) picks the Operate screen's one-line reason for no decodes from `QuietFacts`; the wording is in `02-ui-spec.md` ("Why it's quiet").
+
+- **Counting** (`QuietWatch`): each FT8 or FT4 slot the decoder returns adds one when it had no decodes (a failed decode counts as none) and resets to zero when it had any. A slot I transmitted in is skipped; the same slot twice (early pass, then full decode) counts once; a slot that began before start-up or a reset is partial and skipped. A band or mode change, or a dial move of more than 3 kHz (`Session.RetuneHz`), resets it. The line shows from 2 empty slots (`SlotsBeforeQuiet`).
+- **Nothing shown** in PSK and RTTY, with fewer than 2 empty slots, or with no radio set up and simulation off (rule 2).
+- **Order of confidence**, first match wins:
+    1. **Receive audio**: the settled level (`InputLevelTrend`: once a second, outside transmit time and two seconds after, classified by `InputLevelClassifier`, the same bands as Setup's meter: good -40 to -10 dBFS RMS, clipping at a peak of -1 dBFS or more; a state counts when it held for 7 of the last 10 readings). No audio, silence, too quiet and clipping are causes; too loud is not (decodes usually survive it).
+    2. **Dial**: more than 1 kHz (`DialToleranceHz`) from the frequency table's dial for the band and mode. Within 1 kHz most of the 3 kHz sub-band is still in the passband, so the dial alone would not silence the band. Only for a radio that reports its dial and mode over CAT (not VOX, whose dial is only what Costas was told) and is connected. Fix: Go to the usual dial.
+    3. **Radio mode**: the mode the radio reports is not `PKTUSB` or `USB` (plain USB is accepted: it is Costas's own fallback for radios that refuse data mode, and receives FT8 fine). Same conditions as the dial. Fix: Go to the usual dial, which also sets USB data.
+    4. **Decoder**: its status is Down (not running, for example jt9 not found) or Degraded (the slot's decode failed, as while it restarts).
+    5. **Clock**: the clock offset (SNTP after correction, or the decodes' median DT) beyond the clock limit (Settings › Transmitting, default 2 s), the same limit that blocks transmit.
+    6. **Radio not connected**: nothing; the no-radio banner already says so.
+    7. Otherwise **nothing found**: the band may just be quiet.
+- The readout never changes rig state. Only the operator's click on its Go to button tunes, through `AppHost.TuneDialAsync`.

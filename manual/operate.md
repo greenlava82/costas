@@ -60,6 +60,32 @@ Two banners can appear under the top bar:
 A **Hunt list** bar appears below them when a station on your [Hunt list](hunt.md) is heard, with **Go to** *band*
 and **Dismiss**.
 
+## Why it's quiet
+
+When FT8 or FT4 has decoded nothing for two slots in a row (30 seconds in FT8, 15 in FT4), a line appears under the
+top bar with the most likely reason and, where there is one, the fix. Two slots, so that both the even and the odd
+slot have passed with nothing heard. Slots you transmitted in don't count, and changing band, mode or frequency starts
+the count again. The line goes as soon as anything is decoded.
+
+![The Why it's quiet line, with the dial off the usual frequency](images/operate-quiet.png)
+
+Costas checks, in this order: the receive audio (no audio, silence, too quiet or clipping, measured the same way as
+the input meter in Station setup), the dial (more than 1 kHz from the band's usual FT8 or FT4 frequency), the
+radio's mode (anything other than USB data or USB), the decoder, and your clock (off by more than the clock limit,
+2 s unless you changed it). The first one that is wrong is shown. If everything looks right it says so: the band may
+just be quiet.
+
+![Nothing wrong: the band is quiet](images/quiet-band.png)
+
+When the fix is a frequency, the line has a **Go to 14.074** button (with the band's real frequency). Click it and
+Costas tunes the radio there in USB data, exactly as if you had typed the frequency in the
+[frequency menu](#typing-a-frequency). Nothing happens to your radio until you click: the line only gives advice. The
+button is hidden while you are transmitting.
+
+The line is not shown when no radio is set up (Costas is not receiving anything then), and when the radio is not
+connected the yellow *Radio not connected* banner explains instead. It is shown on the Operate view only, and on the
+[phone page](phone.md). PSK and RTTY have no slots, so they don't show it.
+
 ## Big and small windows
 
 Costas picks one of two layouts for the Operate view from the size of its window, and switches as you resize it:
