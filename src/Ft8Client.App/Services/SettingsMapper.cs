@@ -8,6 +8,7 @@
 
 using Ft8Client.App.Engine;
 using Ft8Client.Core;
+using Ft8Client.Core.Bands;
 using Ft8Client.Core.Keyboard;
 using Ft8Client.Core.Contacts;
 using Ft8Client.Core.Logbook;
@@ -27,6 +28,34 @@ public static class SettingsMapper
     /// <summary>The contest named in settings, or <see cref="Core.Contests.ContestId.None"/>.</summary>
     public static Core.Contests.ContestId ContestOf(string? name) =>
         Enum.TryParse<Core.Contests.ContestId>(name, out var id) && Enum.IsDefined(id) ? id : Core.Contests.ContestId.None;
+
+    /// <summary>The stored names of the licence classes, in the order Settings offers them.</summary>
+    public static readonly IReadOnlyList<(string Key, UsLicenceClass Class)> LicenceKeys =
+    [
+        ("extra", UsLicenceClass.AmateurExtra),
+        ("advanced", UsLicenceClass.Advanced),
+        ("general", UsLicenceClass.General),
+        ("technician", UsLicenceClass.Technician),
+        ("none", UsLicenceClass.NotUs),
+    ];
+
+    /// <summary>
+    /// A profile's licence class. One not chosen yet follows the older "US data segments only" switch: Extra when on (the
+    /// default), not US when off. An unknown stored name is read as Extra, the narrowest guess that keeps today's check.
+    /// </summary>
+    public static UsLicenceClass Licence(StationProfile p, OperatingSettings o)
+    {
+        if (p.LicenceClass is not { } key) return o.UsDataSegmentsOnly ? UsLicenceClass.AmateurExtra : UsLicenceClass.NotUs;
+        foreach (var (k, c) in LicenceKeys)
+            if (string.Equals(k, key.Trim(), StringComparison.OrdinalIgnoreCase)) return c;
+        return UsLicenceClass.AmateurExtra;
+    }
+
+    /// <summary>The active profile's licence class.</summary>
+    public static UsLicenceClass Licence(AppSettings s) => Licence(s.Profile, s.Operating);
+
+    /// <summary>The stored name of a licence class.</summary>
+    public static string LicenceKey(UsLicenceClass c) => LicenceKeys.First(k => k.Class == c).Key;
 
     /// <summary>The session configuration for the active profile.</summary>
     public static SessionConfig ToConfig(AppSettings s)

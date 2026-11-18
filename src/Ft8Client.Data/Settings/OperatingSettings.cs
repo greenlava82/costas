@@ -125,7 +125,10 @@ public sealed class OperatingSettings
     /// <summary>Correct Costas's own clock from internet time when the PC clock is off (the PC clock is never changed).</summary>
     public bool CorrectClock { get; set; } = true;
 
-    /// <summary>Refuse to transmit outside the US data segments (FCC 97.305), besides the band limits. Off for other countries.</summary>
+    /// <summary>
+    /// Before licence classes (2026-11-18): refuse to transmit outside the US Extra data segments. Kept only to choose the
+    /// class of a profile that has none yet (<see cref="StationProfile.LicenceClass"/>); Settings no longer shows it.
+    /// </summary>
     public bool UsDataSegmentsOnly { get; set; } = true;
 
     /// <summary>Clock offset above which transmit is blocked, in seconds.</summary>

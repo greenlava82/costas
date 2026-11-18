@@ -12,6 +12,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Ft8Client.App.Engine;
 using Ft8Client.App.Services;
+using Ft8Client.Core.Bands;
 using Ft8Client.Core.Contacts;
 using Ft8Client.Core.Logbook;
 using Ft8Client.Core.Ranking;
@@ -40,7 +41,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             Profiles.Add(new ProfileDraft
             {
-                Id = p.Id, Name = p.Name, Callsign = p.Callsign, Grid = p.Grid, Power = p.PowerWatts.ToString(CultureInfo.InvariantCulture),
+                Id = p.Id, Name = p.Name, Callsign = p.Callsign, Grid = p.Grid, Licence = SettingsMapper.Licence(p, s.Operating), Power = p.PowerWatts.ToString(CultureInfo.InvariantCulture),
                 MaxPower = p.Rig.MaxPowerWatts?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 LogbookKey = host.Secrets.Get(SecretNames.QrzLogbookKey(p.Id)) ?? string.Empty,
                 EqslUser = host.Secrets.Get(SecretNames.EqslUsername(p.Id)) ?? string.Empty,
@@ -55,6 +56,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _loadedProfile = s.Profile.Id;
         var active = Profiles.First(d => d.Id == s.Profile.Id);
         (Callsign, Grid, Power, MaxPower, LogbookKey) = (active.Callsign, active.Grid, active.Power, active.MaxPower, active.LogbookKey);
+        LicenceChoice = LicenceName(active.Licence);
         _shownProfile = active;
         SelectedProfile = active;
         TxGain = _loadedTxGain = TxLevelController.LevelFor(s.Profile.Audio, s.Operating.Band, s.Operating.Mode).ToString("0.0", CultureInfo.InvariantCulture);
@@ -89,7 +91,6 @@ public sealed partial class SettingsViewModel : ObservableObject
             .ToString("0.0", CultureInfo.InvariantCulture);
         DoubleClickSwitches = s.Operating.DoubleClickSwitches;
         CorrectClock = s.Operating.CorrectClock;
-        UsDataSegmentsOnly = s.Operating.UsDataSegmentsOnly;
         foreach (var t in SettingsMapper.ToRanking(s.Ranking).TierOrder) TierOrder.Add(new TierItem(t, StationText.Need(t)));
         PreferHearsMe = s.Ranking.PreferHearsMe;
         OnlyCallingCq = s.Ranking.OnlyCallingCq;
@@ -239,6 +240,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (value is null || ReferenceEquals(value, _shownProfile)) return;
         StoreFields();
         (Callsign, Grid, Power, MaxPower, LogbookKey) = (value.Callsign, value.Grid, value.Power, value.MaxPower, value.LogbookKey);
+        LicenceChoice = LicenceName(value.Licence);
         ShowEqsl(value);
         KeyStatus = string.Empty;
         _shownProfile = value;
@@ -253,7 +255,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         var draft = new ProfileDraft
         {
             Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, Name = NewProfileName(Profiles.Select(p => p.Name)),
-            Callsign = from.Callsign, Grid = from.Grid, Power = from.Power, MaxPower = from.MaxPower,
+            Callsign = from.Callsign, Grid = from.Grid, Licence = from.Licence, Power = from.Power, MaxPower = from.MaxPower,
         };
         Profiles.Add(draft);
         SelectedProfile = draft;
@@ -290,6 +292,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (_shownProfile is null) return;
         _shownProfile.Callsign = Callsign;
         _shownProfile.Grid = Grid;
+        _shownProfile.Licence = LicenceOf(LicenceChoice);
         _shownProfile.Power = Power;
         _shownProfile.MaxPower = MaxPower;
         _shownProfile.LogbookKey = LogbookKey;
@@ -338,6 +341,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             p.Name = string.IsNullOrWhiteSpace(d.Name) ? p.Name : d.Name.Trim();
             p.Callsign = d.Callsign.Trim().ToUpperInvariant();
             p.Grid = d.Grid.Trim().ToUpperInvariant();
+            p.LicenceClass = SettingsMapper.LicenceKey(d.Licence);
             p.PowerWatts = Watts(d.Power, p.PowerWatts);
             p.Rig.MaxPowerWatts = string.IsNullOrWhiteSpace(d.MaxPower) ? null : Watts(d.MaxPower, p.Rig.MaxPowerWatts ?? 100);
             p.Eqsl.SyncEnabled = d.EqslSync;
@@ -617,9 +621,19 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool CorrectClock { get; set; }
 
-    /// <summary>Transmit only inside the US data segments.</summary>
+    /// <summary>The licence classes offered on the Station page, in <see cref="SettingsMapper.LicenceKeys"/> order.</summary>
+    public IReadOnlyList<string> LicenceChoices { get; } = [.. SettingsMapper.LicenceKeys.Select(k => LicenceName(k.Class))];
+
+    /// <summary>The shown profile's licence class, as named in <see cref="LicenceChoices"/>.</summary>
     [ObservableProperty]
-    public partial bool UsDataSegmentsOnly { get; set; }
+    public partial string LicenceChoice { get; set; } = string.Empty;
+
+    /// <summary>"Amateur Extra", "General"… or "Not US / don't check".</summary>
+    public static string LicenceName(UsLicenceClass c) => c == UsLicenceClass.NotUs ? "Not US / don't check" : UsDataSegments.Name(c);
+
+    /// <summary>The class a <see cref="LicenceChoices"/> name stands for; Extra for anything else.</summary>
+    public static UsLicenceClass LicenceOf(string? name) =>
+        SettingsMapper.LicenceKeys.Select(k => k.Class).FirstOrDefault(c => LicenceName(c) == name, UsLicenceClass.AmateurExtra);
 
     /// <summary>Clock block seconds.</summary>
     [ObservableProperty]
@@ -1466,7 +1480,6 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Operating.CommandStartLimitMs = (int)Math.Round(Dbl(CommandStartLimit, 0, SettingsMapper.MaxCommandStartLimitMs / 1000.0, 3) * 1000);
             s.Operating.DoubleClickSwitches = DoubleClickSwitches;
             s.Operating.CorrectClock = CorrectClock;
-            s.Operating.UsDataSegmentsOnly = UsDataSegmentsOnly;
             s.Qrz.LogbookEnabled = LogbookEnabled;
             s.Qrz.LookupEnabled = !string.IsNullOrWhiteSpace(QrzUser) && !string.IsNullOrEmpty(QrzPassword);
             s.Qrz.UploadOnComplete = UploadOnComplete;

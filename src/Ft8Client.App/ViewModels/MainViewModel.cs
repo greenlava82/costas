@@ -1273,7 +1273,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         var keep = _updatingBand;
         _updatingBand = true;
         Bands.Clear();
-        foreach (var b in BandPlan.WithBand(_host.Frequencies.Bands(mode), extraBand)) Bands.Add(new BandChoiceViewModel(b));
+        foreach (var b in BandPlan.WithBand(_host.Frequencies.Bands(mode), extraBand))
+            Bands.Add(new BandChoiceViewModel(b) { ReceiveOnly = _host.Frequencies.ReceiveOnly(b, mode) });
         SelectedBandChoice = Bands.FirstOrDefault(b => b.Name == SelectedBand);
         _updatingBand = keep;
         ApplyBandOpenings(_host.Session.Snapshot);
