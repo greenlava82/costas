@@ -8,6 +8,7 @@
 
 using Ft8Client.Core;
 using Ft8Client.Core.Contacts;
+using Ft8Client.Core.Decoding;
 using Ft8Client.Core.Keyboard;
 using Ft8Client.Core.Pileups;
 using Ft8Client.Core.Neighbours;
@@ -144,6 +145,12 @@ public sealed record SessionSnapshot
 
     /// <summary>What is wrong with the receive audio (no audio, silence, clipping), or null.</summary>
     public string? ReceiveLevelWarning { get; init; }
+
+    /// <summary>
+    /// The "why is it quiet" line after two received slots with no decodes, or null when it is not shown
+    /// (<see cref="WhyQuiet"/>).
+    /// </summary>
+    public QuietReadout? Quiet { get; init; }
 
     /// <summary>Measured clock offset in seconds (SNTP or DT estimate), if known.</summary>
     public double? ClockOffsetSeconds { get; init; }
