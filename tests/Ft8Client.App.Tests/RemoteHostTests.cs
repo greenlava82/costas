@@ -22,7 +22,23 @@ namespace Ft8Client.App.Tests;
 public class RemoteHostTests
 {
     [Fact]
-    public async Task State_LinkedUserAnotherProfileInUse_CarriesTheProfileNote()
+    public Task State_LinkedUserAnotherProfileInUse_CarriesTheProfileNote() => WithRemoteHost(async (host, http, port) =>
+    {
+        var token = await LoginAsync(http);
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{port}/ws"), TestContext.Current.CancellationToken);
+        await ws.SendAsync(JsonSerializer.SerializeToUtf8Bytes(new { type = "hello", token }), WebSocketMessageType.Text, true, TestContext.Current.CancellationToken);
+        JsonElement state;
+        do state = await ReceiveAsync(ws);
+        while (state.GetProperty("type").GetString() != "state");
+
+        state.GetProperty("state").GetProperty("myCall").GetString().Should().Be("K1UTA");
+        state.GetProperty("state").GetProperty("profileNote").GetString()
+            .Should().Be("You will operate as K1GLV (Home profile) when you take control, if the station is idle.");
+    });
+
+    // A whole app with two profiles (K1UTA in use), sign-in on, and the user "dan" linked to the Home profile (K1GLV).
+    internal static async Task WithRemoteHost(Func<AppHost, HttpClient, int, Task> test)
     {
         var dir = Path.Combine(Path.GetTempPath(), "costas-remote-" + Guid.NewGuid());
         Directory.CreateDirectory(dir);
@@ -48,18 +64,7 @@ public class RemoteHostTests
             database = host.Database;
             host.Remote.Control.Users!.SetPassword("u1", "correct horse battery");
             using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}/") };
-            var token = await LoginAsync(http);
-
-            using var ws = new ClientWebSocket();
-            await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{port}/ws"), TestContext.Current.CancellationToken);
-            await ws.SendAsync(JsonSerializer.SerializeToUtf8Bytes(new { type = "hello", token }), WebSocketMessageType.Text, true, TestContext.Current.CancellationToken);
-            JsonElement state;
-            do state = await ReceiveAsync(ws);
-            while (state.GetProperty("type").GetString() != "state");
-
-            state.GetProperty("state").GetProperty("myCall").GetString().Should().Be("K1UTA");
-            state.GetProperty("state").GetProperty("profileNote").GetString()
-                .Should().Be("You will operate as K1GLV (Home profile) when you take control, if the station is idle.");
+            await test(host, http, port);
         }
         finally
         {
@@ -73,7 +78,7 @@ public class RemoteHostTests
     }
 
     // As nginx on this computer would pass a browser's https sign-in; the server may still be starting.
-    private static async Task<string> LoginAsync(HttpClient http)
+    internal static async Task<string> LoginAsync(HttpClient http)
     {
         for (var attempt = 0; ; attempt++)
         {
@@ -93,7 +98,7 @@ public class RemoteHostTests
         }
     }
 
-    private static async Task<JsonElement> ReceiveAsync(ClientWebSocket ws)
+    internal static async Task<JsonElement> ReceiveAsync(ClientWebSocket ws)
     {
         var buf = new byte[256 * 1024];
         var count = 0;

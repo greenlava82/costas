@@ -70,7 +70,7 @@ main{padding:12px 14px 120px;display:flex;flex-direction:column;gap:12px;flex:1}
 .hero.tx .hband{background:rgba(0,0,0,.25);border-color:rgba(255,255,255,.4)}.hero.tx .hband b,.hero.tx .hband span{color:#fff}
 .banner{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-tx);border-radius:12px;padding:12px;font-size:14px}
 .banner.info{background:var(--card);border-color:var(--accent);color:var(--tx)}
-.banner.note{background:var(--note-bg);border-color:var(--note-line);color:var(--note-tx);font-weight:600}
+.banner.opnote{background:var(--note-bg);border-color:var(--note-line);color:var(--note-tx);font-weight:600}
 .notice{display:flex;align-items:center;gap:8px}.notice+.notice{margin-top:8px}.notice .t{flex:1}.notice .s{color:var(--mut);font-size:12px}
 .note{position:fixed;left:14px;right:14px;bottom:110px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;display:none;z-index:3}
 /* The "Logged" notice: one slim line above HALT TX with a countdown bar; it closes itself after 5 s. */
@@ -265,7 +265,7 @@ body.dashon #slot,body.dashon #onair{display:none!important}
     <div id="fault" class="banner hidden"></div>
     <div id="hunt" class="banner hidden" aria-live="polite"></div>
     <div id="notices" class="banner info hidden" role="status" aria-live="polite"></div>
-    <div id="profileNote" class="banner note hidden" role="status"></div>
+    <div id="profileNote" class="banner opnote hidden" role="status"></div>
     <div id="meter" class="banner warnline hidden"></div>
     <div id="services" class="mini hidden"></div>
     <div id="board" class="board"><div class="col">
