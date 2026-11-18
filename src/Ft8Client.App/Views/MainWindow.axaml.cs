@@ -426,10 +426,22 @@ public partial class MainWindow : Window
             FileTypeChoices = [new Avalonia.Platform.Storage.FilePickerFileType("Cabrillo log") { Patterns = ["*.log", "*.cbr"] }],
         });
         if (file is null) return;
-        await using var stream = await file.OpenWriteAsync();
-        stream.SetLength(0);
-        await using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false));
-        await writer.WriteAsync(text);
+        // A file that cannot be written (read-only, full disk, removed drive) is reported on the status line. Left to the
+        // unexpected-error handler it would also halt the transmission in progress.
+        try
+        {
+            await using var stream = await file.OpenWriteAsync();
+            stream.SetLength(0);
+            await using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false));
+            await writer.WriteAsync(text);
+        }
+        catch (Exception e) when (LogViewModel.IsFileError(e))
+        {
+            Serilog.Log.Warning(e, "Cabrillo export to {File} failed", file.Name);
+            vm.StatusText = $"Could not save the Cabrillo log {file.Name}: {e.Message}";
+            vm.StatusKind = TextKind.Caution;
+            return;
+        }
         vm.Host.Usage.Track("contest_export", "contest", vm.Host.Session.Snapshot.Contest?.Info.Id.ToString() ?? string.Empty);
     }
 

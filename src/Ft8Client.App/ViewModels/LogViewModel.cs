@@ -180,7 +180,7 @@ public sealed partial class LogViewModel : ObservableObject
     [ObservableProperty]
     public partial QsoEditViewModel? Editing { get; set; }
 
-    /// <summary>True while syncing.</summary>
+    /// <summary>True while syncing, importing or exporting.</summary>
     [ObservableProperty]
     public partial bool Syncing { get; set; }
 
@@ -347,23 +347,71 @@ public sealed partial class LogViewModel : ObservableObject
     [RelayCommand]
     private void CancelEdit() => Editing = null;
 
-    /// <summary>Imports an ADIF file.</summary>
-    public void Import(string path)
+    /// <summary>
+    /// Imports an ADIF file. The file is read and parsed and the contacts written on a worker thread, so Halt and Esc
+    /// stay responsive during a large import. A file or database error is reported in <see cref="Message"/> rather than
+    /// thrown: an exception reaching the UI thread's unhandled-error handler halts transmit.
+    /// </summary>
+    public async Task ImportAsync(string path)
     {
+        if (Syncing) return;
         var (profileId, call) = _profile();
-        var r = AdifImporter.Import(_qsos, File.ReadAllText(path), profileId, call, _countries);
-        Message = $"Imported {r.Imported}, merged {r.Merged} duplicates, skipped {r.Skipped}.";
+        Syncing = true;
+        Message = $"Importing {Path.GetFileName(path)}…";
+        try
+        {
+            var r = await Task.Run(() => AdifImporter.Import(_qsos, File.ReadAllText(path), profileId, call, _countries));
+            Message = $"Imported {r.Imported}, merged {r.Merged} duplicates, skipped {r.Skipped}.";
+        }
+        catch (Exception e) when (IsFileError(e))
+        {
+            Message = $"Could not import {Path.GetFileName(path)}: {e.Message}";
+            return;
+        }
+        finally
+        {
+            Syncing = false;
+        }
         Refresh();
         _changed();
     }
 
-    /// <summary>Exports the log to an ADIF file.</summary>
-    public void Export(string path)
+    /// <summary>
+    /// Exports the log to an ADIF file, on a worker thread. A file or database error is reported in
+    /// <see cref="Message"/> rather than thrown.
+    /// </summary>
+    public async Task ExportAsync(string path)
     {
-        var rows = _qsos.List();
-        File.WriteAllText(path, AdifImporter.Export(rows, DateTime.UtcNow));
-        Message = $"Exported {rows.Count} contacts.";
+        if (Syncing) return;
+        Syncing = true;
+        Message = $"Exporting to {Path.GetFileName(path)}…";
+        try
+        {
+            var count = await Task.Run(() =>
+            {
+                var rows = _qsos.List();
+                File.WriteAllText(path, AdifImporter.Export(rows, DateTime.UtcNow));
+                return rows.Count;
+            });
+            Message = $"Exported {count} contacts.";
+        }
+        catch (Exception e) when (IsFileError(e))
+        {
+            Message = $"Could not export to {Path.GetFileName(path)}: {e.Message}";
+        }
+        finally
+        {
+            Syncing = false;
+        }
     }
+
+    /// <summary>
+    /// True for the errors an import or export can meet in normal use: the file cannot be read or written, its text
+    /// cannot be parsed, or the database refuses the write (full disk, locked file). Anything else is a bug and goes to
+    /// the unexpected-error handler.
+    /// </summary>
+    public static bool IsFileError(Exception e) =>
+        e is IOException or UnauthorizedAccessException or FormatException or OverflowException or System.Data.Common.DbException;
 
     /// <summary>Syncs with QRZ now.</summary>
     [RelayCommand]

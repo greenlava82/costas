@@ -12,8 +12,8 @@
         <Button Content="Send to loggers again" Command="{Binding ResendToLoggersCommand}"
                 ToolTip.Tip="Sends the selected contact again over UDP, as when it was logged, for a logger (Log4OM, WLGate, JTAlert and others) that was not running then. Settings › Other programs sets where it goes." />
         <Button Content="{Binding ConfirmingDelete, Converter={x:Static v:LogView.DeleteText}}" Command="{Binding DeleteCommand}" />
-        <Button Content="Import ADIF" Click="OnImport" />
-        <Button Content="Export ADIF" Click="OnExport" />
+        <Button Content="Import ADIF" Click="OnImport" IsEnabled="{Binding !Syncing}" />
+        <Button Content="Export ADIF" Click="OnExport" IsEnabled="{Binding !Syncing}" />
         <Button Content="Sync with QRZ now" Command="{Binding SyncCommand}" IsEnabled="{Binding !Syncing}" />
         <Button Content="LoTW ▾" IsEnabled="{Binding !Syncing}" ToolTip.Tip="Logbook of the World: confirmations and uploads">
           <Button.Flyout>
