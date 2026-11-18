@@ -32,6 +32,9 @@ public sealed class QrzServiceTests : IDisposable
     private readonly InMemorySecretStore _secrets = new();
     private readonly Session _session;
     private readonly CallsignCacheRepository _cache;
+    private readonly QsoRepository _qsos;
+    private readonly UploadQueueRepository _queue;
+    private readonly string _profileId;
     private readonly QrzService _svc;
 
     private sealed class NoAudio : ISlotSource
@@ -67,13 +70,27 @@ public sealed class QrzServiceTests : IDisposable
         var settings = new AppSettingsAccessor(new SettingsStore(Path.Combine(_dir, "settings.json")), s);
         var db = new SqliteDatabase(Path.Combine(_dir, "log.db"));
         _cache = new CallsignCacheRepository(db);
-        _svc = new QrzService(_session, settings, _secrets, new QsoRepository(db), new UploadQueueRepository(db), new SyncStateRepository(db),
+        _qsos = new QsoRepository(db);
+        _queue = new UploadQueueRepository(db);
+        _profileId = s.Profile.Id;
+        _svc = new QrzService(_session, settings, _secrets, _qsos, _queue, new SyncStateRepository(db),
             _cache, countries, _clock, _server)
         {
             Delay = (_, _) => Task.CompletedTask,
         };
         _secrets.Set(SecretNames.QrzUsername, "user");
         _secrets.Set(SecretNames.QrzPassword, "pass");
+        _secrets.Set(SecretNames.QrzLogbookKey(_profileId), LogbookKey);
+    }
+
+    private void QueueContact(string call)
+    {
+        var id = _qsos.Insert(new QsoRecord
+        {
+            ProfileId = _profileId, Call = call, QsoDateOn = _clock.UtcNow, Band = "20m", Mode = "FT8", StationCallsign = "W7LIT",
+            RstSent = "-10", RstRcvd = "-12", Source = QsoSource.Local,
+        });
+        _queue.Enqueue(id, "qrz", _clock.UtcNow);
     }
 
     public void Dispose()
@@ -147,5 +164,35 @@ public sealed class QrzServiceTests : IDisposable
         QrzStatus.Health.Should().Be(ServiceHealth.Degraded);
         QrzStatus.Message.Should().Contain("Lookup limit reached");
         _cache.GetFresh("ZL2RPA", _clock.UtcNow).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UploadDueAsync_FailedThenUploaded_ReportsOkAgain()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        QueueContact("ZL2RPA");
+        _server.FailNext = 1;
+        await _svc.UploadDueAsync(ct);
+        QrzStatus.Health.Should().Be(ServiceHealth.Degraded);
+
+        _clock.Advance(TimeSpan.FromHours(1));
+        await _svc.UploadDueAsync(ct);
+
+        _queue.Count().Should().Be(0);
+        QrzStatus.Health.Should().Be(ServiceHealth.Ok, "the upload went through, so the indicator no longer says retrying");
+    }
+
+    [Fact]
+    public async Task UploadDueAsync_UploadedWhileLookupsRefused_StillShowsDown()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _secrets.Set(SecretNames.QrzPassword, "wrong");
+        await _svc.LookupOneAsync("K1ABC", ct);
+        QueueContact("ZL2RPA");
+
+        await _svc.UploadDueAsync(ct);
+
+        _queue.Count().Should().Be(0);
+        QrzStatus.Health.Should().Be(ServiceHealth.Down, "an upload working does not hide the refused lookup login");
     }
 }

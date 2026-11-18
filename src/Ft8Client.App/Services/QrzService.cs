@@ -79,7 +79,7 @@ public sealed class QrzService : IDisposable
         _http = MakeClient();
     }
 
-    /// <summary>Waits between lookups after a failure. Tests replace it so they do not wait.</summary>
+    /// <summary>Waits between QRZ requests (lookups after a failure, the upload rate limit). Tests replace it so they do not wait.</summary>
     internal Func<TimeSpan, CancellationToken, Task> Delay { get; set; } = Task.Delay;
 
     /// <summary>Raised after a sync changed the log.</summary>
@@ -316,24 +316,11 @@ public sealed class QrzService : IDisposable
 
     private async Task UploadLoopAsync(CancellationToken ct)
     {
-        var http = Client();
-        var svc = new QrzUploadService(new QrzLogbookClient(http), _qsos, _queue, _clock);
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                // A new station callsign gets a new client (its User-Agent names the call): upload through that one.
-                if (!ReferenceEquals(http, Client()))
-                {
-                    http = Client();
-                    svc = new QrzUploadService(new QrzLogbookClient(http), _qsos, _queue, _clock);
-                }
-                var key = Key;
-                if (key is not null && _settings.Current.Qrz.LogbookEnabled && _settings.Current.Qrz.UploadOnComplete && _queue.Count() > 0)
-                {
-                    if (await svc.ProcessDueAsync(key, ct, ProfileId).ConfigureAwait(false) > 0) LogChanged?.Invoke();
-                    if (svc.Status.Health is ServiceHealth.Down or ServiceHealth.Degraded) _session.SetService(ServiceNames.Qrz, svc.Status);
-                }
+                await UploadDueAsync(ct).ConfigureAwait(false);
                 await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -347,6 +334,40 @@ public sealed class QrzService : IDisposable
             }
         }
     }
+
+    /// <summary>
+    /// One pass of the upload queue. The upload part of the QRZ indicator follows the uploader: Down or Degraded while it
+    /// fails, Ok again once an upload goes through (the combined indicator still shows any other part that is failing).
+    /// </summary>
+    internal async Task UploadDueAsync(CancellationToken ct)
+    {
+        // A new station callsign gets a new client (its User-Agent names the call): upload through that one.
+        if (_uploader is null || !ReferenceEquals(_uploadHttp, Client()))
+        {
+            _uploadHttp = Client();
+            _uploader = new QrzUploadService(new QrzLogbookClient(_uploadHttp), _qsos, _queue, _clock, delay: (t, c) => Delay(t, c));
+            _uploadShown = null;
+        }
+        var key = Key;
+        if (key is null || !_settings.Current.Qrz.LogbookEnabled || !_settings.Current.Qrz.UploadOnComplete || _queue.Count() == 0)
+        {
+            // Nothing left to upload: an old upload failure no longer applies.
+            if (_uploadShown is not null) ClearStatus(UploadPart);
+            _uploadShown = null;
+            return;
+        }
+        if (await _uploader.ProcessDueAsync(key, ct, ProfileId).ConfigureAwait(false) > 0) LogChanged?.Invoke();
+        var st = _uploader.Status;
+        if (st.Health != ServiceHealth.Off && !ReferenceEquals(st, _uploadShown))
+        {
+            _uploadShown = st;
+            SetStatus(UploadPart, st);
+        }
+    }
+
+    private QrzUploadService? _uploader;
+    private HttpClient? _uploadHttp;
+    private ServiceStatus? _uploadShown;
 
     private HttpClient Client()
     {
