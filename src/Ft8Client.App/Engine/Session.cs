@@ -51,6 +51,13 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     private readonly List<(DateTime Slot, SlotParity Parity, List<int> Offsets)> _recentOffsets = [];
     private readonly Dictionary<string, ServiceStatus> _services = new(StringComparer.Ordinal);
     private string? _receiveLevelWarning;
+    // The "why is it quiet" line's facts, under _gate: empty received slots, the radio's reported mode (null for a radio
+    // that reports none), the settled receive level, and whether a radio is set up (or simulation is on).
+    private readonly QuietWatch _quiet;
+    private string? _rigMode;
+    private InputLevelState? _inputLevel;
+    private double? _inputLevelDbfs;
+    private bool _radioSetUp;
     private readonly Dictionary<string, CallsignCacheEntry> _lookups = new(StringComparer.Ordinal);
     private readonly List<TonightContact> _tonight = [];
     private readonly List<string> _callWhenFree = []; // Watching rows marked "call when free", oldest first
@@ -62,6 +69,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     private readonly List<BandSample> _samples = [];
     private IReadOnlyDictionary<string, BandOpening> _sampledOpenings = new Dictionary<string, BandOpening>(StringComparer.Ordinal);
     private bool _samplesDirty;
+    private IReadOnlyList<BandAdvice> _advice = [];
+    private DateTime _adviceUtc;
+    private DateTime? _bandFollowedSince; // since when the current band's nearby reports have been followed without a break
     private StationTracker _tracker;
     private PileupTracker _pileups;
     private readonly List<NeighbourReport> _neighbours = [];
@@ -108,6 +118,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         _source = source;
         _tx = tx;
         _clock = clock;
+        _quiet = new QuietWatch(clock.UtcNow);
         _countries = countries;
         _frequencies = frequencies;
         _log = log;
@@ -583,6 +594,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             var now = _clock.UtcNow;
             var heard = result.Decodes.Select(HeardMessage.From).ToList();
             AddRaw(slot, heard);
+            _quiet.Slot(slot, result.Decodes.Count);
 
             _tracker.KeepFor = _config.Ranking.KeepCqCallers;
             _tracker.ApplySlot(slot, heard);
@@ -775,6 +787,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         lock (_gate)
         {
             _engine.OnTransmitted(tx.Plan, startedUtc);
+            _quiet.Transmitted(tx.Plan.SlotStartUtc);
             _raw.Add(new RawDecodeLine(new Decode(tx.Plan.SlotStartUtc, 0, 0, tx.OffsetHz, tx.Plan.Message, false), MessageParser.Parse(tx.Plan.Message),
                 null, false, Transmitted: true, Mode: tx.Mode));
             if (_engine.View is { Outcome: not ContactOutcome.InProgress }) _finishedShownAt = tx.Plan.SlotStartUtc;
@@ -1225,6 +1238,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             _config = _config with { Band = band, Mode = mode };
             _dialHz = dialHz ?? _frequencies.Find(band, mode)?.DialHz ?? _dialHz;
             _rxMovedUtc = _clock.UtcNow;
+            _quiet.Reset(_rxMovedUtc);
             _tracker = new StationTracker(_config.MyCall, _config.MyGrid, _countries, mode);
             _callWhenFree.Clear();
             StopAutoCall(null);
@@ -1241,6 +1255,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             // A refusal or fault from the old band or mode no longer applies.
             _fault = null;
             _hearsMe = new HearsMe(band, _hearsMe.Available, ModeInfo.Name(mode));
+            // The new band's closing line needs 30 minutes followed from now; the advice is rebuilt at the next publish.
+            _bandFollowedSince = BandOpenings.IsFollowed(_bandFeed, string.Empty, string.Empty) ? _clock.UtcNow : null;
+            _adviceUtc = default;
             // Reports of nearby stations cover every band (for the band menu); only a mode change makes them irrelevant.
             if (mode != oldMode)
             {
@@ -1248,6 +1265,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 _samples.Clear();
                 _samplesDirty = true;
                 _openingsUtc = default;
+                _adviceUtc = default;
             }
             _recentOffsets.Clear();
             _slotCounts.Clear();
@@ -1289,7 +1307,11 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         {
             // The dial moved while something is on the air: check it still fits inside the band.
             if (hz != _dialHz) outside = _tx.OnAirOutsideBand(_config.Band, hz);
-            if (Math.Abs(hz - _dialHz) > RetuneHz) _rxMovedUtc = _clock.UtcNow;
+            if (Math.Abs(hz - _dialHz) > RetuneHz)
+            {
+                _rxMovedUtc = _clock.UtcNow;
+                _quiet.Reset(_rxMovedUtc);
+            }
             _dialHz = hz;
         }
         if (outside is not null) _ = HaltAsync($"Transmission stopped: the dial moved. {outside}");
@@ -1315,6 +1337,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 _samples.Clear();
                 _samplesDirty = true;
                 _openingsUtc = default;
+                _adviceUtc = default;
                 _tracker.SetMyStation(config.MyCall, config.MyGrid);
                 _myEntity = _countries.Lookup(config.MyCall);
             }
@@ -1350,6 +1373,49 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         {
             if (_receiveLevelWarning == text) return;
             _receiveLevelWarning = text;
+        }
+        Publish();
+    }
+
+    /// <summary>
+    /// Records the mode the radio reports, as Hamlib names it, or null for a radio that reports none (audio only with
+    /// VOX). Read by the "why is it quiet" line only.
+    /// </summary>
+    public void SetRigMode(string? mode)
+    {
+        lock (_gate)
+        {
+            if (string.Equals(_rigMode, mode, StringComparison.Ordinal)) return;
+            _rigMode = mode;
+        }
+        Publish();
+    }
+
+    /// <summary>
+    /// Records the settled receive level (<see cref="InputLevelTrend"/>), or null when it is not measured. Publishes only
+    /// when the state changes; the level in dBFS is picked up by the next snapshot.
+    /// </summary>
+    public void SetInputLevel(InputLevelState? state, double? rmsDbfs)
+    {
+        lock (_gate)
+        {
+            _inputLevelDbfs = rmsDbfs;
+            if (_inputLevel == state) return;
+            _inputLevel = state;
+        }
+        Publish();
+    }
+
+    /// <summary>
+    /// Whether a radio (or audio only with VOX) is set up, or simulation is on. Without one the "why is it quiet" line is
+    /// never shown: nothing real is being received (rule 2).
+    /// </summary>
+    public void SetRadioSetUp(bool setUp)
+    {
+        lock (_gate)
+        {
+            if (_radioSetUp == setUp) return;
+            _radioSetUp = setUp;
         }
         Publish();
     }
@@ -1438,7 +1504,13 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         lock (_gate)
         {
             if (_bandFeed == feed) return;
+            // The band I am on is followed all the time on every band, or alone after a fall-back.
+            var wasFollowed = BandOpenings.IsFollowed(_bandFeed, string.Empty, string.Empty);
+            var followed = BandOpenings.IsFollowed(feed, string.Empty, string.Empty);
+            if (!followed) _bandFollowedSince = null;
+            else if (!wasFollowed) _bandFollowedSince = _clock.UtcNow;
             _bandFeed = feed;
+            _adviceUtc = default;
         }
         Publish();
     }
@@ -1487,6 +1559,19 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         _samplesDirty = false;
         _sampledOpenings = BandOpenings.BuildSampled(_samples, _config.MyCall, _config.MyGrid, ModeInfo.Name(_config.Mode), _countries, _logIndex, now);
         return _sampledOpenings;
+    }
+
+    // The band advice line (docs/04-domain-logic.md, section 14a), from the band menu's numbers, my own reports and the last
+    // 30 minutes of nearby reports. Rebuilt at most once a slot, or at once after a band, mode, grid or feed change. Under _gate.
+    private IReadOnlyList<BandAdvice> Advice(IReadOnlyDictionary<string, BandOpening> followed, IReadOnlyDictionary<string, BandOpening> sampled,
+                                             DateTime now)
+    {
+        if (now - _adviceUtc < (ModeInfo.IsSlotted(_config.Mode) ? ModeInfo.SlotLength(_config.Mode) : TimeSpan.FromSeconds(15))) return _advice;
+        _adviceUtc = now;
+        var shown = BandOpenings.Shown(followed, sampled, _bandFeed, _config.Band);
+        _advice = BandAdvisor.Advise(new BandAdviceInput(shown, _neighbours, _hearsMe.Reports, _config.Band, ModeInfo.Name(_config.Mode), _config.MyCall,
+            _config.MyGrid, _myEntity?.Continent, _bandFollowedSince, now), _countries);
+        return _advice;
     }
 
     // The band menu's activity. It looks up the country of every receiver, so while reports stream in it is rebuilt at
@@ -1559,6 +1644,25 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
 
     // ---------------------------------------------------------------- snapshots
 
+    // Under _gate. The dial only counts as read from the radio when the radio reports its mode too: a VOX setup has no
+    // CAT, and its "dial" is only what Costas was told.
+    private QuietFacts QuietFactsNow() => new()
+    {
+        Mode = _config.Mode,
+        Band = _config.Band,
+        RadioSetUp = _radioSetUp,
+        EmptySlots = _quiet.EmptySlots,
+        Audio = _inputLevel,
+        AudioDbfs = _inputLevelDbfs,
+        Radio = _services.TryGetValue(ServiceNames.Radio, out var radio) ? radio.Health : ServiceHealth.Off,
+        DialHz = _rigMode is null ? null : _dialHz,
+        UsualDialHz = _frequencies.Find(_config.Band, _config.Mode)?.DialHz,
+        RigMode = _rigMode,
+        Decoder = _services.GetValueOrDefault(ServiceNames.Decoder),
+        ClockOffsetSeconds = ClockEstimate.Offset(_sntpOffset, _medianDt),
+        ClockLimitSeconds = _config.ClockBlockSeconds,
+    };
+
     /// <summary>Recomputes and publishes the snapshot.</summary>
     public void Publish()
     {
@@ -1570,6 +1674,8 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             var stations = _tracker.Stations.ToList();
             var contestScore = ScoreNow();
             var rank = Ranker.Rank(RankInputAt(stations, now, contestScore));
+            var openings = Openings(now);
+            var sampledOpenings = SampledOpenings(now);
             var summary = BandSummaryCalculator.Compute(stations, _logIndex, _config.Band, LogModeKey.Of(_config.Mode), now, _slotCounts, _tonight,
                 _config.Ranking);
             snap = new SessionSnapshot
@@ -1595,8 +1701,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 ReceptionHistory = _receptionHistory.Buckets(_config.Band, ModeInfo.Name(_config.Mode), now),
                 Neighbours = NeighbourComparison.Compare(_hearsMe.Reports, _neighbours, _config.MyCall, _config.MyGrid, _config.Band,
                     ModeInfo.Name(_config.Mode), _countries, now),
-                SampledBandOpenings = SampledOpenings(now),
-                BandOpenings = Openings(now),
+                SampledBandOpenings = sampledOpenings,
+                BandOpenings = openings,
+                BandAdvice = Advice(openings, sampledOpenings, now),
                 BandActivityFeed = _bandFeed,
                 Services = new Dictionary<string, ServiceStatus>(_services),
                 Contact = keyboard ? KeyboardContactView() : _engine.View,
@@ -1612,6 +1719,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 Fault = _logFault ?? _fault ?? _engine.StopReason,
                 ClockOffsetSeconds = ClockEstimate.Offset(_sntpOffset, _medianDt),
                 ReceiveLevelWarning = _receiveLevelWarning,
+                Quiet = WhyQuiet.Explain(QuietFactsNow()),
                 Waiting = _engine.Waiting.ToList(),
                 CallWhenFree = _callWhenFree.ToList(),
                 AutoCall = _autoCall,

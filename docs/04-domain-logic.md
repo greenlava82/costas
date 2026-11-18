@@ -344,6 +344,27 @@ The band menu shows, for each band, whether stations near me are being heard rig
 
 This shows where the band is open from my area, not who I can hear: a receiver hearing my neighbour is a station listening on that band.
 
+## 14a. Band advice
+
+C5 (owner request 2026-11-18): one line that answers "which band should I be on?" from evidence Costas already holds about this station, not solar indices. `BandAdvisor` (Core, pure) judges; `BandAdviceText` words it. **Display only:** it never changes band, ranking or who is called, and has no Go link.
+
+Evidence, all from the last 15 minutes unless said otherwise:
+
+- **Stations near me on every band**: the band menu's openings (section 14, `BandOpenings.Shown`: bands followed all the time, plus sampled bands). Each opening carries, per receiver continent, the distinct receivers and distinct nearby senders (`ContinentReach`); these are real counts, never scaled up from a sample.
+- **My own signal on the band I am on**: PSK Reporter and RBN reports (`HearsMe`), in my mode, with the receiver's continent from the country file.
+- **Nearby reports on the band I am on for the last 30 minutes**, for the closing line.
+
+Rules (thresholds are constants on `BandAdvisor`):
+
+- My own continent (from the country file for my call) is never advised: "20 m is open to North America" says nothing to a US station. Distances are in kilometres internally (300 miles = 482.8 km, as in section 13) and shown in the operator's units.
+- **Open from my area**: at least 5 distinct stations on a continent heard at least 2 distinct stations near me on the band. Two senders stop one loud neighbour from reading as a band opening.
+- **Open for me**: at least 5 distinct stations on a continent heard my own signal on the band I am on.
+- **Which line**: another band is named only for continents the band I am on is not already open to (by either rule), so the line never suggests a move that gains nothing. Among other bands: most receivers on its best continent, then most needed countries, then band order. With no other band, the band I am on is named, "for me" before "from my area". At most two continents, most receivers first. "You need" is the band's needed countries from section 14.
+- **Closing** (the band I am on, second line): a continent had at least 8 distinct receivers of at least 2 nearby senders 15 to 30 minutes ago, and a third as many or fewer in the last 15 minutes. It needs the band followed without a break for 30 minutes (reset on a band change or when the feed falls back past it) and at least 10 nearby reports on the band in the last 15 minutes, so a feed that went quiet is not read as a closing band. A continent the band is closing to is not also called open.
+- Nothing is shown without a valid grid, with the feed or band activity off, or when no rule is met. Rebuilt at most once a slot, and at once after a band, mode, grid or feed change.
+
+The thresholds are first guesses from the band menu's shading (10 spots is "medium") and have not been tuned on the air; see V27 in `08-open-questions.md`.
+
 ## 15. Rarity (most wanted)
 
 Club Log publishes a most-wanted list of DXCC entities, ranked by how many of its users still need each one (owner request 2026-10-12). `MostWanted` (Core) maps it to country-file entity keys through the ADIF DXCC codes in the bundled `dxcc-adif.csv` (from AD1C's `cty.csv`, the same source and licence as `cty.dat`). `Rarity` turns a rank into a five-step meter:
@@ -371,7 +392,23 @@ Owner request 2026-10-12, via the review ideas. The operator lists targets (`Hun
 
 `LogIndex.Build` takes a `ConfirmationSource`: `Lotw` (default) counts only `lotw_confirmed`; `Any` also counts QRZ, eQSL and card confirmations. When "count only confirmed" is on, stations that uploaded to LoTW in the last year (`LotwUsers`) sort ahead of others within the same tier, after calling me and heard in the last slot. Owner to confirm both defaults.
 
-## 18. Band-edge and licence guard
+## 18. Why it's quiet
+
+Owner request 2026-11-18. `WhyQuiet.Explain` (Core, pure) picks the Operate screen's one-line reason for no decodes from `QuietFacts`; the wording is in `02-ui-spec.md` ("Why it's quiet").
+
+- **Counting** (`QuietWatch`): each FT8 or FT4 slot the decoder returns adds one when it had no decodes (a failed decode counts as none) and resets to zero when it had any. A slot I transmitted in is skipped; the same slot twice (early pass, then full decode) counts once; a slot that began before start-up or a reset is partial and skipped. A band or mode change, or a dial move of more than 3 kHz (`Session.RetuneHz`), resets it. The line shows from 2 empty slots (`SlotsBeforeQuiet`).
+- **Nothing shown** in PSK and RTTY, with fewer than 2 empty slots, or with no radio set up and simulation off (rule 2).
+- **Order of confidence**, first match wins:
+    1. **Receive audio**: the settled level (`InputLevelTrend`: once a second, outside transmit time and two seconds after, classified by `InputLevelClassifier`, the same bands as Setup's meter: good -40 to -10 dBFS RMS, clipping at a peak of -1 dBFS or more; a state counts when it held for 7 of the last 10 readings). No audio, silence, too quiet and clipping are causes; too loud is not (decodes usually survive it).
+    2. **Dial**: more than 1 kHz (`DialToleranceHz`) from the frequency table's dial for the band and mode. Within 1 kHz most of the 3 kHz sub-band is still in the passband, so the dial alone would not silence the band. Only for a radio that reports its dial and mode over CAT (not VOX, whose dial is only what Costas was told) and is connected. Fix: Go to the usual dial.
+    3. **Radio mode**: the mode the radio reports is not `PKTUSB` or `USB` (plain USB is accepted: it is Costas's own fallback for radios that refuse data mode, and receives FT8 fine). Same conditions as the dial. Fix: Go to the usual dial, which also sets USB data.
+    4. **Decoder**: its status is Down (not running, for example jt9 not found) or Degraded (the slot's decode failed, as while it restarts).
+    5. **Clock**: the clock offset (SNTP after correction, or the decodes' median DT) beyond the clock limit (Settings › Transmitting, default 2 s), the same limit that blocks transmit.
+    6. **Radio not connected**: nothing; the no-radio banner already says so.
+    7. Otherwise **nothing found**: the band may just be quiet.
+- The readout never changes rig state. Only the operator's click on its Go to button tunes, through `AppHost.TuneDialAsync`.
+
+## 19. Band-edge and licence guard
 
 Every transmission, Tune tone and CQ passes `FrequencyTable.TransmitAllowed` (Core) before PTT, after the radio, audio and clock guards. The whole signal must fit: from dial + offset to dial + offset + width for FT8 and FT4 (tones sit above the offset), and centred on dial + offset for PSK and RTTY, with the RTTY width from its shift and speed. It is refused when the signal is outside the frequency table's limits for the band, when a PSK or RTTY signal has no row for its mode on the band, or when it is not wholly inside one data segment of the operator's US licence class.
 

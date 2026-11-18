@@ -38,6 +38,27 @@ public class BandOpeningsTests
     }
 
     [Fact]
+    public void Build_SpotsFromOneContinent_CountsDistinctReceiversAndSenders()
+    {
+        var o = Build([R("20m", "K7AAA", "DN41", "DL1ABC", minutesAgo: 8), R("20m", "K7AAA", "DN41", "DL1ABC", minutesAgo: 3),
+                       R("20m", "N7BBB", "DN31", "G4XYZ", minutesAgo: 6)]);
+
+        o["20m"].ReachByContinent.Should().ContainKey("EU").WhoseValue.Should().Be(new ContinentReach(2, 2, Now.AddMinutes(-3)));
+    }
+
+    [Fact]
+    public void Shown_CurrentBandOnly_TakesSampledNumbersForOtherBands()
+    {
+        var followed = Build([R("20m", "K7AAA", "DN41", "DL1ABC"), R("15m", "K7AAA", "DN41", "DL1ABC")]);
+        var sampled = Build([R("20m", "K7AAA", "DN41", "JA1ABC"), R("17m", "K7AAA", "DN41", "JA1ABC")]);
+
+        var shown = BandOpenings.Shown(followed, sampled, BandActivityFeed.CurrentBandOnly, "20m");
+
+        shown.Keys.Should().BeEquivalentTo("20m", "17m");
+        shown["20m"].Should().BeSameAs(followed["20m"]);
+    }
+
+    [Fact]
     public void Build_FarSenderOldSpotOtherModeOrMyCall_AreLeftOut()
     {
         var o = Build([R("20m", "W1AAA", "FN42", "DL1ABC"), R("20m", "K7AAA", "DN41", "DL1ABC", minutesAgo: 16),
