@@ -475,7 +475,8 @@ public sealed class AppHost : IAsyncDisposable
         Eqsl = new EqslService(Session, Settings, Secrets, Qsos, Uploads, EqslInbox, SyncState, Clock, uploadsAllowed: !Simulating);
         Eqsl.LogChanged += RebuildLogIndex;
         Eqsl.Start();
-        Cloudlog = new CloudlogService(Session, Settings, Secrets, Qsos, Uploads, Clock, uploadsAllowed: !Simulating);
+        Cloudlog = new CloudlogService(Session, Settings, Secrets, Qsos, Uploads, SyncState, Countries, Clock, uploadsAllowed: !Simulating);
+        Cloudlog.LogChanged += RebuildLogIndex;
         Cloudlog.Start();
         ClubLog = new ClubLogService(Session, Settings, Secrets, Qsos, Uploads, Clock, ClubLogApiKey, uploadsAllowed: !Simulating);
         ClubLog.Start();

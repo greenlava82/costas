@@ -8,6 +8,8 @@
 
 using System.Net;
 using Ft8Client.App.Services;
+using Ft8Client.App.ViewModels;
+using Ft8Client.Data.Settings;
 using Ft8Client.Integrations.Cloudlog;
 using Ft8Client.Integrations.Net;
 
@@ -35,6 +37,36 @@ public class CloudlogServiceTests
 
         message.Should().Contain("can read contacts but not upload them, until 2027-01-31").And.Contain("Uploads need the qso:write scope");
         stations.Should().ContainSingle().Which.Id.Should().Be("4");
+    }
+
+    [Fact]
+    public async Task TestV2_WriteOnlyTokenWithDownloadOn_WarnsAboutQsoRead()
+    {
+        using var handler = new Handler(request => request.RequestUri!.AbsolutePath == "/index.php/api/v2/token"
+            ? Answer(HttpStatusCode.OK, """{"data":{"name":"up","scopes":["qso:write"],"expires_at":null}}""")
+            : Answer(HttpStatusCode.Forbidden, """{"error":{"code":"insufficient_scope"}}"""));
+        using var http = HttpFactory.Create("K1GLV", handler);
+
+        var (message, _) = await CloudlogService.TestV2Async(new CloudlogClient(http), Site, "wl2_t", upload: true, TestContext.Current.CancellationToken, download: true);
+
+        message.Should().Contain("Downloading needs the qso:read scope").And.NotContain("Uploads need");
+    }
+
+    [Fact]
+    public void ApplyProfiles_DownloadSwitch_KeptPerProfile()
+    {
+        var s = new AppSettings();
+        s.Profile.Callsign = "K1GLV";
+        s.Profiles.Add(new StationProfile { Id = "club", Name = "Club", Callsign = "W1AW" });
+        var drafts = s.Profiles.Select(p => new ProfileDraft
+        {
+            Id = p.Id, Name = p.Name, Callsign = p.Callsign, Grid = "FN42", Power = "100", CloudlogDownload = p.Id == "club",
+        }).ToList();
+
+        SettingsViewModel.ApplyProfiles(s, drafts, s.Profile.Id);
+
+        s.Profiles.Single(p => p.Id == "club").Cloudlog.DownloadForWorked.Should().BeTrue();
+        s.Profile.Cloudlog.DownloadForWorked.Should().BeFalse();
     }
 
     [Fact]
