@@ -452,9 +452,29 @@ public sealed class UpdateService : IDisposable
         Changed?.Invoke();
     }
 
-    // Velopack's downloads (the GitHub feed and the packages) carry the app's User-Agent like every other request.
+    // Velopack's downloads (the GitHub feed and the packages) carry the app's User-Agent like every other request, and
+    // are refused unless they are HTTPS (UpdateUrls), like the classic installer's.
     private sealed class IdentifiedDownloader(Func<string> callsign) : HttpClientFileDownloader
     {
+        public override Task DownloadFile(string url, string targetFile, Action<int> progress, IDictionary<string, string>? headers, double timeout,
+            CancellationToken cancelToken)
+        {
+            UpdateUrls.RequireHttps(url);
+            return base.DownloadFile(url, targetFile, progress, headers, timeout, cancelToken);
+        }
+
+        public override Task<byte[]> DownloadBytes(string url, IDictionary<string, string>? headers, double timeout)
+        {
+            UpdateUrls.RequireHttps(url);
+            return base.DownloadBytes(url, headers, timeout);
+        }
+
+        public override Task<string> DownloadString(string url, IDictionary<string, string>? headers, double timeout)
+        {
+            UpdateUrls.RequireHttps(url);
+            return base.DownloadString(url, headers, timeout);
+        }
+
         protected override HttpClient CreateHttpClient(IDictionary<string, string>? headers, double timeout)
         {
             var client = base.CreateHttpClient(headers, timeout);

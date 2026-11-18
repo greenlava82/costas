@@ -192,4 +192,34 @@ public class UpdateTests
         await act.Should().ThrowAsync<InvalidDataException>();
         fake.Requests.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task DownloadAsync_HttpInstallerUrl_RefusedBeforeDownloading()
+    {
+        var fake = new FakeGitHub(_ => Ok("x"));
+        using var http = new HttpClient(fake);
+        var release = UpdateChecker.Parse(Release("v0.1.0.42"))! with { InstallerUrl = "http://example.invalid/Costas-Setup.exe" };
+        var act = () => new UpdateDownloader(http).DownloadAsync(release, Path.GetTempPath(), null, TestContext.Current.CancellationToken);
+        await act.Should().ThrowAsync<InvalidDataException>();
+        fake.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task LatestAsync_ShaAssetOverHttp_NotReadAndNoChecksum()
+    {
+        var json = Release("v0.1.0.42", digest: false, shaAsset: true).Replace("https://example.invalid/sha", "http://example.invalid/sha", StringComparison.Ordinal);
+        var fake = new FakeGitHub(u => u.AbsolutePath.EndsWith("/sha", StringComparison.Ordinal) ? Ok(InstallerSha) : Ok(json));
+        using var http = new HttpClient(fake);
+        var r = await new UpdateChecker(http, "somedudenamedtony/costas").LatestAsync(TestContext.Current.CancellationToken);
+        r!.Sha256.Should().BeNull();
+        fake.Requests.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Constructor_HttpApiBase_Throws()
+    {
+        using var http = new HttpClient(new FakeGitHub(_ => Ok("{}")));
+        var act = () => new UpdateChecker(http, "x/y", new Uri("http://api.github.com/"));
+        act.Should().Throw<ArgumentException>();
+    }
 }

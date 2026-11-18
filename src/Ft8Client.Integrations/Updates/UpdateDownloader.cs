@@ -15,19 +15,21 @@ public sealed class UpdateDownloader(HttpClient http)
 {
     /// <summary>
     /// Downloads to <paramref name="folder"/> and returns the installer path. Throws <see cref="InvalidDataException"/> when
-    /// the release publishes no checksum or the file does not match it; a file that fails the check is deleted.
+    /// the release publishes no checksum, the installer's address is not HTTPS, or the file does not match the checksum; a
+    /// file that fails the check is deleted.
     /// </summary>
     public async Task<string> DownloadAsync(ReleaseInfo release, string folder, IProgress<double>? progress, CancellationToken ct)
     {
         if (release.Sha256 is null) throw new InvalidDataException("This release has no checksum, so the download cannot be verified.");
         if (release.InstallerName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || release.InstallerName.Contains("..", StringComparison.Ordinal))
             throw new InvalidDataException("The installer name is not a plain file name.");
+        var url = UpdateUrls.RequireHttps(release.InstallerUrl);
         Directory.CreateDirectory(folder);
         var path = Path.Combine(folder, release.InstallerName);
         var partial = path + ".partial";
         try
         {
-            using (var resp = await http.GetAsync(new Uri(release.InstallerUrl), HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
+            using (var resp = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
             {
                 resp.EnsureSuccessStatusCode();
                 var total = resp.Content.Headers.ContentLength ?? release.InstallerSize;
