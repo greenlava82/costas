@@ -64,7 +64,8 @@ public static class RemoteStateBuilder
         var slotLen = slotted ? ModeInfo.SlotLength(s.Mode) : TimeSpan.Zero;
         var into = slotted ? nowUtc - SlotMath.SlotStart(nowUtc, s.Mode) : TimeSpan.Zero;
         var (meter, meterTip, meterKind) = TxMeterText.Warning(s.TxMeters);
-        var summary = s.Summary is null ? null : new SummaryViewModel(s.Summary, s.LogIsEmpty, ModeInfo.IsSlotted(s.Mode) ? null : s.Activity);
+        var summary = s.Summary is null ? null : new SummaryViewModel(s.Summary, s.LogIsEmpty, ModeInfo.IsSlotted(s.Mode) ? null : s.Activity,
+            s.BandAdvice, units, nowUtc);
 
         return new RemoteState
         {
@@ -100,7 +101,8 @@ public static class RemoteStateBuilder
             MeterTip = meterTip,
             MeterCritical = meterKind == TextKind.Critical,
             Services = Services(s),
-            Summary = summary is null ? null : new RemoteSummary(summary.Title, summary.StationsHeard, summary.Countries, summary.CallingCq, summary.YouNeed, summary.Caption),
+            Summary = summary is null ? null : new RemoteSummary(summary.Title, summary.StationsHeard, summary.Countries, summary.CallingCq, summary.YouNeed, summary.Caption,
+                summary.Advice, summary.Closing),
             Repeats = [.. OperateViewModel.RepeatOrder(s.Rank.Worked).Take(MaxRows).Select(x => Repeat(new RepeatRowViewModel(x, log?.LastContactWith(x.Station.Call),
                 log?.ContactsWith(x.Station.Call).Count ?? 0, units, nowUtc), s))],
             Watching = [.. s.Rank.Watching.Take(MaxRows).Select(x => new WatchRowViewModel(x, nowUtc, units, band: s.Band)).Select(x => new RemoteWatch(x.Call, x.Where, x.Why, x.Reason))],

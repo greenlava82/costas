@@ -60,6 +60,7 @@ main{padding:12px 14px 120px;display:flex;flex-direction:column;gap:12px;flex:1}
 .list .it{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line)}
 .list .it:first-of-type{border-top:0}
 .c{font-weight:600;font-size:16px}.s{font-size:12px;color:var(--mut)}
+.advice{font-size:13px;font-weight:600;color:var(--accent);margin-top:6px}
 .tag{white-space:nowrap;font-size:11px;font-weight:600;padding:1px 6px;border-radius:4px;background:var(--tag-bg);color:var(--tag-tx)}
 .head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
 /* Fox/Hound, as on the desk: a purple tag on a Fox's row, a filled chip and a banner on a contact worked the Hound way. */
@@ -740,6 +741,9 @@ function renderStations(s) {
         const d = el("div"); d.append(el("b", null, v), el("span", null, l)); g.append(d);
       });
       box.append(g, el("div", "s", u.caption));
+      // Band advice, as on the desk. Display only.
+      if (u.advice) box.append(el("div", "advice", u.advice));
+      if (u.closing) box.append(el("div", "s", u.closing));
     }
   }
   list($("repeats"), "repeats", "Repeats", "Already in your log on " + s.frequency.split(" · ")[1], s.repeats,
@@ -1145,6 +1149,7 @@ function dashBand(s) {
     const d = el("div", cls); d.append(el("b", null, v), el("span", null, l)); n.append(d);
   });
   box.append(n);
+  if (u.advice) box.append(el("div", "advice", u.advice));
 }
 
 // Next in line as a table; the sort is kept on this phone.
