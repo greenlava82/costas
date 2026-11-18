@@ -225,4 +225,33 @@ public class RemoteStateBuilderTests
 
         RemoteStateBuilder.Build(Snap() with { LastLogged = logged }, Now, Ctx, "you", null).Logged.Should().BeNull();
     }
+
+    [Fact]
+    public void Build_Quiet_SendsTheDesksLineAndButton()
+    {
+        var snap = Snap() with { Quiet = new QuietReadout(QuietCause.DialOff, "No decodes: the dial is on 14.090, not the usual FT8 frequency for 20 m.", 14_074_000) };
+        var s = RemoteStateBuilder.Build(snap, Now, Ctx, "you", null);
+
+        s.Quiet.Should().Be("No decodes: the dial is on 14.090, not the usual FT8 frequency for 20 m.");
+        s.QuietGo.Should().Be("Go to 14.074");
+    }
+
+    [Fact]
+    public void Build_QuietWhileTransmitting_NoButton()
+    {
+        var snap = Snap() with { Transmitting = true, Quiet = new QuietReadout(QuietCause.DialOff, "No decodes: the dial is on 14.090.", 14_074_000) };
+        var s = RemoteStateBuilder.Build(snap, Now, Ctx, "you", null);
+
+        s.Quiet.Should().NotBeNull();
+        s.QuietGo.Should().BeNull();
+    }
+
+    [Fact]
+    public void Build_NotQuiet_NoLine()
+    {
+        var s = RemoteStateBuilder.Build(Snap(), Now, Ctx, "you", null);
+
+        s.Quiet.Should().BeNull();
+        s.QuietGo.Should().BeNull();
+    }
 }
