@@ -34,7 +34,8 @@ unsigned or signed by anyone other than Costas's publisher.
 
 - Costas's own programs and libraries, the installer and the uninstaller.
 - The installer also carries the WSJT-X `jt9` decoder and Hamlib's `rigctld`, unmodified from those projects' own
-  releases (fetched by `third_party/fetch.ps1` during the build, with their licences). Files that already
+  releases (fetched by `third_party/fetch.ps1` during the build, with their licences; the build stops unless each
+  download matches the SHA-256 pinned in that script). Files that already
   carry a valid signature, such as the .NET runtime, are left as they are.
 - Signing is checked after it runs: if any file is not validly signed, the release fails and nothing is published.
 
