@@ -803,6 +803,46 @@ public class ContactEngineTests
     }
 
     [Fact]
+    public void OnDecodes_Rr73ForLastRetryDecodedAfterSlotStart_LogsWithoutSending()
+    {
+        var s = new Sim(new ContactSettings { RetryLimit = 1 });
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        s.Step();
+        s.Step("W7LIT ZL2RPA -22");
+        s.Step().Should().Be("ZL2RPA W7LIT R-19");
+        s.Step();
+        s.Step().Should().Be("ZL2RPA W7LIT R-19", "the last attempt");
+
+        // Slot 6 starts before the quick decode of slot 5 is in: the retry limit ends the contact first.
+        s.E.PlanTransmission(s.Start(6), Mode.Ft8, s.Start(6).AddSeconds(-0.5)).Should().BeNull();
+        s.E.View!.Outcome.Should().Be(ContactOutcome.NoReply);
+        var rr73 = HeardMessage.From(new Decode(s.Start(5), -12, 0.1, 1200, "W7LIT ZL2RPA RR73", false));
+        s.E.OnDecodes(s.Start(5), Mode.Ft8, [rr73], s.Start(6).AddSeconds(2));
+
+        s.Logs.Should().ContainSingle().Which.Call.Should().Be("ZL2RPA");
+        s.E.View!.Outcome.Should().Be(ContactOutcome.Logged);
+        s.E.Waiting.Should().BeEmpty();
+        s.E.PlanTransmission(s.Start(8), Mode.Ft8, s.Start(8).AddSeconds(-0.5)).Should().BeNull("nothing is sent for a contact the retry limit ended");
+    }
+
+    [Fact]
+    public void OnDecodes_Rr73InLaterSlotAfterRetryLimit_WaitsForOperator()
+    {
+        var s = new Sim(new ContactSettings { RetryLimit = 1 });
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        s.Step();
+        s.Step("W7LIT ZL2RPA -22");
+        s.Step();
+        s.Step();
+        s.Step();
+        s.Step();
+        s.Step();
+        s.Step("W7LIT ZL2RPA RR73");
+        s.Logs.Should().BeEmpty("a sign-off after the slot that answered my last attempt is late");
+        s.E.Waiting.Should().ContainSingle().Which.AfterStop.Should().BeTrue();
+    }
+
+    [Fact]
     public void Abandon_LateSignoffAfterWaitingWindow_Ignored()
     {
         var s = new Sim();

@@ -392,14 +392,14 @@ public sealed class ContactEngine
             {
                 // A late sign-off of a stopped contact is still logged; it just does not come back to Calling you.
                 if (_stopped is { } d && Callsign.EqualsCall(m.SenderCall, d.Contact.DxCall)
-                    && d.ListenForSignoff && _settings.AutoLog && CompletesHeld(d.Contact, m))
+                    && d.LogsSignoffIn(slotStartUtc) && _settings.AutoLog && CompletesHeld(d.Contact, m))
                     LogSetAside(d.Contact, m, slotStartUtc, nowUtc);
                 continue;
             }
             if (_lastLogged is { } l && Callsign.EqualsCall(m.SenderCall, l.DxCall) && nowUtc - l.LoggedUtc < LateWindow) continue;
             if (_stopped is { } s && Callsign.EqualsCall(m.SenderCall, s.Contact.DxCall))
             {
-                if (s.ListenForSignoff && _settings.AutoLog && CompletesHeld(s.Contact, m))
+                if (s.LogsSignoffIn(slotStartUtc) && _settings.AutoLog && CompletesHeld(s.Contact, m))
                 {
                     LogSetAside(s.Contact, m, slotStartUtc, nowUtc);
                     continue;
@@ -450,7 +450,11 @@ public sealed class ContactEngine
             var isFinal = IsFinalCourtesy(_c, _c.Phase);
             if (!isFinal && _c.StepTxCount >= 1 + _settings.RetryLimit)
             {
+                // The DX station's reply to my last attempt is in the slot that has just ended, and its decode is
+                // usually applied after this slot starts: a sign-off in it still logs the contact.
+                var answerSlot = slotStartUtc - ModeInfo.SlotLength(mode);
                 End(ContactOutcome.NoReply, nowUtc);
+                if (_stopped is { } s) _stopped = s with { SignoffSlotUtc = answerSlot };
                 return _c is null ? PlanTransmission(slotStartUtc, mode, nowUtc) : null;
             }
             if (isFinal && _c.StepTxCount >= 1) return null;
@@ -675,6 +679,8 @@ public sealed class ContactEngine
         if (expired)
         {
             End(ContactOutcome.NoReply, nowUtc, resume: false);
+            // The Fox's slot that has just ended may still hold its RR73 to my last R-report (see PlanTransmission).
+            if (c.Phase == 2 && _stopped is { } s) _stopped = s with { SignoffSlotUtc = slotStartUtc - ModeInfo.SlotLength(mode) };
             return null;
         }
         c.AwaitingReply = false;
@@ -1101,8 +1107,13 @@ public sealed class ContactEngine
     private sealed record Finished(string DxCall, ContactFlow Flow, SlotParity MyParity, DateTime LoggedUtc, Contact Contact);
 
     // ListenForSignoff: a held contact set aside by calling CQ, logged if the DX station's sign-off arrives.
+    // SignoffSlotUtc: the DX station's slot that answered my last attempt when the retry limit (or the Hound R-report
+    // limit) ended the contact; a sign-off decoded from that slot arrived in time and is logged.
     private sealed record Stopped(Contact Contact, DateTime EndedUtc, List<(ParsedMessage Message, DateTime SlotUtc, HeardMessage Heard)> Late,
-                                  bool ListenForSignoff = false);
+                                  bool ListenForSignoff = false, DateTime? SignoffSlotUtc = null)
+    {
+        public bool LogsSignoffIn(DateTime slotUtc) => ListenForSignoff || SignoffSlotUtc == slotUtc;
+    }
 
     private string Format(Finished f, int index) => Format(f.Contact, index);
 }
