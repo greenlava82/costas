@@ -9,6 +9,7 @@
 using Ft8Client.App.Engine;
 using Ft8Client.App.Remote;
 using Ft8Client.Core;
+using Ft8Client.Core.Decoding;
 using Ft8Client.Core.Remote;
 using Ft8Client.Core.Time;
 
@@ -123,5 +124,38 @@ public class RemoteTuningTests
 
         await rc.HandleAsync("phone", new RemoteCommand("show", ""));
         rc.ViewingFor("phone").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task HandleAsync_GoTo_TunesToTheReadoutsFrequency()
+    {
+        _target.Snapshot = _target.Snapshot with { Quiet = new QuietReadout(QuietCause.DialOff, "No decodes: the dial is on 14.090.", 14_074_000) };
+        var note = await Make().HandleAsync("phone", new RemoteCommand("goTo", Hz: 7_074_000));
+
+        note.Should().BeNull();
+        _tuning.Calls.Should().Equal(["dial 14074000"], "the phone cannot choose another frequency");
+    }
+
+    [Fact]
+    public async Task HandleAsync_GoToWithoutReadout_Refuses()
+    {
+        var note = await Make().HandleAsync("phone", new RemoteCommand("goTo"));
+
+        note.Should().Be("There is no frequency to go to now.");
+        _tuning.Calls.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task HandleAsync_GoToWhileTransmitting_Refuses()
+    {
+        _target.Snapshot = _target.Snapshot with
+        {
+            Transmitting = true,
+            Quiet = new QuietReadout(QuietCause.WrongMode, "No decodes: the radio is in LSB.", 14_074_000),
+        };
+        var note = await Make().HandleAsync("phone", new RemoteCommand("goTo"));
+
+        note.Should().Be("Wait until this transmission ends to change frequency.");
+        _tuning.Calls.Should().BeEmpty();
     }
 }

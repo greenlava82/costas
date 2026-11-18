@@ -12,6 +12,7 @@ using Ft8Client.Core;
 using Ft8Client.Core.Decoding;
 using Ft8Client.Core.Logbook;
 using Ft8Client.Core.Messages;
+using Ft8Client.Core.Neighbours;
 using Ft8Client.Core.Pileups;
 using Ft8Client.Core.Ranking;
 using Ft8Client.Core.Stations;
@@ -62,6 +63,30 @@ public class RemoteStateBuilderTests
         s.Repeats.Select(r => r.Call).Should().Equal("W1AW", "N0XYZ");
         s.Repeats[1].Button.Should().BeEmpty();
         s.Watching.Should().ContainSingle().Which.Reason.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void Build_BandAdvice_CarriedInTheSummary()
+    {
+        var advice = new BandAdvice(BandAdviceKind.OpenFromArea, "15m", [new BandAdviceContinent("EU", 23, 6, Now.AddMinutes(-2))], []);
+        var snap = Snap() with
+        {
+            Summary = new BandSummary { Band = "20m", HeardFrom = new Dictionary<string, int>() },
+            BandAdvice = [advice],
+        };
+
+        var s = RemoteStateBuilder.Build(snap, Now, Ctx, "you", null);
+
+        s.Summary!.Advice.Should().Be("15 m is open to Europe from your area: 23 stations there heard 6 stations near you in the last 15 min.");
+        s.Summary.Closing.Should().BeNull();
+    }
+
+    [Fact]
+    public void Build_NoBandAdvice_SendsNone()
+    {
+        var snap = Snap() with { Summary = new BandSummary { Band = "20m", HeardFrom = new Dictionary<string, int>() } };
+
+        RemoteStateBuilder.Build(snap, Now, Ctx, "you", null).Summary!.Advice.Should().BeNull();
     }
 
     [Fact]
@@ -224,5 +249,34 @@ public class RemoteStateBuilderTests
         var logged = new LoggedContact(3, "W9TJP", NeedTag.NewCall, "", "20m", Mode.Ft8, -12, -8, Now.AddSeconds(-6));
 
         RemoteStateBuilder.Build(Snap() with { LastLogged = logged }, Now, Ctx, "you", null).Logged.Should().BeNull();
+    }
+
+    [Fact]
+    public void Build_Quiet_SendsTheDesksLineAndButton()
+    {
+        var snap = Snap() with { Quiet = new QuietReadout(QuietCause.DialOff, "No decodes: the dial is on 14.090, not the usual FT8 frequency for 20 m.", 14_074_000) };
+        var s = RemoteStateBuilder.Build(snap, Now, Ctx, "you", null);
+
+        s.Quiet.Should().Be("No decodes: the dial is on 14.090, not the usual FT8 frequency for 20 m.");
+        s.QuietGo.Should().Be("Go to 14.074");
+    }
+
+    [Fact]
+    public void Build_QuietWhileTransmitting_NoButton()
+    {
+        var snap = Snap() with { Transmitting = true, Quiet = new QuietReadout(QuietCause.DialOff, "No decodes: the dial is on 14.090.", 14_074_000) };
+        var s = RemoteStateBuilder.Build(snap, Now, Ctx, "you", null);
+
+        s.Quiet.Should().NotBeNull();
+        s.QuietGo.Should().BeNull();
+    }
+
+    [Fact]
+    public void Build_NotQuiet_NoLine()
+    {
+        var s = RemoteStateBuilder.Build(Snap(), Now, Ctx, "you", null);
+
+        s.Quiet.Should().BeNull();
+        s.QuietGo.Should().BeNull();
     }
 }

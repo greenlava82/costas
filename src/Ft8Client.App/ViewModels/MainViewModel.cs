@@ -15,8 +15,10 @@ using Ft8Client.App.Services;
 using Ft8Client.Core;
 using Ft8Client.Core.Messages;
 using Ft8Client.Core.Neighbours;
+using Ft8Client.Core.Notifications;
 using Ft8Client.Core.Bands;
 using Ft8Client.Core.Contacts;
+using Ft8Client.Core.Decoding;
 using Ft8Client.Core.Hunting;
 using Ft8Client.Core.Ranking;
 using Ft8Client.Core.Services;
@@ -479,6 +481,24 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
 
     private HuntSighting? _hunt;
 
+    /// <summary>The "why is it quiet" line is shown: Operate view, two received slots with no decodes.</summary>
+    [ObservableProperty]
+    public partial bool QuietVisible { get; set; }
+
+    /// <summary>"No decodes: the dial is on 14.090, not the usual FT8 frequency for 20 m."</summary>
+    [ObservableProperty]
+    public partial string QuietText { get; set; } = string.Empty;
+
+    /// <summary>"Go to 14.074", or empty when the fix is not a frequency change.</summary>
+    [ObservableProperty]
+    public partial string QuietGoText { get; set; } = string.Empty;
+
+    /// <summary>The Go to button is shown: the readout offers a frequency and nothing is on the air.</summary>
+    [ObservableProperty]
+    public partial bool QuietCanGo { get; set; }
+
+    private QuietReadout? _quiet;
+
     /// <summary>Raised when the window should ask for the operator's attention (flash in the taskbar).</summary>
     public event Action? AttentionRequested;
 
@@ -501,7 +521,12 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         BarShowsCqAndSlot = ShowCqAndSlotInBar(Tab);
         FillLookups(s);
         ApplyBandOpenings(s);
-        if (_callers.Update(s.Waiting) && _host.Settings.Current.Operating.ChimeOnCaller) _host.Chime.Play(_host.Clock.UtcNow);
+        if (_callers.Update(s.Waiting))
+        {
+            if (_host.Settings.Current.Operating.ChimeOnCaller) _host.Chime.Play(_host.Clock.UtcNow);
+            var modeKey = Core.Logbook.LogModeKey.Of(s.Mode);
+            foreach (var w in _callers.Fresh) _host.Notifications.Raise(NotificationText.Caller(w, s.Band, modeKey));
+        }
         Raw.Units = Operate.Units;
         Raw.Apply(s.RawDecodes, s.Rank, s.Contact?.DxCall, keyboard: !ModeInfo.IsSlotted(s.Mode), band: s.Band);
         Logged.Apply(s.LastLogged);
@@ -521,6 +546,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         NoRadioText = radio is null ? string.Empty : $"Radio not connected · {radio.Message}";
         CanChangeBand = !s.Transmitting;
         RefreshHuntGo(); // after CanChangeBand, so Go hides as soon as a transmission starts
+        _quiet = s.Quiet;
+        RefreshQuiet();
         CqText = s.CallingCq ? "Stop CQ" : "Call CQ";
         UpdateTune(s);
         TxOffsetText = (s.TxOffsetAuto ? string.Empty : "Manual · ") + TxOffsetPicker.Describe(new TxOffsetChoice(s.TxOffsetHz, s.TxOffsetClear));
@@ -649,6 +676,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     partial void OnTabChanged(int value)
     {
         BarShowsCqAndSlot = ShowCqAndSlotInBar(value);
+        RefreshQuiet();
         if (value >= 0 && value < TabNames.Length) _host.Usage.Track("view_opened", "view", TabNames[value]);
         RefreshView(value);
     }
@@ -794,7 +822,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         StatusKind = TextKind.Normal;
     }
 
-    // A Hunt list entry was heard: the bar, mini mode and the phone say so; the chime and the taskbar flash when wanted.
+    // A Hunt list entry was heard: the bar, mini mode and the phone say so; a desktop notification, the chime and the
+    // taskbar flash when wanted.
     private void ShowHunt(HuntSighting s)
     {
         _hunt = s;
@@ -802,11 +831,22 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         RefreshHuntGo();
         HuntVisible = true;
         Mini.ShowHunt(HuntText);
+        _host.Notifications.Raise(NotificationText.Hunt(s, _host.Countries, SettingsMapper.Units(_host.Settings.Current)));
         if (_host.Settings.Current.Hunt.Sound)
         {
             _host.Chime.Play(_host.Clock.UtcNow);
             AttentionRequested?.Invoke();
         }
+    }
+
+    /// <summary>
+    /// A desktop notification was clicked: Operate, with the station selected when it is in Next in line. The window
+    /// comes forward separately. Nothing is called, sent or retuned.
+    /// </summary>
+    public void ShowFromNotification(string call)
+    {
+        SelectTab(0);
+        Operate.SelectCall(call);
     }
 
     private string AlertText(HuntSighting s) =>
@@ -848,6 +888,27 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         _ = _host.SetBandAsync(h.Heard.Band, mode);
         _host.Usage.Track("hunt_go");
         HuntCanGo = false;
+    }
+
+    // The line belongs to the Operate view only; it follows the snapshot, so it goes the moment anything decodes.
+    private void RefreshQuiet()
+    {
+        QuietVisible = _quiet is not null && Tab == 0;
+        QuietText = _quiet?.Text ?? string.Empty;
+        QuietGoText = _quiet?.GoToText ?? string.Empty;
+        QuietCanGo = _quiet?.GoToDialHz is not null && CanChangeBand;
+    }
+
+    /// <summary>
+    /// The readout's "Go to 14.074": tunes to the usual frequency (and USB data) through the same path as a frequency typed
+    /// in the frequency menu. Only ever run from the operator's click; the readout itself never changes the radio.
+    /// </summary>
+    [RelayCommand]
+    private async Task QuietGoAsync()
+    {
+        if (_quiet?.GoToDialHz is not { } hz || !CanChangeBand) return;
+        Activity();
+        if (await _host.TuneDialAsync(hz) is { } refused) StatusText = refused;
     }
 
     /// <summary>Hides the Hunt alert.</summary>
@@ -1232,11 +1293,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         var on = _host.Settings.Current.PskReporter is { FeedEnabled: true, BandActivity: true };
         var feed = on ? s.BandActivityFeed : BandActivityFeed.Off;
         var current = s.Band.ToLowerInvariant();
-        bool Followed(string band) => feed == BandActivityFeed.AllBands || (feed == BandActivityFeed.CurrentBandOnly && band == current);
-        bool Sampled(string band) => feed == BandActivityFeed.Stopped || (feed == BandActivityFeed.CurrentBandOnly && band != current);
-        var openings = s.BandOpenings.Where(kv => Followed(kv.Key))
-                        .Concat(s.SampledBandOpenings.Where(kv => Sampled(kv.Key)))
-                        .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+        bool Followed(string band) => BandOpenings.IsFollowed(feed, band, current);
+        var openings = BandOpenings.Shown(s.BandOpenings, s.SampledBandOpenings, feed, current);
         var live = openings.Values.Any(o => o.Spots > 0);
         var max = live ? openings.Values.Max(o => o.Spots) : 0;
         var units = SettingsMapper.Units(_host.Settings.Current);

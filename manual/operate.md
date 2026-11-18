@@ -60,6 +60,32 @@ Two banners can appear under the top bar:
 A **Hunt list** bar appears below them when a station on your [Hunt list](hunt.md) is heard, with **Go to** *band*
 and **Dismiss**.
 
+## Why it's quiet
+
+When FT8 or FT4 has decoded nothing for two slots in a row (30 seconds in FT8, 15 in FT4), a line appears under the
+top bar with the most likely reason and, where there is one, the fix. Two slots, so that both the even and the odd
+slot have passed with nothing heard. Slots you transmitted in don't count, and changing band, mode or frequency starts
+the count again. The line goes as soon as anything is decoded.
+
+![The Why it's quiet line, with the dial off the usual frequency](images/operate-quiet.png)
+
+Costas checks, in this order: the receive audio (no audio, silence, too quiet or clipping, measured the same way as
+the input meter in Station setup), the dial (more than 1 kHz from the band's usual FT8 or FT4 frequency), the
+radio's mode (anything other than USB data or USB), the decoder, and your clock (off by more than the clock limit,
+2 s unless you changed it). The first one that is wrong is shown. If everything looks right it says so: the band may
+just be quiet.
+
+![Nothing wrong: the band is quiet](images/quiet-band.png)
+
+When the fix is a frequency, the line has a **Go to 14.074** button (with the band's real frequency). Click it and
+Costas tunes the radio there in USB data, exactly as if you had typed the frequency in the
+[frequency menu](#typing-a-frequency). Nothing happens to your radio until you click: the line only gives advice. The
+button is hidden while you are transmitting.
+
+The line is not shown when no radio is set up (Costas is not receiving anything then), and when the radio is not
+connected the yellow *Radio not connected* banner explains instead. It is shown on the Operate view only, and on the
+[phone page](phone.md). PSK and RTTY have no slots, so they don't show it.
+
 ## Big and small windows
 
 Costas picks one of two layouts for the Operate view from the size of its window, and switches as you resize it:
@@ -83,6 +109,24 @@ slot countdown, **Call CQ**, the CQ picker, **Auto-call**, and **Resend**, **Log
 until a contact starts). Under it is the **band summary**, the same numbers as the side column's **Band** tab
 described [below](#side-column), laid out across the width. If the window is too short for both, the band summary
 moves to the top of the call list and scrolls with it, so the card is never cut off.
+
+### Band advice
+
+When the evidence supports it, a line under the band summary (on a small window, on the **Band** tab) says which band
+looks best for you right now, for example:
+
+- *15 m is open to Europe from your area: 23 stations there heard 6 stations near you in the last 15 min.* Stations
+  within 300 miles of you are being heard in Europe on 15 m, and the band you are on is not reaching Europe.
+- *20 m is open to Europe for you: 12 stations there heard you in the last 15 min.* Your own signal on this band, from
+  PSK Reporter and the Reverse Beacon Network.
+- *20 m is closing to Europe: 1 station there heard stations near you in the last 15 min, 14 in the 15 min before.*
+
+If countries you still need on that band are among the listeners, the line says so. Hover over it to see the
+numbers per continent, how recent the newest report is, and the rule that was met. A band is called open only when at
+least 5 stations on another continent heard at least 2 stations near you (or 5 heard you). Your own continent is never
+named. When Costas isn't sure, it says nothing. It needs the same settings as the band menu's activity (see
+[Maps](maps.md#band-activity-near-you)), and it shows nothing with no live reports. The line is advice only: Costas never
+changes band for you.
 
 ### Small window: idle card and band strip
 
@@ -276,7 +320,8 @@ the idle card.
 On a small window it is one card with four tabs, one showing at a time. Costas remembers the tab you left it on.
 
 - **Band**: the full band summary. **20 m right now** has stations heard in the last 5 minutes, countries, how many
-  are calling CQ and **You need**, with decodes in the last slot and the average per slot over the past hour.
+  are calling CQ and **You need**, with decodes in the last slot and the average per slot over the past hour, and the
+  [band advice](#band-advice) line when there is one.
   **Heard from** is a bar per continent (N. Am., Europe, Asia, Oceania, S. Am., Africa). **Your log on 20 m** has
   countries worked and confirmed on this band, US states worked (and the first few you still need), grid squares
   worked, and **This session**: contacts, new DXCC and new band DXCC this session. A session starts when you open

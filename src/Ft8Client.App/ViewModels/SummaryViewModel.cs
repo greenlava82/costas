@@ -7,7 +7,9 @@
 // see the GNU General Public License in LICENSE for details.
 
 using System.Globalization;
+using Ft8Client.Core;
 using Ft8Client.Core.Bands;
+using Ft8Client.Core.Neighbours;
 using Ft8Client.Core.Ranking;
 using Ft8Client.Core.Stations;
 
@@ -25,8 +27,27 @@ public sealed class SummaryViewModel
     /// Builds the panel. PSK and RTTY have no slots: pass <paramref name="keyboardActivity"/> (stations read per three
     /// minutes) and the caption counts those instead of decodes per slot.
     /// </summary>
-    public SummaryViewModel(BandSummary s, bool logEmpty, IReadOnlyList<SlotActivity>? keyboardActivity = null)
+    /// <param name="s">The band summary.</param>
+    /// <param name="logEmpty">True when the log is empty.</param>
+    /// <param name="keyboardActivity">For PSK and RTTY: stations read per three minutes.</param>
+    /// <param name="advice">The band advice (docs/04-domain-logic.md, section 14a); empty or null for none.</param>
+    /// <param name="units">For the radius in the advice tooltip.</param>
+    /// <param name="nowUtc">Now, for how recent the advice's evidence is.</param>
+    public SummaryViewModel(BandSummary s, bool logEmpty, IReadOnlyList<SlotActivity>? keyboardActivity = null, IReadOnlyList<BandAdvice>? advice = null,
+                            DistanceUnit units = DistanceUnit.Miles, DateTime nowUtc = default)
     {
+        // Display only: the advice never changes band, ranking or who is called.
+        if (advice?.FirstOrDefault(a => a.Kind != BandAdviceKind.Closing) is { } open)
+        {
+            Advice = BandAdviceText.Line(open);
+            AdviceTip = BandAdviceText.Tip(open, units, nowUtc);
+        }
+        if (advice?.FirstOrDefault(a => a.Kind == BandAdviceKind.Closing) is { } closing)
+        {
+            Closing = BandAdviceText.Line(closing);
+            ClosingTip = BandAdviceText.Tip(closing, units, nowUtc);
+        }
+
         var band = BandPlan.Display(s.Band);
         Title = $"{band} right now";
         LogTitle = $"Your log on {band}";
@@ -53,6 +74,27 @@ public sealed class SummaryViewModel
         Tonight = $"{s.TonightContacts} contacts · {s.TonightNewCountries} new DXCC · {s.TonightNewBands} new band DXCC";
         LogNotice = logEmpty ? "Your log is empty, so every station shows as a new call. Set up QRZ or import an ADIF file." : null;
     }
+
+    /// <summary>"15 m is open to Europe from your area: …", or null when the evidence supports no band.</summary>
+    public string? Advice { get; }
+
+    /// <summary>The evidence behind <see cref="Advice"/>.</summary>
+    public string? AdviceTip { get; }
+
+    /// <summary>True when there is an <see cref="Advice"/> line.</summary>
+    public bool HasAdvice => Advice is not null;
+
+    /// <summary>"20 m is closing to Europe: …", or null.</summary>
+    public string? Closing { get; }
+
+    /// <summary>The evidence behind <see cref="Closing"/>.</summary>
+    public string? ClosingTip { get; }
+
+    /// <summary>True when there is a <see cref="Closing"/> line.</summary>
+    public bool HasClosing => Closing is not null;
+
+    /// <summary>True when there is either advice line.</summary>
+    public bool HasAnyAdvice => HasAdvice || HasClosing;
 
     /// <summary>"20 m right now".</summary>
     public string Title { get; }
