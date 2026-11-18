@@ -43,6 +43,24 @@ public sealed class QrzService : IDisposable
     private string _agentCall = string.Empty;
     private QrzXmlClient? _xml;
     private (string User, string Password, HttpClient Http)? _xmlFor;
+    private readonly CombinedServiceStatus _status = new();
+    private readonly object _refusedGate = new();
+    private (string User, string Password, DateTime RetryUtc)? _lookupRefused;
+
+    /// <summary>The logbook sync's part of the QRZ indicator.</summary>
+    internal const string SyncPart = "sync";
+
+    /// <summary>The upload queue's part of the QRZ indicator.</summary>
+    internal const string UploadPart = "upload";
+
+    /// <summary>The callsign lookups' part of the QRZ indicator.</summary>
+    internal const string LookupPart = "lookup";
+
+    /// <summary>
+    /// After QRZ refuses the lookup login, no lookup is tried with the same username and password for this long (changing
+    /// either, or a passing Test in Settings, ends the pause). Without it every new call on screen logged in again.
+    /// </summary>
+    internal static readonly TimeSpan RefusedLoginPause = TimeSpan.FromHours(1);
 
     /// <summary>Creates the service. <paramref name="handler"/> replaces the network (the fake server in simulation).</summary>
     public QrzService(Session session, AppSettingsAccessor settings, ISecretStore secrets, QsoRepository qsos, UploadQueueRepository queue,
@@ -60,6 +78,9 @@ public sealed class QrzService : IDisposable
         _handler = handler;
         _http = MakeClient();
     }
+
+    /// <summary>Waits between lookups after a failure. Tests replace it so they do not wait.</summary>
+    internal Func<TimeSpan, CancellationToken, Task> Delay { get; set; } = Task.Delay;
 
     /// <summary>Raised after a sync changed the log.</summary>
     public event Action? LogChanged;
@@ -102,7 +123,12 @@ public sealed class QrzService : IDisposable
         try
         {
             var ok = await new QrzXmlClient(Client(), () => (user, password)).TestAsync(ct).ConfigureAwait(false);
-            return ok ? (true, "Lookups work.") : (false, "QRZ refused the username or password.");
+            if (!ok) return (false, "QRZ refused the username or password.");
+            lock (_refusedGate)
+            {
+                if (_lookupRefused is { } r && r.User == user && r.Password == password) _lookupRefused = null;
+            }
+            return (true, "Lookups work.");
         }
         catch (QrzException ex)
         {
@@ -116,7 +142,7 @@ public sealed class QrzService : IDisposable
         var key = Key;
         if (key is null || !_settings.Current.Qrz.LogbookEnabled)
         {
-            _session.SetService(ServiceNames.Qrz, ServiceStatus.Off("QRZ logbook not set up"));
+            SetStatus(SyncPart, ServiceStatus.Off("QRZ logbook not set up"));
             return "QRZ logbook is not set up.";
         }
         if (!await _syncLock.WaitAsync(0, ct).ConfigureAwait(false)) return "A sync is already running.";
@@ -126,13 +152,13 @@ public sealed class QrzService : IDisposable
             var r = await svc.SyncAsync(ProfileId, _settings.Current.Profile.Callsign, key, new Progress<int>(n => SyncProgress?.Invoke(n)), ct)
                 .ConfigureAwait(false);
             LastSyncUtc = _clock.UtcNow;
-            _session.SetService(ServiceNames.Qrz, new ServiceStatus(ServiceHealth.Ok, $"Synced {r.Fetched} records", _clock.UtcNow));
+            SetStatus(SyncPart, new ServiceStatus(ServiceHealth.Ok, $"Synced {r.Fetched} records", _clock.UtcNow));
             if (r.Changed) LogChanged?.Invoke();
             return $"Synced: {r.Fetched} fetched, {r.Inserted} new.";
         }
         catch (QrzException ex)
         {
-            _session.SetService(ServiceNames.Qrz, new ServiceStatus(ex.IsAuth ? ServiceHealth.Down : ServiceHealth.Degraded, ex.Message, _clock.UtcNow));
+            SetStatus(SyncPart, new ServiceStatus(ex.IsAuth ? ServiceHealth.Down : ServiceHealth.Degraded, ex.Message, _clock.UtcNow));
             Log.Warning("QRZ sync failed: {Message}", ex.Message);
             return ex.Message;
         }
@@ -199,7 +225,7 @@ public sealed class QrzService : IDisposable
     }
 
     // Returns true when QRZ was asked (so the next request waits a second).
-    private async Task<bool> LookupOneAsync(string call, CancellationToken ct)
+    internal async Task<bool> LookupOneAsync(string call, CancellationToken ct)
     {
         var cached = _cache.GetFresh(call, _clock.UtcNow);
         if (cached is not null)
@@ -213,20 +239,45 @@ public sealed class QrzService : IDisposable
         if (!_settings.Current.Qrz.LookupEnabled || user is null || pass is null)
         {
             _lookups.Failed(call, _clock.UtcNow + TimeSpan.FromMinutes(1));
+            ClearStatus(LookupPart);
             return false;
+        }
+        lock (_refusedGate)
+        {
+            if (_lookupRefused is { } refused)
+            {
+                if (refused.User == user && refused.Password == pass && _clock.UtcNow < refused.RetryUtc)
+                {
+                    // QRZ refused these credentials: do not log in again for every call until they change.
+                    _lookups.Failed(call, refused.RetryUtc);
+                    return false;
+                }
+                _lookupRefused = null;
+            }
         }
         try
         {
             var r = await new CallsignLookupService(XmlClient(user, pass), _cache, _clock).LookupAsync(call, ct).ConfigureAwait(false);
             _lookups.Settle(call);
             if (r is not null) _session.SetLookups([r]);
+            if (_status.Get(LookupPart) is { Health: not ServiceHealth.Ok })
+                SetStatus(LookupPart, new ServiceStatus(ServiceHealth.Ok, "QRZ lookups working", _clock.UtcNow));
+        }
+        catch (QrzException ex) when (ex.IsAuth)
+        {
+            var retry = _clock.UtcNow + RefusedLoginPause;
+            lock (_refusedGate) _lookupRefused = (user, pass, retry);
+            _lookups.Failed(call, retry);
+            SetStatus(LookupPart, new ServiceStatus(ServiceHealth.Down, $"{ex.Message.TrimEnd('.')}. Lookups paused; check the QRZ username and password in Settings.", _clock.UtcNow));
+            Log.Warning("QRZ lookup login refused; lookups paused until the credentials change: {Message}", ex.Message);
         }
         catch (QrzException ex)
         {
             // Unreachable or refused: try this call again later, and give QRZ a rest before the next one.
             _lookups.Failed(call, _clock.UtcNow + TimeSpan.FromMinutes(10));
+            SetStatus(LookupPart, new ServiceStatus(ServiceHealth.Degraded, $"{ex.Message.TrimEnd('.')}. Lookups retrying.", _clock.UtcNow));
             Log.Information("QRZ lookup failed for {Call}: {Message}", call, ex.Message);
-            await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+            await Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
         }
         return true;
     }
@@ -250,7 +301,7 @@ public sealed class QrzService : IDisposable
             {
                 // Anything but a QRZ answer (the database busy, a network error): say so and keep the loop alive.
                 Log.Error(ex, "QRZ sync failed");
-                _session.SetService(ServiceNames.Qrz, new ServiceStatus(ServiceHealth.Degraded, $"Sync failed: {ex.Message}", _clock.UtcNow));
+                SetStatus(SyncPart, new ServiceStatus(ServiceHealth.Degraded, $"Sync failed: {ex.Message}", _clock.UtcNow));
             }
             try
             {
@@ -325,6 +376,14 @@ public sealed class QrzService : IDisposable
             _xmlFor = (user, password, http);
         }
         return _xml;
+    }
+
+    // Every part of QRZ reports here; the indicator shows the combination, so one part working does not hide another failing.
+    private void SetStatus(string part, ServiceStatus status) => _session.SetService(ServiceNames.Qrz, _status.Set(part, status));
+
+    private void ClearStatus(string part)
+    {
+        if (_status.Clear(part) is { } now) _session.SetService(ServiceNames.Qrz, now);
     }
 
     private HttpClient MakeClient() => HttpFactory.Create(_settings.Current.Profile.Callsign, _handler);
