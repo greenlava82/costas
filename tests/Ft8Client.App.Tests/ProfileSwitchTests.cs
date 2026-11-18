@@ -49,4 +49,9 @@ public class ProfileSwitchTests
     [Fact]
     public void Refusal_AutoCall_Refused() =>
         ProfileSwitch.Refusal(Idle with { AutoCall = true }).Should().Contain("while Auto-call is on");
+
+    [Fact]
+    public void Refusal_CallsignEdit_SaysYourCallsign() =>
+        ProfileSwitch.Refusal(Idle with { CallingCq = true }, "your callsign")
+            .Should().Be("Nothing was saved: your callsign cannot change while calling CQ as K1ABC. Try again when the station is idle.");
 }

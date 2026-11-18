@@ -1449,8 +1449,13 @@ public sealed partial class SettingsViewModel : ObservableObject
             SelectedPage = MobilePage;
             return false;
         }
-        // A different profile changes the callsign on the air: only when idle (D25). Checked before anything is stored.
-        if ((SelectedProfile ?? Profiles[0]).Id != _loadedProfile && ProfileSwitch.Refusal(_host.Session.Snapshot) is { } busy)
+        // A different profile, or a new callsign for the one in use, changes what goes out: only when idle (D25).
+        // Checked before anything is stored.
+        var chosen = SelectedProfile ?? Profiles[0];
+        var what = chosen.Id != _loadedProfile ? "the station profile"
+            : !string.Equals(chosen.Callsign.Trim().ToUpperInvariant(), _host.Settings.Current.Profile.Callsign, StringComparison.Ordinal) ? "your callsign"
+            : null;
+        if (what is not null && ProfileSwitch.Refusal(_host.Session.Snapshot, what) is { } busy)
         {
             Message = busy;
             SelectedPage = 0;

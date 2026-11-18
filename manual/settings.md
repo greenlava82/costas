@@ -24,7 +24,7 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
   and antenna on the PSK and RTTY page also belong to the profile shown.
   **Delete** removes the profile shown (the last one cannot be removed). The profile shown when you press **Save** is
   the one Costas uses from then on; if it uses another radio or sound card, Costas reconnects to it. Changing the
-  profile changes the callsign you send, so it only happens when the station is idle: while transmitting, during a
+  profile, or the callsign of the profile in use, changes what you send, so it only happens when the station is idle: while transmitting, during a
   contact, or with CQ or Auto-call on, **Save** and **Apply** refuse and say why, and nothing is saved until you try
   again once the station is idle. Set a profile's radio and audio in **Station setup** while it is the active one. Worked-before and log totals count the contacts
   logged under that profile's callsign.

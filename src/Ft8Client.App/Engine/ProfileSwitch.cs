@@ -13,12 +13,16 @@ namespace Ft8Client.App.Engine;
 /// <summary>
 /// When the active station profile may change (owner decision D25, 2026-11-17): only when the station is idle. A switch
 /// changes the callsign that goes out, so it is refused while transmitting, in a contact, or with CQ, Auto-call or a
-/// keyboard-mode transmission going, and the operator is told why. The same rule applies at the desk and from a phone.
+/// keyboard-mode transmission going, and the operator is told why. Editing the callsign of the profile in use is held
+/// to the same rule (owner decision 2026-11-17). The same rule applies at the desk and from a phone.
 /// </summary>
 public static class ProfileSwitch
 {
-    /// <summary>Why the profile cannot change now under <paramref name="s"/>'s profile, or null when it can.</summary>
-    public static string? Refusal(SessionSnapshot s)
+    /// <summary>
+    /// Why <paramref name="what"/> (the station profile, or the callsign of the one in use: both change what goes out)
+    /// cannot change now, or null when it can.
+    /// </summary>
+    public static string? Refusal(SessionSnapshot s, string what = "the station profile")
     {
         var why = s.Transmitting || s.KeyboardTx.Active ? "while transmitting"
             : s.Contact is { Outcome: ContactOutcome.InProgress } c ? $"during the contact with {c.DxCall}"
@@ -27,6 +31,6 @@ public static class ProfileSwitch
             : null;
         if (why is null) return null;
         var under = s.MyCall.Length > 0 ? $" as {s.MyCall}" : string.Empty;
-        return $"Nothing was saved: the station profile cannot change {why}{under}. Try again when the station is idle.";
+        return $"Nothing was saved: {what} cannot change {why}{under}. Try again when the station is idle.";
     }
 }
