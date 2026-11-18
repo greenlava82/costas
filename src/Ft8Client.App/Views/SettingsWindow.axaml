@@ -532,7 +532,7 @@
               <TextBlock Classes="label" Text="Alert" />
               <StackPanel Grid.Column="1">
                 <CheckBox Content="Play the chime and flash Costas in the taskbar" IsChecked="{Binding HuntSound}" />
-                <TextBlock Classes="help" Text="Each entry alerts once per band, then stays quiet there for 30 minutes. The chime plays on the computer's default speakers, never on the radio's audio device." />
+                <TextBlock Classes="help" Text="Each entry alerts once per band, then stays quiet there for 30 minutes. The chime plays on the computer's default speakers, never on the radio's audio device. Desktop notifications for alerts are set on the Notifications page." />
               </StackPanel>
             </Grid>
           </StackPanel>
