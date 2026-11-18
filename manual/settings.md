@@ -108,7 +108,7 @@ exchange and the reports are fixed by FT8, so only the parts above can change.
 | **Double-click** | off | On: in FT8 and FT4, double-clicking another station in Next in line or Repeats during a contact ends the contact (as Abandon does; one already logged stays logged) and calls the new one. Off: during a contact a double-click does nothing. See [Switching to another station](contacts.md#switching-to-another-station) |
 | **Logging** | on | Log each contact automatically when it completes |
 | **Station is busy** | off | On: keep calling a station that is working someone else, as WSJT-X does. A Call on a station already in a contact calls it anyway, and a station that answers another caller is called again until it answers you, **Give up after** is reached, or you stop. Off: Costas stops and the contact card says *In another contact* |
-| **Calling you › Chime** | off | A chime on the computer's default speakers when a new station calls you. Never on the radio's audio device |
+| **Calling you › Chime** | off | A chime on the computer's default speakers when a new station calls you. Never on the radio's audio device. A desktop notification for a new caller is set in [Notifications](#notifications) |
 
 ## PSK and RTTY
 
@@ -166,6 +166,25 @@ What you are looking for, and how you are told. See [Hunt list and alerts](hunt.
 - **Add**: the kind (Country, Call, US state, Grid, Any new country), what to look for, and a band or *Any band*.
 - **Also watch the bands I am not on, through PSK Reporter**: on. **Count receivers within** 620 miles (1,000 km).
 - **Play the chime and flash Costas in the taskbar**: on.
+
+## Notifications
+
+![Settings: Notifications](images/settings-notifications.png)
+
+Desktop notifications, in Windows' notification centre or your Linux desktop's. Clicking one brings Costas to the
+front with the station selected; it never calls, transmits or changes band. There are no buttons on them.
+
+- **Show desktop notifications**: on.
+- **Notify me when**: *A station on my Hunt list is heard* (on) and *A station calls me* (on). A caller's
+  notification reads *W1ABC is calling you · 20 m FT8 · -9 dB · W7LIT W1ABC FN31*.
+- **Only when Costas is in the background**: on. Background means minimized, in mini mode, or another program in
+  front. Off: notifications show even while you are looking at Costas.
+
+A station is notified at most once every 10 minutes, and several within a minute share one notification
+(*3 stations are calling you*), so a busy band does not flood the notification centre. Notifications are silent:
+the chime settings decide whether Costas makes a sound. Windows Focus Assist and your desktop's Do Not Disturb hold
+them back as they do for any program. If this computer has no notification centre Costas can use, the page says so
+and nothing is shown.
 
 ## Logbooks
 

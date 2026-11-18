@@ -127,6 +127,10 @@ public static class SettingsMapper
     public static RankingSettings ToRanking(AppSettings s) =>
         ToRanking(s.Ranking) with { PreferNewParks = s.Ranking.PreferNewParks && s.Pota.SpotsEnabled };
 
+    /// <summary>The desktop notification choices.</summary>
+    public static Core.Notifications.NotificationPolicy Notifications(AppSettings s) =>
+        new(s.Notifications.Enabled, s.Notifications.Hunt, s.Notifications.Callers, s.Notifications.OnlyInBackground);
+
     /// <summary>Ranking settings from stored options.</summary>
     public static RankingSettings ToRanking(RankingOptions r)
     {

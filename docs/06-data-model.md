@@ -232,6 +232,7 @@ Plain text, one line per event, monthly files. Compatible in spirit with WSJT-X 
             "uploadOnComplete": false, "userList": true },
   "hunt": { "targets": [{ "kind": "country", "value": "KL", "band": "40m" }], "watchAllBands": true,
             "nearbyKm": 1000, "sound": true },
+  "notifications": { "enabled": true, "hunt": true, "callers": true, "onlyInBackground": true },
   "qrz": { "logbookEnabled": true, "lookupEnabled": true, "syncMinutes": 15, "uploadOnComplete": true },
   "pskReporter": { "feedEnabled": true, "uploadSpots": false },
   "udp": { "enabled": true, "address": "127.0.0.1", "port": 2237 },

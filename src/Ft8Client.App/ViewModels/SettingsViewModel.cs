@@ -12,6 +12,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Ft8Client.App.Engine;
 using Ft8Client.App.Services;
+using Ft8Client.App.Services.Notifications;
 using Ft8Client.Core.Bands;
 using Ft8Client.Core.Contacts;
 using Ft8Client.Core.Logbook;
@@ -110,6 +111,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         HuntEmpty = HuntRows.Count == 0;
         HuntAllBands = s.Hunt.WatchAllBands;
         HuntSound = s.Hunt.Sound;
+        NotifyEnabled = s.Notifications.Enabled;
+        NotifyHunt = s.Notifications.Hunt;
+        NotifyCallers = s.Notifications.Callers;
+        NotifyOnlyInBackground = s.Notifications.OnlyInBackground;
+        NotifyBackend = host.Notifications.Backend is NullDesktopNotifier
+            ? "This computer has no notification centre Costas can use, so none are shown. The Hunt bar, mini mode and the chime still tell you."
+            : "Windows Focus Assist and your desktop's Do Not Disturb hold them back, as they do for any program.";
         var km = s.Hunt.NearbyKm;
         HuntNearby = (s.Appearance.Units == "km" ? km : (int)Math.Round(GreatCircleMiles(km))).ToString(CultureInfo.InvariantCulture);
         HuntNearbyUnit = s.Appearance.Units == "km" ? "km" : "miles";
@@ -751,6 +759,25 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Chime and taskbar flash with an alert.</summary>
     [ObservableProperty]
     public partial bool HuntSound { get; set; }
+
+    /// <summary>Desktop notifications at all.</summary>
+    [ObservableProperty]
+    public partial bool NotifyEnabled { get; set; }
+
+    /// <summary>A notification for a Hunt list alert.</summary>
+    [ObservableProperty]
+    public partial bool NotifyHunt { get; set; }
+
+    /// <summary>A notification when a station calls me.</summary>
+    [ObservableProperty]
+    public partial bool NotifyCallers { get; set; }
+
+    /// <summary>Only while Costas is minimized, in mini mode or behind another window.</summary>
+    [ObservableProperty]
+    public partial bool NotifyOnlyInBackground { get; set; }
+
+    /// <summary>What the notifications page says about this computer's notification centre.</summary>
+    public string NotifyBackend { get; }
 
     /// <summary>How near (in the display unit) a PSK Reporter receiver must be.</summary>
     [ObservableProperty]
@@ -1441,6 +1468,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Hunt.Targets = HuntRows.Select(r => HuntService.ToEntry(r.Target)).ToList();
             s.Hunt.WatchAllBands = HuntAllBands;
             s.Hunt.Sound = HuntSound;
+            s.Notifications.Enabled = NotifyEnabled;
+            s.Notifications.Hunt = NotifyHunt;
+            s.Notifications.Callers = NotifyCallers;
+            s.Notifications.OnlyInBackground = NotifyOnlyInBackground;
             var near = Int(HuntNearby, 50, 5000, 0);
             if (near > 0) s.Hunt.NearbyKm = HuntNearbyUnit == "km" ? near : (int)Math.Round(near * Core.Geo.GreatCircle.KmPerMile);
             s.Ranking.KeepCqCallersMinutes = KeepMinutesFor(KeepCqCallers);
