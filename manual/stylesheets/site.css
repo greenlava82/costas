@@ -54,10 +54,14 @@ h2 { font-size: clamp(1.7rem, 3.2vw, 2.3rem); }
   font: 600 1.25rem var(--display); letter-spacing: 0.02em; }
 .brand img { border-radius: 4px; }
 .bar__nav { display: flex; align-items: center; gap: 1.4rem; font-size: 0.95rem; }
-.bar__nav a { color: var(--on-ink-muted); text-decoration: none; }
+.bar__nav a { color: var(--on-ink-muted); text-decoration: none; white-space: nowrap; }
 .bar__nav a:hover { color: var(--on-ink); }
 .bar__nav .bar__cta { color: #fff; background: var(--ember); padding: 0.4rem 0.9rem; border-radius: 3px; font-weight: 500; }
 .bar__nav .bar__cta:hover { background: var(--ember-deep); color: #fff; }
+.bar__nav .bar__support { color: var(--on-ink); padding: 0.4rem 0.9rem; border-radius: 3px; font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--ember); }
+.bar__nav .bar__support span { color: var(--ember); }
+.bar__nav .bar__support:hover { color: #fff; background: rgba(196, 80, 28, 0.18); }
 
 /* Buttons */
 .btn { display: inline-block; padding: 0.8rem 1.4rem; border-radius: 3px; font-weight: 600; text-decoration: none;
@@ -153,11 +157,20 @@ a:focus-visible, .btn:focus-visible { outline: 2px solid var(--ember); outline-o
 }
 @media (max-width: 560px) {
   body { font-size: 16px; }
-  .bar__nav a:not(.bar__cta):not([href*="introduction"]) { display: none; }
-  .bar__nav { gap: 1rem; }
+  .bar__nav a:not(.bar__cta):not(.bar__support):not([href*="introduction"]) { display: none; }
+  .bar__nav { gap: 0.75rem; }
+  .bar__nav .bar__cta, .bar__nav .bar__support { padding: 0.4rem 0.7rem; }
   .also__list, .download__boxes { grid-template-columns: minmax(0, 1fr); }
   .support__inner { flex-direction: column; align-items: flex-start; }
   .row__shot--narrow img, .row__shot--phone img { max-height: 26rem; }
+}
+@media (max-width: 420px) {
+  .bar__nav a[href*="introduction"] { display: none; }
+}
+@media (max-width: 360px) {
+  .brand { font-size: 1.1rem; gap: 0.4rem; }
+  .bar__nav { gap: 0.5rem; font-size: 0.9rem; }
+  .bar__nav .bar__cta, .bar__nav .bar__support { padding: 0.35rem 0.55rem; }
 }
 
 /* Inner pages (About) */
