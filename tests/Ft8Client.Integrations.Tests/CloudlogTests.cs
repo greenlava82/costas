@@ -280,6 +280,38 @@ public class CloudlogTests
         queue.All().Single().NextTryUtc.Should().Be(clock.UtcNow + TimeSpan.FromSeconds(600));
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.OK, """{"data":{"exported":2,"lastfetchedid":88,"adif":"<call:5>K1ABC<eor>"},"meta":{"has_more":true}}""", 2, 88L, true, false, null)]
+    [InlineData(HttpStatusCode.OK, """{"data":{"exported":0,"lastfetchedid":88,"adif":null},"meta":{"has_more":false}}""", 0, 88L, false, false, null)]
+    [InlineData(HttpStatusCode.Forbidden, """{"error":{"code":"insufficient_scope","details":{"required_scope":"qso:read"}}}""", -1, 0L, false, true, "qso:read")]
+    [InlineData(HttpStatusCode.Unauthorized, """{"error":{"code":"token_expired"}}""", -1, 0L, false, true, "expired")]
+    [InlineData(HttpStatusCode.TooManyRequests, """{"error":{"code":"rate_limited","details":{"retry_after":30}}}""", -1, 0L, false, false, "slow down")]
+    [InlineData(HttpStatusCode.OK, "<html>Sign in</html>", -1, 0L, false, false, "check the address")]
+    public void ParseV2Download_Answer_PageOrRefusal(HttpStatusCode code, string body, int exported, long last, bool more, bool permanent, string? says)
+    {
+        var r = CloudlogClient.ParseV2Download(code, body, "wl2_t");
+        if (exported < 0)
+        {
+            r.Page.Should().BeNull();
+            r.Permanent.Should().Be(permanent);
+            r.Error.Should().ContainEquivalentOf(says);
+            return;
+        }
+        r.Page.Should().Be(new WavelogDownloadPage(exported, last, exported == 0 ? null : "<call:5>K1ABC<eor>", more));
+    }
+
+    [Fact]
+    public async Task DownloadPage_V1Key_RefusedWithoutAsking()
+    {
+        var calls = 0;
+        using var handler = new Handler((_, _) => { calls++; return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)); });
+        using var http = HttpFactory.Create("W7LIT", handler);
+        var r = await new CloudlogClient(http).DownloadPageAsync(Site, "cl123", "3", 0, TestContext.Current.CancellationToken);
+        (r.Page, r.Permanent).Should().Be((null, true));
+        r.Error.Should().Contain("v2 token");
+        calls.Should().Be(0);
+    }
+
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => send(request, cancellationToken);

@@ -143,6 +143,20 @@ public sealed class QsoRepository(SqliteDatabase db)
         return result;
     }
 
+    /// <summary>
+    /// Upserts many contacts in one transaction and says what became of each, in order: the id kept and whether it was
+    /// new. Id 0 means a sync record for a contact the operator deleted, which was skipped.
+    /// </summary>
+    public IReadOnlyList<(long Id, bool Inserted)> UpsertEach(IEnumerable<QsoRecord> records)
+    {
+        using var c = db.Open();
+        using var tx = c.BeginTransaction();
+        var results = records.Select(q => Upsert(c, tx, q)).ToList();
+        tx.Commit();
+        if (results.Count > 0) Changed?.Invoke();
+        return results;
+    }
+
     /// <summary>Upserts many contacts in one transaction. Returns (inserted, merged).</summary>
     public (int Inserted, int Merged) UpsertMany(IEnumerable<QsoRecord> records)
     {

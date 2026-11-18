@@ -127,26 +127,97 @@ public sealed class CloudlogClient(HttpClient http)
             return new(false, "The logbook did not take the contact: " + (Clean(said, key) ?? "it read no contact from the record") + ".");
         }
         if (code == HttpStatusCode.Conflict) return new(true);
+        var (text, permanent, retryAfter) = V2Refusal(code, error, key, "qso:write", "upload", "The logbook did not take the contact");
+        return new(false, text, permanent, retryAfter);
+    }
+
+    // Words for a v2 refusal, and whether retrying soon can help. scope is the one the call needs; what names the call.
+    private static (string Error, bool Permanent, TimeSpan? RetryAfter) V2Refusal(HttpStatusCode code, JsonElement? error, string? key,
+        string scope, string what, string otherwise)
+    {
         var errorCode = error is { } e1 ? Text(e1, "code") : null;
         var message = Clean(error is { } e2 ? Text(e2, "message") : null, key);
         JsonElement? details = error is { } e3 && e3.TryGetProperty("details", out var dt) && dt.ValueKind == JsonValueKind.Object ? dt : null;
         return (code, errorCode) switch
         {
-            (_, "token_expired") => new(false, "The Wavelog API token has expired; make a new one in Wavelog and enter it in Settings.", Permanent: true),
-            (_, "invalid_token") or (HttpStatusCode.Unauthorized, _) =>
-                new(false, "The logbook refused the API token (unknown or revoked); check it in Settings.", Permanent: true),
-            (_, "insufficient_scope") => new(false,
-                $"The Wavelog API token lacks the {(details is { } s ? Text(s, "required_scope") : null) ?? "qso:write"} permission; add it to the token in Wavelog, or make a new one.",
-                Permanent: true),
-            (HttpStatusCode.Forbidden, _) => new(false, "The logbook refused the upload: " + (message ?? "the station id does not belong to this token's account") + ".", Permanent: true),
-            (HttpStatusCode.NotFound, _) => new(false,
-                "The logbook site has no Wavelog v2 API at that address (it needs Wavelog 3.1 or later); check the address in Settings.", Permanent: true),
-            (HttpStatusCode.TooManyRequests, _) => new(false, "The logbook asked Costas to slow down; waiting to retry.",
-                RetryAfter: details is { } r && Int(r, "retry_after") is > 0 and var secs ? TimeSpan.FromSeconds(secs) : null),
-            _ when error is null => new(false, $"The logbook answered HTTP {(int)code} without a result; check the address in Settings."),
-            _ => new(false, "The logbook did not take the contact: " + (message ?? errorCode ?? $"HTTP {(int)code}") + "."),
+            (_, "token_expired") => ("The Wavelog API token has expired; make a new one in Wavelog and enter it in Settings.", true, null),
+            (_, "invalid_token") or (HttpStatusCode.Unauthorized, _) => ("The logbook refused the API token (unknown or revoked); check it in Settings.", true, null),
+            (_, "insufficient_scope") => (
+                $"The Wavelog API token lacks the {(details is { } s ? Text(s, "required_scope") : null) ?? scope} permission; add it to the token in Wavelog, or make a new one.",
+                true, null),
+            (HttpStatusCode.Forbidden, _) => ($"The logbook refused the {what}: " + (message ?? "the station id does not belong to this token's account") + ".", true, null),
+            (HttpStatusCode.NotFound, _) =>
+                ("The logbook site has no Wavelog v2 API at that address (it needs Wavelog 3.1 or later); check the address in Settings.", true, null),
+            (HttpStatusCode.TooManyRequests, _) => ("The logbook asked Costas to slow down; waiting to retry.", false,
+                details is { } r && Int(r, "retry_after") is > 0 and var secs ? TimeSpan.FromSeconds(secs) : null),
+            _ when error is null => ($"The logbook answered HTTP {(int)code} without a result; check the address in Settings.", false, null),
+            _ => (otherwise + ": " + (message ?? errorCode ?? $"HTTP {(int)code}") + ".", false, null),
         };
     }
+
+    /// <summary>Number of contacts asked for per download page (Wavelog's ADIF default; its maximum is 5000).</summary>
+    public const int DownloadPageSize = 1000;
+
+    /// <summary>
+    /// Asks a v2 Wavelog for the contacts of station location <paramref name="stationId"/> after Wavelog's own id
+    /// <paramref name="sinceId"/> (0 for the whole log), oldest first, as ADIF. Needs the qso:read scope.
+    /// </summary>
+    public async Task<WavelogDownloadResult> DownloadPageAsync(Uri site, string key, string stationId, long sinceId, CancellationToken ct)
+    {
+        if (ApiFor(key) != WavelogApi.V2) return new(null, "Downloading needs a Wavelog v2 token (it starts wl2_).", Permanent: true);
+        if (!int.TryParse(stationId.Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var station))
+            return new(null, "The station id must be a number for the Wavelog v2 API; press Test in Settings to pick the station.", Permanent: true);
+        var query = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"qso?format=adif&station_id={station}&since_id={sinceId}&per_page={DownloadPageSize}");
+        using var request = RequestV2(HttpMethod.Get, site, query, key);
+        try
+        {
+            using var response = await http.SendAsync(request, ct).ConfigureAwait(false);
+            var text = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            return ParseV2Download(response.StatusCode, text, key);
+        }
+        catch (HttpRequestException)
+        {
+            return new(null, "The logbook site is unreachable; waiting to retry.");
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return new(null, "The logbook site did not answer in time; waiting to retry.");
+        }
+    }
+
+    /// <summary>
+    /// Reads a v2 answer to an ADIF download: <c>{"data": {"exported", "lastfetchedid", "adif"}, "meta": {"has_more"}}</c>.
+    /// A bad, expired or under-scoped token, or no v2 API at the address, is permanent.
+    /// </summary>
+    public static WavelogDownloadResult ParseV2Download(HttpStatusCode code, string body, string? key = null)
+    {
+        var (data, error) = V2Envelope(body);
+        if ((int)code is >= 200 and < 300 && data is { ValueKind: JsonValueKind.Object } d)
+        {
+            var hasMore = false;
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                hasMore = doc.RootElement.TryGetProperty("meta", out var meta) && meta.ValueKind == JsonValueKind.Object
+                    && meta.TryGetProperty("has_more", out var more) && more.ValueKind == JsonValueKind.True;
+            }
+            catch (JsonException)
+            {
+                // V2Envelope read it, so this does not happen.
+            }
+            var adif = d.TryGetProperty("adif", out var a) && a.ValueKind == JsonValueKind.String ? a.GetString() : null;
+            return new(new WavelogDownloadPage(Int(d, "exported"), Long(d, "lastfetchedid"), adif, hasMore));
+        }
+        var (text, permanent, retryAfter) = V2Refusal(code, error, key, "qso:read", "download", "The logbook refused the download");
+        return new(null, text, permanent, retryAfter);
+    }
+
+    private static long Long(JsonElement e, string name) =>
+        !e.TryGetProperty(name, out var v) ? 0
+        : v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n) ? n
+        : v.ValueKind == JsonValueKind.String && long.TryParse(v.GetString(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var s) ? s
+        : 0;
 
     // The v2 envelope: {"data": …} on success, {"error": {"code", "message", "details"}} on failure; both null when the
     // body is not JSON (a login page, a proxy error, or the wrong address).
