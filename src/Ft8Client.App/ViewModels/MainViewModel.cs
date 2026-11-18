@@ -1232,11 +1232,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         var on = _host.Settings.Current.PskReporter is { FeedEnabled: true, BandActivity: true };
         var feed = on ? s.BandActivityFeed : BandActivityFeed.Off;
         var current = s.Band.ToLowerInvariant();
-        bool Followed(string band) => feed == BandActivityFeed.AllBands || (feed == BandActivityFeed.CurrentBandOnly && band == current);
-        bool Sampled(string band) => feed == BandActivityFeed.Stopped || (feed == BandActivityFeed.CurrentBandOnly && band != current);
-        var openings = s.BandOpenings.Where(kv => Followed(kv.Key))
-                        .Concat(s.SampledBandOpenings.Where(kv => Sampled(kv.Key)))
-                        .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+        bool Followed(string band) => BandOpenings.IsFollowed(feed, band, current);
+        var openings = BandOpenings.Shown(s.BandOpenings, s.SampledBandOpenings, feed, current);
         var live = openings.Values.Any(o => o.Spots > 0);
         var max = live ? openings.Values.Max(o => o.Spots) : 0;
         var units = SettingsMapper.Units(_host.Settings.Current);

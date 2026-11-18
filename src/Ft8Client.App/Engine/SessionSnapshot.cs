@@ -88,6 +88,12 @@ public sealed record SessionSnapshot
     /// </summary>
     public IReadOnlyDictionary<string, BandOpening> SampledBandOpenings { get; init; } = new Dictionary<string, BandOpening>(StringComparer.Ordinal);
 
+    /// <summary>
+    /// The band advice: at most one "open" line, then at most one "closing" line for this band (docs/04-domain-logic.md,
+    /// section 14a). Empty when the evidence does not support any. Display only.
+    /// </summary>
+    public IReadOnlyList<BandAdvice> BandAdvice { get; init; } = [];
+
     /// <summary>Which bands <see cref="BandOpenings"/> are being received for.</summary>
     public BandActivityFeed BandActivityFeed { get; init; }
 
