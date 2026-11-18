@@ -71,7 +71,7 @@ CREATE TABLE qso (
   lotw_confirmed   INTEGER NOT NULL DEFAULT 0, -- 1 if LoTW confirmed it (migration 003)
   lotw_upload_state TEXT   NOT NULL DEFAULT 'none', -- none | uploaded (signed through TQSL)
   need_tier        INTEGER,                   -- tier at the time of the contact (local contacts only)
-  source           TEXT    NOT NULL,          -- 'local', 'qrz', 'adif'
+  source           TEXT    NOT NULL,          -- 'local', 'qrz', 'adif', 'lotw', 'wavelog'
   qrz_logid        INTEGER UNIQUE,
   upload_state     TEXT    NOT NULL DEFAULT 'none', -- none, queued, uploaded, failed
   upload_error     TEXT,

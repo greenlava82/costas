@@ -281,6 +281,24 @@ logbook is left alone and counts as sent. A wrong key or station id waits an hou
 **Wavelog/Cloudlog** indicator in the bottom bar (shown once this is set up) says what the logbook answered. Each
 station profile has its own settings. Off by default. Simulation never contacts the site.
 
+#### Using Wavelog as your logbook for worked-before
+
+With a Wavelog v2 token you can also tick **Download my Wavelog log for worked-before**. Costas then brings that
+station location's Wavelog contacts into its own log, so a caller you have worked shows as Worked, and a new country,
+band or grid shows as new, just as with the QRZ logbook. The first download reads the whole log. After that Costas
+asks only for contacts added since, every 15 minutes, and at once when you change the profile or its Wavelog
+settings.
+
+- The token needs the **qso:read** scope. A read-only token is enough, and it is the safest choice for another
+  operator: Costas cannot change their Wavelog log with it. Upload and download are separate switches, so you can
+  use either or both. A v1 key cannot download: the box stays unavailable until you enter a `wl2_` token.
+- Downloaded contacts show "From Wavelog" in the Log tab and are never sent back to Wavelog. If a contact you logged
+  in Costas is still waiting to upload when the download finds it already in Wavelog, Costas does not send it again.
+- A contact you delete in Costas stays deleted; the next download does not bring it back. A contact you edited keeps
+  your edits.
+- The **Wavelog/Cloudlog** indicator shows the download's result, such as "Downloaded 1,204 contacts from
+  log.example.com" or "log.example.com log up to date". A refused token waits an hour before the next try.
+
 ### Club Log {#club-log}
 
 Costas can send each contact to [Club Log](https://clublog.org) as soon as it is logged, so a DXpedition's online

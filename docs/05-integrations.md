@@ -442,5 +442,15 @@ Read from docs.wavelog.org (API v2 overview, QSO, Station and Token pages) on 20
 - Test: `GET token` (any valid token) gives `{"data": {"name", "scopes": [...], "expires_at"}}`; Settings says whether the token can read (`qso:read`) and upload (`qso:write`) and until when, and warns when uploads are on without `qso:write`. Then `GET station` (scope `station:read`) gives `{"data": [{"id", "name", "callsign", "active", …}]}`; without that scope Test asks for the id by hand.
 - Errors are `{"error": {"code", "message", "details"}}`. `401 invalid_token`, `401 token_expired`, `403 insufficient_scope` (the status names `details.required_scope`), `403 forbidden` and `404` wait an hour, like v1's key errors. `409 conflict` (a duplicate) counts as sent. `429 rate_limited` retries after `details.retry_after` seconds when that is longer than the usual back-off. Rate limits are off unless the site's owner turns them on.
 - A pasted `…/api/v2/…` address is reduced to the site base like the v1 ones.
-- **VERIFY** against a live Wavelog 3.1+ site: that one record sent twice comes back as `skipped` (or 409), and the `expires_at` time zone (shown as a date only).
+- **VERIFY** against a live Wavelog 3.1+ site: that one record sent twice comes back as `skipped` (or 409), and the `expires_at` time zone (shown as a date only). Uploads with a v2 token were tried by the owner on 2026-11-18 and work.
+
+#### Download for worked-before (owner request 2026-11-18, D27)
+
+A per-profile switch (`CloudlogOptions.DownloadForWorked`, off by default, v2 tokens only) brings the chosen station location's Wavelog log into the local log, so worked-before can come from Wavelog instead of, or as well as, QRZ (`WavelogSyncService`).
+
+- `GET qso?format=adif&station_id=<id>&since_id=<n>&per_page=1000`, scope `qso:read`. The answer is `{"data": {"exported", "lastfetchedid", "adif"}, "meta": {"has_more"}}`, oldest first; nothing new is `exported: 0` and `adif: null`. While `has_more`, the next page asks from `lastfetchedid`, at most one request a second.
+- The cursor (`lastfetchedid`) is kept in `sync_state` with the target `wavelog:<host><path>:<station id>`, per profile, and saved after every page: the first run reads the whole log, an interrupted one carries on, and a different site or station location starts over.
+- Records go through `AdifMapper.ToQso` with source `wavelog` and merge by the usual duplicate rule in one transaction per page. A sync never brings back a contact the operator deleted, and an edited contact keeps its edits, as for QRZ and LoTW. A downloaded contact is never queued for upload; one that matches a local contact still waiting to upload to Wavelog takes that item off the queue.
+- It runs from the Wavelog/Cloudlog worker: at start, at once when the profile, site, station, token or switch changes, then every 15 minutes (Wavelog asks for delta loads, not polling every minute). After a refusal it waits an hour, after a network fault 5 minutes, or longer if the site asked. A change to the log rebuilds worked-before (`LogChanged` → `RebuildLogIndex`). Simulation never downloads.
+- **VERIFY** against a live site: which QSL fields Wavelog's ADIF export carries (`lotw_qsl_rcvd`, `qsl_rcvd`, `eqsl_qsl_rcvd`). Without them, Wavelog contacts count as worked but not confirmed.
 
