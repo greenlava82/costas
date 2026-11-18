@@ -7,6 +7,7 @@
 // see the GNU General Public License in LICENSE for details.
 
 using Avalonia.Headless;
+using Avalonia.Threading;
 using Ft8Client.App.ViewModels;
 using Ft8Client.Data.Database;
 using Ft8Client.Data.Settings;
@@ -176,6 +177,28 @@ public class SettingsApplyTests
         host.Settings.Current.Profile.OperatorName.Should().Be("Dan portable");
         host.Settings.Current.Profiles[0].OperatorName.Should().Be("Dan");
         host.Settings.Current.Profiles[0].RigDescription.Should().Be("FT-710");
+    });
+
+    [Fact]
+    public Task FlexAddress_TypedAndSaved_KeptPerProfileAndFollowed() => WithSettings((host, vm, _) =>
+    {
+        vm.FlexPlaceholder.Should().Be("Not set, for example 192.168.1.20");
+        vm.FlexStatus.Should().BeEmpty("nothing to say before an address is set");
+
+        vm.FlexAddress = " 192.168.1.20 ";
+        vm.SaveCommand.Execute(null);
+
+        host.Settings.Current.Profile.Rig.FlexAddress.Should().Be("192.168.1.20");
+        host.Accessories.Settled.Wait(TestContext.Current.CancellationToken);
+        Dispatcher.UIThread.RunJobs();
+        vm.FlexStatus.Should().Be("Not while replaying recordings.", "the tests' host replays recordings, so nothing connects");
+
+        vm.NewProfileCommand.Execute(null);
+        vm.FlexAddress.Should().Be(" 192.168.1.20 ", "a copy of the profile has the same radio");
+        vm.FlexAddress = string.Empty;
+        vm.SaveCommand.Execute(null);
+        host.Settings.Current.Profile.Rig.FlexAddress.Should().BeNull();
+        host.Settings.Current.Profiles[0].Rig.FlexAddress.Should().Be("192.168.1.20");
     });
 
     // A simulated host in a temporary folder (TestHost: an in-memory credential store, so nothing here touches the

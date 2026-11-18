@@ -19,8 +19,8 @@ namespace Ft8Client.App.Services;
 /// <summary>
 /// The amplifier and tuner paired with a FlexRadio (a 4O3A PowerGenius XL and TunerGenius XL), shown and switched
 /// through the radio's own API (docs/05-integrations.md section 2a, docs/02-ui-spec.md bottom bar "Amp and tuner").
-/// Used only when the station's radio is set up as one of Hamlib's SmartSDR Slice models, whose address is the radio's
-/// own; never while replaying recordings. Nothing is ever switched on its own: only the operator's click changes
+/// Used when a FlexRadio address is set in Settings › Station, or the station's radio is one of Hamlib's SmartSDR Slice
+/// models, whose address is the radio's own; never while replaying recordings. Nothing is ever switched on its own: only the operator's click changes
 /// operate, standby or bypass, and never while anything is on the air or the tuner is tuning.
 /// </summary>
 public sealed class FlexAccessoryService : IAsyncDisposable
@@ -29,6 +29,10 @@ public sealed class FlexAccessoryService : IAsyncDisposable
     public const string OnAir = "Wait until this transmission ends to switch the amplifier or tuner.";
 
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(8);
+
+    // Lines logged as received after each connection: enough to see what a real radio sends, without a tuner's status
+    // filling the log for hours. Changes in what is shown are logged regardless.
+    private const int LinesLogged = 40;
 
     private readonly Session _session;
     private readonly AppSettingsAccessor _settings;
@@ -60,8 +64,14 @@ public sealed class FlexAccessoryService : IAsyncDisposable
         _newClient = newClient ?? ((host, port) => new FlexAccessoryClient(host, port));
     }
 
-    /// <summary>Raised when the amplifier or tuner changes, on a background thread.</summary>
+    /// <summary>Raised when the amplifier, the tuner or the connection's status changes, on a background thread.</summary>
     public event Action? Changed;
+
+    /// <summary>The connection's status, as Diagnostics shows it.</summary>
+    public ServiceStatus Status { get; private set; } = ServiceStatus.Off("Not started");
+
+    /// <summary>The address followed now, or null.</summary>
+    public (string Host, int Port)? Address => _following;
 
     /// <summary>What the radio reports now; empty when not connected or not a FlexRadio.</summary>
     public FlexAccessories Current => _shown ?? _client?.Current ?? FlexAccessories.Empty;
@@ -81,23 +91,38 @@ public sealed class FlexAccessoryService : IAsyncDisposable
     internal Task Settled => _identity;
 
     /// <summary>
-    /// The radio's address when <paramref name="rig"/> is a SmartSDR Slice model with a host given, else null. The
-    /// port given is used (Hamlib connects to the same API), or 4992 when none is.
+    /// The FlexRadio's API address for <paramref name="rig"/>: the FlexRadio address typed in Settings, whatever the
+    /// radio model, or else the radio's own address when it is one of Hamlib's SmartSDR Slice models. Null when there is
+    /// none or what was typed is not an address. A port is optional (4992).
     /// </summary>
     public static (string Host, int Port)? RadioAddress(RigSettings rig)
     {
+        if (!string.IsNullOrWhiteSpace(rig.FlexAddress)) return ParseAddress(rig.FlexAddress);
         if (rig.Mode != RigModes.Hamlib || rig.Model is not { } m || !HamlibModel.IsSmartSdrSlice(m)) return null;
-        var p = rig.Port?.Trim();
+        return ParseAddress(rig.Port);
+    }
+
+    /// <summary>
+    /// Reads <c>host</c> or <c>host:port</c>; null when empty, when the port is not 1 to 65535, or when the host has
+    /// a space, a slash or another colon (a URL or a COM port typed by mistake).
+    /// </summary>
+    public static (string Host, int Port)? ParseAddress(string? text)
+    {
+        var p = text?.Trim();
         if (string.IsNullOrEmpty(p)) return null;
         var colon = p.LastIndexOf(':');
-        if (colon < 0) return (p, FlexAccessoryClient.DefaultPort);
-        var host = p[..colon].Trim();
-        if (host.Length == 0 || !int.TryParse(p[(colon + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out var port) || port is < 1 or > 65535)
+        var host = colon < 0 ? p : p[..colon].Trim();
+        var port = FlexAccessoryClient.DefaultPort;
+        if (colon >= 0 && (!int.TryParse(p[(colon + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out port) || port is < 1 or > 65535))
             return null;
+        if (host.Length == 0 || host.IndexOfAny([' ', '/', '\\', ':']) >= 0 || IsSerialPort(host)) return null;
         return (host, port);
     }
 
-    /// <summary>Connects when the radio is a FlexRadio set up as a SmartSDR Slice model; later radio changes follow.</summary>
+    private static bool IsSerialPort(string host) =>
+        host.StartsWith("COM", StringComparison.OrdinalIgnoreCase) && host.Length > 3 && host[3..].All(char.IsAsciiDigit);
+
+    /// <summary>Connects when there is a FlexRadio address (<see cref="RadioAddress"/>); later changes follow.</summary>
     public void Start()
     {
         _settings.Changed += OnSettingsChanged;
@@ -109,26 +134,37 @@ public sealed class FlexAccessoryService : IAsyncDisposable
 
     private async Task FollowAsync(AppSettings s)
     {
-        var want = _simulating ? null : RadioAddress(s.Profile.Rig);
+        var address = RadioAddress(s.Profile.Rig);
+        var want = _simulating ? null : address;
         await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (_disposed || (_applied && want == _following)) return;
+            // With nothing to connect to, the reason is set again: what was typed may have changed while the answer stayed "none".
+            if (_disposed || (_applied && want == _following && want is not null)) return;
             _applied = true;
             await StopAsync().ConfigureAwait(false);
             _following = want;
             if (want is not { } a)
             {
-                _session.SetService(ServiceNames.Accessories, ServiceStatus.Off(_simulating
-                    ? "Not while replaying recordings"
-                    : "Only for a FlexRadio set up as SmartSDR Slice A to H"));
+                SetStatus(ServiceStatus.Off(_simulating && address is not null ? "Not while replaying recordings"
+                    : !string.IsNullOrWhiteSpace(s.Profile.Rig.FlexAddress) ? $"\"{s.Profile.Rig.FlexAddress.Trim()}\" is not an address; type the radio's IP address, such as 192.168.1.20"
+                    : "No FlexRadio address set"));
                 return;
             }
-            _session.SetService(ServiceNames.Accessories, new ServiceStatus(ServiceHealth.Degraded, $"Connecting to the radio at {a.Host}", DateTime.UtcNow));
+            SetStatus(new ServiceStatus(ServiceHealth.Degraded, $"Connecting to the radio at {a.Host}", DateTime.UtcNow));
             var client = _newClient(a.Host, a.Port);
+            var heard = 0;
             client.StatusChanged += st =>
             {
-                if (ReferenceEquals(client, _client)) _session.SetService(ServiceNames.Accessories, st);
+                if (!ReferenceEquals(client, _client)) return;
+                if (st.Health == ServiceHealth.Ok) Interlocked.Exchange(ref heard, 0);
+                Log.Information("FlexRadio amp and tuner connection: {Health}, {Message}", st.Health, st.Message);
+                SetStatus(st);
+            };
+            client.Heard += line =>
+            {
+                if (ReferenceEquals(client, _client) && Interlocked.Increment(ref heard) <= LinesLogged)
+                    Log.Information("FlexRadio said: {Line}", line);
             };
             client.Changed += now =>
             {
@@ -143,6 +179,13 @@ public sealed class FlexAccessoryService : IAsyncDisposable
         {
             _gate.Release();
         }
+    }
+
+    private void SetStatus(ServiceStatus st)
+    {
+        Status = st;
+        _session.SetService(ServiceNames.Accessories, st);
+        Changed?.Invoke();
     }
 
     private async Task StopAsync()

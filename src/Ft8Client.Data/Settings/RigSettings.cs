@@ -41,4 +41,11 @@ public sealed class RigSettings
     /// Hamlib reports.
     /// </summary>
     public int? MaxPowerWatts { get; set; }
+
+    /// <summary>
+    /// A FlexRadio's own address (<c>192.168.1.20</c>, or with a port, <c>192.168.1.20:4992</c>), for switching the
+    /// amplifier and tuner paired with it (docs/05-integrations.md section 2a). It works however the radio itself is
+    /// connected. Null or empty for none, except that a SmartSDR Slice model's own address is used then.
+    /// </summary>
+    public string? FlexAddress { get; set; }
 }

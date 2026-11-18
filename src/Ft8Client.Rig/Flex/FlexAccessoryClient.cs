@@ -63,6 +63,12 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
     /// <summary>Raised when what is known about the accessories changes, on the reading thread.</summary>
     public event Action<FlexAccessories>? Changed;
 
+    /// <summary>
+    /// Raised, on the reading thread, for the radio's version line and each <c>amplifier</c> status line as received,
+    /// so the log shows exactly what a real radio sends (docs/08-open-questions.md V-FLX2).
+    /// </summary>
+    public event Action<string>? Heard;
+
     /// <summary>Raised when the connection comes up, drops or fails.</summary>
     public event Action<ServiceStatus>? StatusChanged;
 
@@ -254,7 +260,12 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
             if (_pending.TryGetValue(reply.Sequence, out var tcs)) tcs.TrySetResult(reply);
             return;
         }
-        if (FlexStatusLine.Parse(line) is { } status) Use(Current.With(status));
+        if (line[0] == 'V') Heard?.Invoke(line);
+        if (FlexStatusLine.Parse(line) is { } status)
+        {
+            Heard?.Invoke(line);
+            Use(Current.With(status));
+        }
     }
 
     private void Use(FlexAccessories next)

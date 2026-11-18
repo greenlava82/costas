@@ -69,10 +69,15 @@ public sealed record HamlibModel(int Number, string Manufacturer, string Model, 
     /// </summary>
     public static string? SetupNoteFor(int number) =>
         number == Flex6xxxModel
-            ? "Hamlib's FlexRadio 6xxx driver connects over the network, to a TCP port set up in SmartSDR CAT. If you made COM ports in SmartSDR CAT, choose Kenwood as the manufacturer and TS-2000 as the model instead, with the CAT port (and the PTT port if you made one)."
+            ? "Hamlib's FlexRadio 6xxx driver connects over the network, to a TCP port set up in SmartSDR CAT. If you made COM ports in SmartSDR CAT, choose Kenwood as the manufacturer and TS-2000 as the model instead, with the CAT port (and the PTT port if you made one)." + AmpNote
             : IsSmartSdrSlice(number)
-                ? "Enter the radio's own IP address with port 4992, not 127.0.0.1. Using SmartSDR CAT COM ports instead? Choose Kenwood TS-2000."
-                : null;
+                ? "Enter the radio's own IP address with port 4992, not 127.0.0.1. Using SmartSDR CAT COM ports instead? Choose Kenwood TS-2000." + AmpNote
+                : number == KenwoodTs2000Model
+                    ? "FlexRadio owners: SmartSDR CAT COM ports answer as this model." + AmpNote
+                    : null;
+
+    // How a FlexRadio owner finds the amplifier and tuner buttons, whichever model they chose.
+    private const string AmpNote = " A PowerGenius XL or TunerGenius XL with it? After setup, type the radio's IP address in Settings › Station › FlexRadio amp and tuner.";
 
     /// <summary>A note shown in Setup under the radio model, or null.</summary>
     public string? SetupNote => SetupNoteFor(Number);
