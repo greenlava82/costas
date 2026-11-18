@@ -125,6 +125,7 @@ public class SessionSimulationTests
     [Fact]
     public async Task StopCq_NotCallingCq_DoesNotStartIt()
     {
+        Assert.SkipWhen(Jt9Locator.Find() is null, "jt9 is not installed.");
         var d = new SimDriver(new SilentSource(), Config());
         await d.RunSlotsAsync(1);
 
