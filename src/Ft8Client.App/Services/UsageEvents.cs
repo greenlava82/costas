@@ -37,6 +37,7 @@ public static class UsageEvents
             ["psk_upload"] = OnOff(s.PskReporter.UploadSpots),
             ["rbn"] = OnOff(s.ReverseBeacon.Enabled),
             ["pota"] = OnOff(s.Pota.SpotsEnabled),
+            ["dx_cluster"] = OnOff(s.DxCluster.Enabled),
             ["udp"] = OnOff(s.Udp.Enabled),
             ["remote"] = OnOff(s.Remote.Enabled),
             ["hunt_entries"] = s.Hunt.Targets.Count,

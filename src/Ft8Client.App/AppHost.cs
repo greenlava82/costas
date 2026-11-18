@@ -266,6 +266,9 @@ public sealed class AppHost : IAsyncDisposable
     /// <summary>Reverse Beacon Network spots of my callsign.</summary>
     public ReverseBeaconService Rbn { get; private set; } = null!;
 
+    /// <summary>DX cluster spots (display only).</summary>
+    public DxClusterService Cluster { get; private set; } = null!;
+
     /// <summary>The audio backend.</summary>
     public IAudioBackend AudioBackend { get; private set; } = new NullAudioBackend();
 
@@ -475,6 +478,10 @@ public sealed class AppHost : IAsyncDisposable
         Rbn = new ReverseBeaconService(Session, Settings, Spots, Cache, Countries, Clock);
         Rbn.Start();
 
+        // While replaying, the cluster's spots come from the recorded lines beside the recordings, never a node.
+        Cluster = new DxClusterService(Session, Settings, Spots, Clock, replay: Simulating ? () => ClusterReplayLines(Plan.ReplayFolder) : null);
+        Cluster.Start();
+
         Lotw = new LotwService(Session, Settings, Secrets, Qsos, SyncState, Countries, Paths, Clock, Guard, allowed: !Simulating);
         Lotw.LogChanged += RebuildLogIndex;
         Lotw.UsersChanged += Session.SetLotwUsers;
@@ -635,6 +642,26 @@ public sealed class AppHost : IAsyncDisposable
     }
 
     // Parks in the log under this station call, like the log index.
+    // samples/dxcluster/spots.txt, looked for in the replay folder and the folders above it (--simulate samples/ft8 too).
+    private static IReadOnlyList<string> ClusterReplayLines(string? folder)
+    {
+        for (var dir = folder is null ? null : new DirectoryInfo(Path.GetFullPath(folder)); dir is not null; dir = dir.Parent)
+        {
+            var file = Path.Combine(dir.FullName, "dxcluster", "spots.txt");
+            if (!File.Exists(file)) continue;
+            try
+            {
+                return File.ReadAllLines(file);
+            }
+            catch (IOException ex)
+            {
+                Log.Warning(ex, "Could not read the recorded DX cluster spots");
+                return [];
+            }
+        }
+        return [];
+    }
+
     private Core.Pota.WorkedParks WorkedParksFromLog() =>
         PotaAdif.Worked(Qsos.List().Where(q => string.Equals(q.StationCallsign, Settings.Current.Profile.Callsign, StringComparison.OrdinalIgnoreCase)));
 
@@ -1441,6 +1468,7 @@ public sealed class AppHost : IAsyncDisposable
         NeighbourHistory?.Flush();
         if (Psk is not null) await Psk.DisposeAsync().ConfigureAwait(false);
         if (Rbn is not null) await Rbn.DisposeAsync().ConfigureAwait(false);
+        if (Cluster is not null) await Cluster.DisposeAsync().ConfigureAwait(false);
         await _rig.DisposeAsync().ConfigureAwait(false);
         foreach (var d in _disposables) d.Dispose();
         // Last: an update starts the new version as soon as this returns, and it must be able to take the lock.
