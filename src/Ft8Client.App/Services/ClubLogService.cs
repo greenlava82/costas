@@ -49,18 +49,18 @@ public sealed class ClubLogService(Session session, AppSettingsAccessor settings
                 {
                     try
                     {
-                        // One client for the run, so the worker keeps its pacing and a refused login; a new callsign
-                        // (User-Agent) starts afresh.
+                        // One client for the run, so the worker keeps its pacing; a new callsign (User-Agent) starts
+                        // afresh. A refused login is kept in settings, so neither this nor a restart forgets it.
                         if (_http is null || _httpCall != profile.Callsign)
                         {
                             _http?.Dispose();
                             _http = HttpFactory.Create(profile.Callsign);
                             _httpCall = profile.Callsign;
-                            _worker = new ClubLogUploadService(new ClubLogRealtimeClient(_http), qsos, queue, clock);
+                            _worker = new ClubLogUploadService(new ClubLogRealtimeClient(_http), qsos, queue, clock, stops: new SettingsClubLogStopStore(settings));
                         }
                         await _worker!.ProcessDueAsync(profile.Id, profile.Callsign, options.Email.Trim(), password.Trim(), apiKey, ct).ConfigureAwait(false);
                         var waiting = queue.All().Any(i => i.Target == ClubLogUploadService.Target && qsos.Get(i.QsoId)?.ProfileId == profile.Id);
-                        session.SetService(ServiceNames.ClubLog, _worker.RefusedLogin is not null || _worker.Status.Health is ServiceHealth.Down or ServiceHealth.Degraded
+                        session.SetService(ServiceNames.ClubLog, _worker.Stopped || _worker.Status.Health is ServiceHealth.Down or ServiceHealth.Degraded
                             ? _worker.Status
                             : new(ServiceHealth.Ok, waiting ? "Club Log waiting to retry" : "Club Log ready", clock.UtcNow));
                     }

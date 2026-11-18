@@ -75,6 +75,15 @@ public sealed partial class ProfileDraft : ObservableObject
     /// <summary>Upload each contact to Club Log when it is logged.</summary>
     public bool ClubLogUpload { get; set; }
 
+    /// <summary>The Club Log Application Password as stored when the window opened, to notice a new one on save.</summary>
+    public string ClubLogPasswordSaved { get; init; } = string.Empty;
+
+    /// <summary>The stop in force when the window opened (Club Log refused the login), or null.</summary>
+    public Ft8Client.Data.Settings.ClubLogStop? ClubLogStop { get; init; }
+
+    /// <summary>True once the operator chose to resume Club Log uploads; saving clears the stop.</summary>
+    public bool ClubLogResume { get; set; }
+
     /// <inheritdoc />
     public override string ToString() => Name;
 }

@@ -50,6 +50,8 @@ public sealed partial class SettingsViewModel : ObservableObject
                 CloudlogKey = host.Secrets.Get(SecretNames.CloudlogKey(p.Id)) ?? string.Empty,
                 ClubLogEmail = p.ClubLog.Email, ClubLogUpload = p.ClubLog.UploadOnComplete,
                 ClubLogPassword = host.Secrets.Get(SecretNames.ClubLogPassword(p.Id)) ?? string.Empty,
+                ClubLogPasswordSaved = host.Secrets.Get(SecretNames.ClubLogPassword(p.Id)) ?? string.Empty,
+                ClubLogStop = p.ClubLog.Stop,
             });
         }
         _loadedProfile = s.Profile.Id;
@@ -314,6 +316,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         CloudlogStations.Clear();
         CloudlogStatus = string.Empty;
         (ClubLogEmail, ClubLogPassword, ClubLogUploadOnComplete) = (d.ClubLogEmail, d.ClubLogPassword, d.ClubLogUpload);
+        ClubLogStopText = d.ClubLogStop is { } stop && !d.ClubLogResume ? Ft8Client.Integrations.ClubLog.ClubLogUploadService.Describe(stop) : string.Empty;
     }
 
     /// <summary>
@@ -346,6 +349,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             p.Cloudlog.Url = d.CloudlogUrl.Trim();
             p.Cloudlog.StationId = d.CloudlogStationId.Trim();
             p.Cloudlog.UploadOnComplete = d.CloudlogUpload;
+            if (ClubLogStopEnds(p.ClubLog.Stop, d)) p.ClubLog.Stop = null;
             p.ClubLog.Email = d.ClubLogEmail.Trim();
             p.ClubLog.UploadOnComplete = d.ClubLogUpload;
             result.Add(p);
@@ -353,6 +357,16 @@ public sealed partial class SettingsViewModel : ObservableObject
         s.Profiles = result;
         s.ActiveProfile = active;
     }
+
+    /// <summary>
+    /// True when saving this draft ends a Club Log login stop: the operator resumed uploads, or changed the email,
+    /// Application Password or callsign Club Log refused. Club Log asks for no more requests until then.
+    /// </summary>
+    public static bool ClubLogStopEnds(ClubLogStop? stop, ProfileDraft d) =>
+        stop is not null
+        && (d.ClubLogResume
+            || !string.Equals(d.ClubLogPassword.Trim(), d.ClubLogPasswordSaved.Trim(), StringComparison.Ordinal)
+            || !stop.Covers(d.ClubLogEmail, d.Callsign));
 
     /// <summary>Call.</summary>
     [ObservableProperty]
@@ -875,6 +889,22 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Upload each new contact to Club Log.</summary>
     [ObservableProperty]
     public partial bool ClubLogUploadOnComplete { get; set; }
+
+    /// <summary>Why Club Log uploads are stopped (it refused the login), or blank.</summary>
+    [ObservableProperty]
+    public partial string ClubLogStopText { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Resumes Club Log uploads after a refused login, once saved. Only for a login fixed on the Club Log site: Club Log
+    /// firewalls an address that keeps sending a login it refused.
+    /// </summary>
+    [RelayCommand]
+    private void ResumeClubLog()
+    {
+        if (_shownProfile is null) return;
+        _shownProfile.ClubLogResume = true;
+        ClubLogStopText = string.Empty;
+    }
 
     /// <summary>Why Club Log uploads cannot run in this build, or blank.</summary>
     public string ClubLogBuildNote => AppHost.ClubLogApiKey is null
