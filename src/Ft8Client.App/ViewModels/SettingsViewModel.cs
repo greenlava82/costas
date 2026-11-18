@@ -1449,6 +1449,13 @@ public sealed partial class SettingsViewModel : ObservableObject
             SelectedPage = MobilePage;
             return false;
         }
+        // A different profile changes the callsign on the air: only when idle (D25). Checked before anything is stored.
+        if ((SelectedProfile ?? Profiles[0]).Id != _loadedProfile && ProfileSwitch.Refusal(_host.Session.Snapshot) is { } busy)
+        {
+            Message = busy;
+            SelectedPage = 0;
+            return false;
+        }
         // Passwords first, so sign-in never comes on before the password that lets a phone in is stored.
         var remoteUsers = _host.Remote.Control.Users;
         foreach (var r in RemoteUsers.Where(r => r.NewPassword.Length > 0))

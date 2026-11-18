@@ -23,8 +23,10 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
   or Wavelog account, so they enter their own. Costas asks for the callsign before it saves. Your name, QTH, radio
   and antenna on the PSK and RTTY page also belong to the profile shown.
   **Delete** removes the profile shown (the last one cannot be removed). The profile shown when you press **Save** is
-  the one Costas uses from then on; if it uses another radio or sound card, Costas reconnects to it. Set a profile's
-  radio and audio in **Station setup** while it is the active one. Worked-before and log totals count the contacts
+  the one Costas uses from then on; if it uses another radio or sound card, Costas reconnects to it. Changing the
+  profile changes the callsign you send, so it only happens when the station is idle: while transmitting, during a
+  contact, or with CQ or Auto-call on, **Save** and **Apply** refuse and say why, and nothing is saved until you try
+  again once the station is idle. Set a profile's radio and audio in **Station setup** while it is the active one. Worked-before and log totals count the contacts
   logged under that profile's callsign.
 - **Callsign** and **Grid square** (4 or 6 characters). Used in every message you send and to work out distances.
   A `/P` or `/R` call is sent like any other. A compound call such as `VE3/W7LIT` or `W7LIT/7` does not fit a
