@@ -75,6 +75,8 @@ CREATE TABLE qso (
   qrz_logid        INTEGER UNIQUE,
   upload_state     TEXT    NOT NULL DEFAULT 'none', -- none, queued, uploaded, failed
   upload_error     TEXT,
+  wavelog_upload_state TEXT NOT NULL DEFAULT 'none', -- none, queued, uploaded (also: Wavelog already has it), failed (migration 006)
+  wavelog_upload_error TEXT,                  -- last Wavelog/Cloudlog refusal, never the key
   raw_adif         TEXT,                      -- original record for imported or fetched contacts
   created_utc      TEXT    NOT NULL,
   modified_utc     TEXT    NOT NULL
