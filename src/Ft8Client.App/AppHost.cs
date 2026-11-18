@@ -795,10 +795,10 @@ public sealed class AppHost : IAsyncDisposable
     }
 
     /// <summary>
-    /// Switches to the station profile a remote user is linked to, as their command takes control (owner decision D25).
-    /// Refused, with the reason, while the station is busy, so nothing goes out under another operator's callsign and
+    /// Switches to the station profile a remote user is linked to, when they tap Operate as on their phone (owner decision
+    /// D25). Refused, with the reason, while the station is busy, so nothing goes out under another operator's callsign and
     /// the contact in progress is left alone. A user with no profile linked, or one since deleted, operates as the active
-    /// profile. Returns the refusal, or the callsign now in use when the profile changed.
+    /// profile. Returns the refusal, or the profile now in use when it changed.
     /// </summary>
     public (string? Refusal, string? NowAs) SwitchProfileForRemoteUser(string userId)
     {

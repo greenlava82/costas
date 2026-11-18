@@ -50,14 +50,17 @@ public sealed class RemoteControl
     /// <param name="controls">The radio's receive and tuner settings; without them the Radio tab shows only Tune and meters.</param>
     /// <param name="users">Username and password sign-in; without it phones only pair.</param>
     /// <param name="switchProfile">
-    /// Switches to a signed-in user's own station profile (by user id) as their command takes control: the refusal while the
-    /// station is busy, or the callsign now in use. Without it everyone operates as the active profile.
+    /// Switches to a signed-in user's own station profile (by user id) when they tap Operate as: the refusal while the
+    /// station is busy, or the profile now in use. Without it everyone operates as the active profile.
     /// </param>
+    /// <param name="profileOffer">The profile a signed-in user (by user id) is linked to, or null when they are not linked.</param>
     public RemoteControl(IRemoteTarget target, IClock clock, DeviceTokens tokens, Action<string> saveTokens,
                          IRemoteTuning? tuning = null, RadioPowerService? power = null, RadioControlsService? controls = null,
-                         RemoteUsers? users = null, Func<string, (string? Refusal, string? NowAs)>? switchProfile = null)
+                         RemoteUsers? users = null, Func<string, (string? Refusal, string? NowAs)>? switchProfile = null,
+                         Func<string, RemoteProfileOffer?>? profileOffer = null)
     {
         _switchProfile = switchProfile;
+        _profileOffer = profileOffer;
         _target = target;
         _tuning = tuning;
         _power = power;
@@ -112,6 +115,11 @@ public sealed class RemoteControl
     /// <summary>The signed-in user behind <paramref name="deviceId"/>, or null for a paired phone or one not seen yet.</summary>
     public string? UserIdOf(string deviceId) => _userIds.TryGetValue(deviceId, out var id) ? id : null;
     private readonly Func<string, (string? Refusal, string? NowAs)>? _switchProfile;
+    private readonly Func<string, RemoteProfileOffer?>? _profileOffer;
+
+    /// <summary>The profile the user behind <paramref name="deviceId"/> is linked to, for their phone; null when there is none.</summary>
+    public RemoteProfileOffer? ProfileFor(string deviceId) =>
+        _profileOffer is not null && UserIdOf(deviceId) is { } user ? _profileOffer(user) : null;
 
     private string NameOf(string deviceId) => _names.TryGetValue(deviceId, out var n) ? n : "A phone";
 
@@ -199,35 +207,12 @@ public sealed class RemoteControl
         var call = cmd.Call?.Trim().ToUpperInvariant() ?? string.Empty;
         // A message the station cannot act on changes nothing: it must not take control or reset the Tx watchdog.
         if (!Understood(cmd, call)) return "The station did not understand that.";
-        // A user linked to a station profile operates as it (D25): switched in now if the station is idle, otherwise the
-        // command is refused so nothing goes out under another operator's callsign. Stop, Stop CQ and Abandon only ever
-        // end a transmission, so they always work and never switch.
-        string? nowAs = null;
-        if (cmd.Type is not ("halt" or "abandon" or "cqStop") && _switchProfile is not null && _userIds.TryGetValue(deviceId, out var userId))
-        {
-            (var refusal, nowAs) = _switchProfile(userId);
-            if (refusal is not null) return refusal;
-        }
-        bool changed;
-        string? previous;
-        lock (_gate)
-        {
-            previous = Lease.Holder;
-            changed = !string.Equals(previous, deviceId, StringComparison.Ordinal);
-            Lease.Take(deviceId, now);
-        }
-        _target.SetWatchdogCap(ControlLease.WatchdogCapMinutes);
-        if (changed)
-        {
-            var from = previous is null ? "the desk" : _names.TryGetValue(previous, out var p) ? p : "another phone";
-            Notices.Add($"{NameOf(deviceId)} took control from {from}.", deviceId, now);
-            Changed?.Invoke();
-        }
-        if (nowAs is not null)
-        {
-            Notices.Add($"Now operating as {nowAs} for {NameOf(deviceId)}.", deviceId, now);
-            Changed?.Invoke();
-        }
+        // A user linked to a station profile switches to it deliberately, with Operate as (D25). Until they have, what
+        // would go out or be logged under the profile in use is refused, so nobody transmits under another operator's
+        // callsign; everything else (Stop, Stop CQ, Abandon, the band, the offset, the radio) works as for anyone.
+        if (cmd.Type == "switchProfile") return SwitchProfile(deviceId, now);
+        if (OperatesAs(cmd.Type) && ProfileFor(deviceId) is { OnMine: false } offer) return NotYetYours(offer);
+        TakeControl(deviceId, now);
         switch (cmd.Type)
         {
             case "halt":
@@ -302,9 +287,58 @@ public sealed class RemoteControl
         }
     }
 
+    // Commands that put the station's callsign on the air or in the log: a linked user sends them only from their own
+    // profile. Tune is not one: its carrier carries no callsign.
+    private static bool OperatesAs(string type) =>
+        type is "cq" or "call" or "answer" or "answerAfter" or "resend" or "macro" or "jump" or "logNow";
+
+    private static string NotYetYours(RemoteProfileOffer offer) => offer.Busy is { } busy
+        ? $"Not done: the station is on {offer.InUse}, busy {busy}. You can switch to {offer.Mine} when it is idle."
+        : $"Not done: the station is on {offer.InUse}. Tap Operate as {offer.MineCall} first.";
+
+    // The phone's Operate as button: the user's own profile, only while the station is idle. It takes control, as any
+    // deliberate tap does, and everyone else is told.
+    private string? SwitchProfile(string deviceId, DateTime now)
+    {
+        if (_switchProfile is null || UserIdOf(deviceId) is not { } user || _profileOffer?.Invoke(user) is not { } offer)
+            return "Only a signed-in user linked to a station profile can switch. Link one at the desk in Settings > Mobile connection.";
+        string? nowAs = null;
+        if (!offer.OnMine)
+        {
+            (var refusal, nowAs) = _switchProfile(user);
+            if (refusal is not null) return refusal;
+        }
+        TakeControl(deviceId, now);
+        _target.Activity();
+        if (nowAs is not null)
+        {
+            Notices.Add($"{NameOf(deviceId)} switched the station to {nowAs}.", deviceId, now);
+            Changed?.Invoke();
+        }
+        return null;
+    }
+
+    // The device that sent a deliberate command becomes the control point; the others are told when that changes.
+    private void TakeControl(string deviceId, DateTime now)
+    {
+        bool changed;
+        string? previous;
+        lock (_gate)
+        {
+            previous = Lease.Holder;
+            changed = !string.Equals(previous, deviceId, StringComparison.Ordinal);
+            Lease.Take(deviceId, now);
+        }
+        _target.SetWatchdogCap(ControlLease.WatchdogCapMinutes);
+        if (!changed) return;
+        var from = previous is null ? "the desk" : _names.TryGetValue(previous, out var p) ? p : "another phone";
+        Notices.Add($"{NameOf(deviceId)} took control from {from}.", deviceId, now);
+        Changed?.Invoke();
+    }
+
     private static bool Understood(RemoteCommand cmd, string call) => cmd.Type switch
     {
-        "halt" or "abandon" or "cq" or "cqStop" or "resend" or "logNow" or "band" or "offsetAuto" or "goTo" => true,
+        "halt" or "abandon" or "cq" or "cqStop" or "switchProfile" or "resend" or "logNow" or "band" or "offsetAuto" or "goTo" => true,
         "call" or "answer" or "answerAfter" or "dismiss" => call.Length > 0,
         "jump" => cmd.Step is not null,
         "offset" => cmd.Hz is not null,

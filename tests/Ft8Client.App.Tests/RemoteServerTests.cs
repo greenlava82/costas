@@ -250,36 +250,104 @@ public sealed class RemoteServerTests : IAsyncLifetime
         _control.Notices.For(RemoteIdentity.DeviceIdFor(dan), _clock.UtcNow)[0].Text.Should().Be("Ash took control from the desk.");
     }
 
-    [Fact]
-    public async Task HandleAsync_LinkedUserStationIdle_SwitchesThenCarriesOutAndTellsOthers()
+    // Ash, signed in and linked to their own profile; the offer says whether it is in use and whether the station is busy.
+    private async Task<(RemoteControl Rc, string Device, List<string> Asked)> LinkedAsync(RemoteProfileOffer offer,
+                                                                                         string? refusal = null)
     {
         AddUser("Ash", "another long password");
         var token = await LoginAsync("ash", "another long password");
         var asked = new List<string>();
         var rc = new RemoteControl(_target, _clock, new DeviceTokens(), _ => { }, users: _users,
-            switchProfile: id => { asked.Add(id); return (null, "AB1CD (Ash profile)"); });
-        var device = rc.SignIn(token)!.DeviceId;
+            switchProfile: id => { asked.Add(id); return (refusal, refusal is null ? "AB1CD (Ash profile)" : null); },
+            profileOffer: _ => offer);
+        return (rc, rc.SignIn(token)!.DeviceId, asked);
+    }
 
-        (await rc.HandleAsync(device, new RemoteCommand("call", "ve7xyz"))).Should().BeNull();
+    private static readonly RemoteProfileOffer NotMine = new("AB1CD (Ash profile)", "AB1CD", "K1ABC (Home profile)", false, null);
 
-        asked.Should().Equal(_options.Users[0].Id);
-        _target.Calls.Should().Equal("call VE7XYZ");
-        rc.Notices.For("desk-or-other", _clock.UtcNow).Select(n => n.Text)
-            .Should().Equal("Now operating as AB1CD (Ash profile) for Ash.", "Ash took control from the desk.");
+    [Fact]
+    public async Task HandleAsync_LinkedUserCallsBeforeSwitching_RefusedAndNothingSwitches()
+    {
+        var (rc, device, asked) = await LinkedAsync(NotMine);
+
+        (await rc.HandleAsync(device, new RemoteCommand("call", "ve7xyz")))
+            .Should().Be("Not done: the station is on K1ABC (Home profile). Tap Operate as AB1CD first.");
+
+        asked.Should().BeEmpty("only Operate as switches the profile");
+        _target.Calls.Should().BeEmpty("nothing goes out under another operator's callsign");
+        rc.Lease.IsHeld.Should().BeFalse();
     }
 
     [Fact]
-    public async Task HandleAsync_LinkedUserStationBusy_RefusedWithoutTakingControl()
+    public async Task HandleAsync_LinkedUserCallsWhileBusy_SaysToWaitForIdle()
+    {
+        var (rc, device, _) = await LinkedAsync(NotMine with { Busy = "while calling CQ as K1ABC" });
+
+        (await rc.HandleAsync(device, new RemoteCommand("cq"))).Should()
+            .Be("Not done: the station is on K1ABC (Home profile), busy while calling CQ as K1ABC. You can switch to AB1CD (Ash profile) when it is idle.");
+    }
+
+    [Theory]
+    [InlineData("dismiss")]
+    [InlineData("tune")]
+    [InlineData("offsetAuto")]
+    public async Task HandleAsync_LinkedUserNothingGoesOutAsThem_CarriedOutWithoutSwitching(string type)
+    {
+        var (rc, device, asked) = await LinkedAsync(NotMine);
+
+        await rc.HandleAsync(device, new RemoteCommand(type, "ve7xyz"));
+
+        asked.Should().BeEmpty();
+        rc.Lease.IsHeld.Should().BeTrue("a deliberate command still takes control");
+    }
+
+    [Fact]
+    public async Task HandleAsync_SwitchProfileIdle_SwitchesTakesControlAndTellsOthers()
+    {
+        var (rc, device, asked) = await LinkedAsync(NotMine);
+
+        (await rc.HandleAsync(device, new RemoteCommand("switchProfile"))).Should().BeNull();
+
+        asked.Should().Equal(_options.Users[0].Id);
+        rc.Lease.Holder.Should().Be(device);
+        _target.Calls.Should().BeEmpty("switching sends nothing");
+        rc.Notices.For("desk-or-other", _clock.UtcNow).Select(n => n.Text)
+            .Should().Equal("Ash switched the station to AB1CD (Ash profile).", "Ash took control from the desk.");
+    }
+
+    [Fact]
+    public async Task HandleAsync_SwitchProfileBusy_RefusedWithoutTakingControl()
+    {
+        var (rc, device, _) = await LinkedAsync(NotMine, "Not done: the station is busy while calling CQ as K1ABC.");
+
+        (await rc.HandleAsync(device, new RemoteCommand("switchProfile"))).Should().StartWith("Not done: the station is busy");
+
+        rc.Lease.IsHeld.Should().BeFalse();
+        rc.Notices.For("desk-or-other", _clock.UtcNow).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task HandleAsync_SwitchProfileAlreadyMine_TakesControlWithoutSwitching()
+    {
+        var (rc, device, asked) = await LinkedAsync(NotMine with { OnMine = true });
+
+        (await rc.HandleAsync(device, new RemoteCommand("switchProfile"))).Should().BeNull();
+        (await rc.HandleAsync(device, new RemoteCommand("call", "ve7xyz"))).Should().BeNull();
+
+        asked.Should().BeEmpty();
+        _target.Calls.Should().Equal("call VE7XYZ");
+    }
+
+    [Fact]
+    public async Task HandleAsync_SwitchProfileNotLinked_Refused()
     {
         AddUser("Ash", "another long password");
         var token = await LoginAsync("ash", "another long password");
         var rc = new RemoteControl(_target, _clock, new DeviceTokens(), _ => { }, users: _users,
-            switchProfile: _ => ("Not done: the station is busy while calling CQ as K1ABC.", null));
-        var device = rc.SignIn(token)!.DeviceId;
+            switchProfile: _ => (null, null), profileOffer: _ => null);
 
-        (await rc.HandleAsync(device, new RemoteCommand("call", "ve7xyz"))).Should().StartWith("Not done: the station is busy");
-
-        _target.Calls.Should().BeEmpty("nothing goes out under another operator's callsign");
+        (await rc.HandleAsync(rc.SignIn(token)!.DeviceId, new RemoteCommand("switchProfile")))
+            .Should().StartWith("Only a signed-in user linked to a station profile can switch.");
         rc.Lease.IsHeld.Should().BeFalse();
     }
 

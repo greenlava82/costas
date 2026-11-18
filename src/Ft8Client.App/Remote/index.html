@@ -72,6 +72,8 @@ main{padding:12px 14px 120px;display:flex;flex-direction:column;gap:12px;flex:1}
 .banner{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-tx);border-radius:12px;padding:12px;font-size:14px}
 .banner.info{background:var(--card);border-color:var(--accent);color:var(--tx)}
 .banner.opnote{background:var(--note-bg);border-color:var(--note-line);color:var(--note-tx);font-weight:600}
+.opnote .t{display:block}.opnote button{display:block;width:100%;margin-top:10px;background:var(--note-line);color:#fff}
+.opnote .s{display:block;margin-top:8px;font-weight:400;font-size:13px}
 .notice{display:flex;align-items:center;gap:8px}.notice+.notice{margin-top:8px}.notice .t{flex:1}.notice .s{color:var(--mut);font-size:12px}
 .note{position:fixed;left:14px;right:14px;bottom:110px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;display:none;z-index:3}
 /* The "Logged" notice: one slim line above HALT TX with a countdown bar; it closes itself after 5 s. */
@@ -531,9 +533,7 @@ function render() {
   renderRadio(s);
   renderLogged(s);
   renderNotices(s);
-  const pn = $("profileNote");
-  pn.classList.toggle("hidden", !s.profileNote);
-  pn.textContent = s.profileNote || "";
+  renderProfile(s);
   if (!wide) renderDash(s);
 
   const busy = s.transmitting || s.callingCq || (s.contact && s.contact.active);
@@ -1262,6 +1262,19 @@ function dismissNotice(id) {
   noticesSeen.add(id);
   try { localStorage.setItem(NOTICES_KEY, JSON.stringify([...noticesSeen].slice(-50))); } catch { }
   if (state) renderNotices(state);
+}
+
+// A user linked to a station profile switches to it with a deliberate tap, never as a side effect of another command
+// (D25). The button waits while the station is busy; the station checks again when the tap arrives.
+function renderProfile(s) {
+  const p = s.profile && !s.profile.onMine ? s.profile : null;
+  const box = $("profileNote");
+  box.classList.toggle("hidden", !p);
+  if (!changed("profile", p) || !p) return;
+  const parts = [el("span", "t", "You're operating as " + p.inUse + ".")];
+  parts.push(button("Operate as " + p.mineCall, "", () => cmd("switchProfile"), !!p.busy));
+  if (p.busy) parts.push(el("span", "s", "The station is busy " + p.busy + ". You can switch when it is idle."));
+  box.replaceChildren(...parts);
 }
 
 function renderLogged(s) {

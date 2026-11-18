@@ -71,7 +71,7 @@ public class SettingsApplyTests
     });
 
     [Fact]
-    public Task RemoteUserProfile_LinkedThenTakesControl_SwitchesAndWindowDoesNotSwitchBack() => WithSettings((host, vm, _) =>
+    public Task RemoteUserProfile_LinkedThenOperateAs_SwitchesAndWindowDoesNotSwitchBack() => WithSettings((host, vm, _) =>
     {
         var home = vm.SelectedProfile!;
         vm.NewOperatorProfileCommand.Execute(null);
@@ -90,7 +90,7 @@ public class SettingsApplyTests
         host.Settings.Current.ActiveProfile.Should().Be(home.Id);
         host.Settings.Current.Remote.Users.Single().ProfileId.Should().Be(guest.Id);
 
-        // The guest's phone takes control while the station is idle.
+        // The guest taps Operate as on their phone while the station is idle.
         host.SwitchProfileForRemoteUser(row.Id).Should().Be(((string?)null, "K0GST (Operator profile)"));
         host.Settings.Current.Profile.Callsign.Should().Be("K0GST");
         host.SwitchProfileForRemoteUser(row.Id).Should().Be(((string?)null, (string?)null), "already in use");
