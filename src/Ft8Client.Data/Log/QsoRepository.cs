@@ -16,6 +16,12 @@ namespace Ft8Client.Data.Log;
 /// <summary>Reads and writes contacts.</summary>
 public sealed class QsoRepository(SqliteDatabase db)
 {
+    /// <summary>
+    /// Raised after any write that changes a contact (log, edit, delete, import, sync, confirmation or upload state), on
+    /// the thread that wrote, which may be the slot thread. Handlers must return at once and must not throw.
+    /// </summary>
+    public event Action? Changed;
+
     private const string Columns = """
         profile_id, call, qso_date_on, qso_date_off, band, freq_hz, mode, submode, rst_sent, rst_rcvd, gridsquare, name, qth, state,
         country, dxcc, entity_key, continent, station_callsign, my_gridsquare, tx_pwr, comment, confirmed, need_tier, source, qrz_logid,
@@ -41,7 +47,9 @@ public sealed class QsoRepository(SqliteDatabase db)
     public long Insert(QsoRecord q)
     {
         using var c = db.Open();
-        return Insert(c, null, q);
+        var id = Insert(c, null, q);
+        Changed?.Invoke();
+        return id;
     }
 
     /// <summary>Updates every column of a contact.</summary>
@@ -50,6 +58,7 @@ public sealed class QsoRepository(SqliteDatabase db)
         using var c = db.Open();
         q.ModifiedUtc = DateTime.UtcNow;
         c.Execute($"UPDATE qso SET {Updates} WHERE id=@Id", q);
+        Changed?.Invoke();
     }
 
     /// <summary>Saves the operator's edit of a contact. Later QRZ syncs keep the edited fields.</summary>
@@ -73,6 +82,7 @@ public sealed class QsoRepository(SqliteDatabase db)
             """, new { id, now = DateTime.UtcNow }, tx);
         c.Execute("DELETE FROM qso WHERE id=@id", new { id }, tx);
         tx.Commit();
+        Changed?.Invoke();
     }
 
     /// <summary>Finds a contact by id.</summary>
@@ -129,6 +139,7 @@ public sealed class QsoRepository(SqliteDatabase db)
         using var tx = c.BeginTransaction();
         var result = Upsert(c, tx, q);
         tx.Commit();
+        Changed?.Invoke();
         return result;
     }
 
@@ -144,6 +155,7 @@ public sealed class QsoRepository(SqliteDatabase db)
             else merged++;
         }
         tx.Commit();
+        if (inserted + merged > 0) Changed?.Invoke();
         return (inserted, merged);
     }
 
@@ -153,6 +165,7 @@ public sealed class QsoRepository(SqliteDatabase db)
         using var c = db.Open();
         c.Execute("UPDATE qso SET upload_state=@state, upload_error=@error, qrz_logid=COALESCE(@qrzLogid, qrz_logid), modified_utc=@now WHERE id=@id",
             new { id, state, error, qrzLogid, now = DateTime.UtcNow });
+        Changed?.Invoke();
     }
 
     /// <summary>Contacts of a station callsign not yet uploaded to LoTW, oldest first.</summary>
@@ -172,6 +185,7 @@ public sealed class QsoRepository(SqliteDatabase db)
         var now = DateTime.UtcNow;
         foreach (var id in ids) c.Execute("UPDATE qso SET lotw_upload_state=@state, modified_utc=@now WHERE id=@id", new { id, state, now }, tx);
         tx.Commit();
+        Changed?.Invoke();
     }
 
     /// <summary>
@@ -193,6 +207,7 @@ public sealed class QsoRepository(SqliteDatabase db)
             else matched++;
         }
         tx.Commit();
+        if (matched + added > 0) Changed?.Invoke();
         return (matched, added);
     }
 
@@ -201,6 +216,7 @@ public sealed class QsoRepository(SqliteDatabase db)
     {
         using var c = db.Open();
         c.Execute("UPDATE qso SET eqsl_confirmed=1, confirmed=1, modified_utc=@now WHERE id=@id", new { id, now = DateTime.UtcNow });
+        Changed?.Invoke();
     }
 
     /// <summary>Sets eQSL delivery state without changing QRZ delivery.</summary>
@@ -209,6 +225,7 @@ public sealed class QsoRepository(SqliteDatabase db)
         using var c = db.Open();
         c.Execute("UPDATE qso SET eqsl_upload_state=@state, eqsl_upload_error=@error, modified_utc=@now WHERE id=@id",
             new { id, state, error, now = DateTime.UtcNow });
+        Changed?.Invoke();
     }
 
     /// <summary>Contacts for the log index of a station callsign.</summary>
