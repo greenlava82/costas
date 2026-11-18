@@ -31,7 +31,20 @@ public sealed partial class RemoteUserEditViewModel : ObservableObject
     public string Id { get; }
 
     /// <summary>A password is already set.</summary>
-    public bool HasPassword { get; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PasswordPlaceholder), nameof(Summary))]
+    public partial bool HasPassword { get; private set; }
+
+    /// <summary>
+    /// The new password was stored (Settings applied without closing): the box empties so a second Apply does not set it
+    /// again, which would sign this user out everywhere once more.
+    /// </summary>
+    public void PasswordSaved()
+    {
+        if (NewPassword.Length == 0) return;
+        NewPassword = string.Empty;
+        HasPassword = true;
+    }
 
     /// <summary>The name typed to sign in.</summary>
     [ObservableProperty]

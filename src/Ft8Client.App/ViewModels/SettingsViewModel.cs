@@ -26,8 +26,8 @@ namespace Ft8Client.App.ViewModels;
 public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly AppHost _host;
-    private readonly string _loadedTxGain;
-    private readonly string _loadedProfile;
+    private string _loadedTxGain;
+    private string _loadedProfile;
     private ProfileDraft? _shownProfile;
 
     /// <summary>Creates the view model from current settings.</summary>
@@ -219,9 +219,13 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private static void OpenQrz() => Services.Browser.Open(Services.Browser.QrzLogbook);
 
-    /// <summary>Message line.</summary>
+    /// <summary>Message line: why Save or Apply stopped.</summary>
     [ObservableProperty]
     public partial string Message { get; set; } = string.Empty;
+
+    /// <summary>Said after Apply stored everything, until the next change is applied or refused.</summary>
+    [ObservableProperty]
+    public partial string AppliedNote { get; set; } = string.Empty;
 
     /// <summary>Station profiles as edited here.</summary>
     public ObservableCollection<ProfileDraft> Profiles { get; } = [];
@@ -1364,6 +1368,23 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
+        if (Commit()) Close?.Invoke();
+    }
+
+    /// <summary>Saves and stays open, so more changes can follow.</summary>
+    [RelayCommand]
+    private void Apply()
+    {
+        AppliedNote = string.Empty;
+        if (!Commit()) return;
+        Message = string.Empty;
+        AppliedNote = $"Applied at {DateTime.Now:HH:mm:ss}.";
+    }
+
+    // Stores everything shown. False when something was refused (the reason is in Message, on its page) or a secret could
+    // not be kept; the window then stays open either way.
+    private bool Commit()
+    {
         static int Int(string s, int min, int max, int fallback) =>
             int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? Math.Clamp(v, min, max) : fallback;
         static double Dbl(string s, double min, double max, double fallback) =>
@@ -1373,7 +1394,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             Message = problem;
             SelectedPage = ContactsPage;
-            return;
+            return false;
         }
         var oldHamlibDir = _host.Settings.Current.Paths.HamlibDir;
 
@@ -1383,20 +1404,20 @@ public sealed partial class SettingsViewModel : ObservableObject
             Message = Profiles.Count > 1 ? $"Enter a valid callsign for the {bad.Name} profile (Station page)." : "Enter a valid callsign (Station page).";
             SelectedProfile = bad;
             SelectedPage = 0;
-            return;
+            return false;
         }
         if (MacroCheck(Macros) is { } check && (check.Blocking || check.Text != _macroWarning))
         {
             Message = check.Text;
             _macroWarning = check.Blocking ? null : check.Text;
             SelectedPage = KeyboardPage;
-            return;
+            return false;
         }
         if ((RemoteUsersCheck(RemoteSignIn, RemoteUsers) ?? ProxyAddressCheck(RemoteProxyAddress)) is { } remoteProblem)
         {
             Message = remoteProblem;
             SelectedPage = MobilePage;
-            return;
+            return false;
         }
         // Passwords first, so sign-in never comes on before the password that lets a phone in is stored.
         var remoteUsers = _host.Remote.Control.Users;
@@ -1410,7 +1431,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             {
                 Message = SecretStoreProblem.Describe(ex.Message);
                 SelectedPage = MobilePage;
-                return;
+                return false;
             }
         }
         var removedRemote = _host.Settings.Current.Remote.Users.Select(u => u.Id).Where(id => RemoteUsers.All(r => r.Id != id)).ToList();
@@ -1547,14 +1568,20 @@ public sealed partial class SettingsViewModel : ObservableObject
         // tells the operator to set it here when rigctld is missing, so it must take effect without a restart.
         if (activeId != _loadedProfile || !string.Equals(oldHamlibDir, _host.Settings.Current.Paths.HamlibDir, StringComparison.Ordinal))
             _ = _host.ReopenDevicesAsync();
+        // What is now saved becomes what the next Apply compares with: the same profile does not reopen the radio again,
+        // a level left as it was does not overwrite one automatic level set meanwhile, and a remote password is not set
+        // a second time (which would sign that user out everywhere again).
+        _loadedProfile = activeId;
+        _loadedTxGain = TxGain.Trim();
+        foreach (var r in RemoteUsers) r.PasswordSaved();
         // Everything else is saved; the window stays open on the reason so the operator knows the key is not kept.
         if (_secretProblem is { } why)
         {
             _secretProblem = null;
             Message = SecretStoreProblem.Describe(why);
-            return;
+            return false;
         }
-        Close?.Invoke();
+        return true;
     }
 
     /// <summary>Closes without saving.</summary>
