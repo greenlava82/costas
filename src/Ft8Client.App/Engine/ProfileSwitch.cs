@@ -19,10 +19,9 @@ namespace Ft8Client.App.Engine;
 public static class ProfileSwitch
 {
     /// <summary>
-    /// Why <paramref name="what"/> (the station profile, or the callsign or grid of the one in use: all change what goes out)
-    /// cannot change now, or null when it can.
+    /// What keeps the station busy, as "during the contact with JA1AAA as K1ABC", or null when it is idle.
     /// </summary>
-    public static string? Refusal(SessionSnapshot s, string what = "the station profile")
+    public static string? Busy(SessionSnapshot s)
     {
         var why = s.Transmitting || s.KeyboardTx.Active ? "while transmitting"
             : s.Contact is { Outcome: ContactOutcome.InProgress } c ? $"during the contact with {c.DxCall}"
@@ -30,7 +29,22 @@ public static class ProfileSwitch
             : s.AutoCall ? "while Auto-call is on"
             : null;
         if (why is null) return null;
-        var under = s.MyCall.Length > 0 ? $" as {s.MyCall}" : string.Empty;
-        return $"Nothing was saved: {what} cannot change {why}{under}. Try again when the station is idle.";
+        return s.MyCall.Length > 0 ? $"{why} as {s.MyCall}" : why;
     }
+
+    /// <summary>
+    /// Why <paramref name="what"/> (the station profile, or the callsign or grid of the one in use: all change what goes out)
+    /// cannot change now, or null when it can. Worded for Settings.
+    /// </summary>
+    public static string? Refusal(SessionSnapshot s, string what = "the station profile") =>
+        Busy(s) is { } busy ? $"Nothing was saved: {what} cannot change {busy}. Try again when the station is idle." : null;
+
+    /// <summary>
+    /// Why a remote user's command cannot switch to their own profile <paramref name="profileName"/> now, or null when it
+    /// can. Worded for the phone: the command was not carried out, and nothing went out under another callsign.
+    /// </summary>
+    public static string? RemoteRefusal(SessionSnapshot s, string profileName) =>
+        Busy(s) is { } busy
+            ? $"Not done: the station is busy {busy}, so it cannot switch to your {profileName} profile yet. Try again when the station is idle."
+            : null;
 }

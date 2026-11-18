@@ -266,7 +266,8 @@ The page is called **PSK Reporter and RBN** in Settings.
   home Wi-Fi), and Costas allows a reverse proxy such as nginx. Takes effect when you save.
 - **Proxy address**: leave empty when the proxy runs on this computer; otherwise the address of the computer that runs
   it.
-- **Add a user**, **Edit**, **Allowed to sign in**, **Sign out everywhere**, **Delete**: who may sign in. See
+- **Add a user**, **Edit**, **Allowed to sign in**, **Operates as**, **Sign out everywhere**, **Delete**: who may sign
+  in, and the station profile each operates as. See
   [Requiring a username and password](phone.md#requiring-a-username-and-password).
 
 See [Operating from a phone](phone.md).

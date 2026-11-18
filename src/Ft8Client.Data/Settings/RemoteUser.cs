@@ -9,8 +9,8 @@
 namespace Ft8Client.Data.Settings;
 
 /// <summary>
-/// Someone who may sign in to the remote page. The id never changes, so renaming keeps their sign-ins (and, later, the
-/// station profile they operate as). The password hash is in the secret store under this id, never here.
+/// Someone who may sign in to the remote page. The id never changes, so renaming keeps their sign-ins and the station
+/// profile they operate as. The password hash is in the secret store under this id, never here.
 /// </summary>
 public sealed class RemoteUser
 {
@@ -22,4 +22,10 @@ public sealed class RemoteUser
 
     /// <summary>May sign in. Turning it off signs the user out everywhere.</summary>
     public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// The station profile this user operates as (owner decision D25): taking control switches Costas to it when the
+    /// station is idle. Null, or a profile since deleted, means whichever profile is active.
+    /// </summary>
+    public string? ProfileId { get; set; }
 }

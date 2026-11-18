@@ -122,6 +122,17 @@ Managing users, in the list under **Sign-in**:
 - Untick **Allowed to sign in** to keep a user but let none of their devices in.
 - **Sign out everywhere** ends all of that user's sign-ins; they can sign in again.
 - **Delete** takes the user off the list.
+- **Operates as** links the user to a station profile, so another licensed operator works under their own callsign,
+  log, contest exchanges and logbook accounts (QRZ, LoTW, eQSL, Club Log, Wavelog). Make the profile first with
+  **New operator** on the Station page. Leave it on **The profile in use** and the user operates as whichever
+  profile is active.
+
+When a linked user's command takes control, Costas switches to their profile first, but only when the station is
+idle. While it is transmitting, in a contact, or has CQ or Auto-call on, the command is refused with the reason
+(*Not done: the station is busy during the contact with JA1AAA as K1ABC…*), so nothing goes out under someone
+else's callsign and the contact in progress is left alone. **Stop** always works and never switches. Everyone else
+sees *Now operating as AB1CD (Ash profile) for Ash.* A click at the desk takes control back but keeps that profile;
+switch it in Settings if you want your own back.
 
 Changes take effect when you press **Save**. Passwords are never stored: Costas keeps only a scrambled check value
 (a PBKDF2 hash) in the Windows credential store, so a forgotten password cannot be shown, only replaced.

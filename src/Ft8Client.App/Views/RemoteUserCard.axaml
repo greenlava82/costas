@@ -17,7 +17,7 @@
                 AutomationProperties.Name="{Binding DisplayName, StringFormat='Delete the user {0}'}" />
       </Grid>
       <StackPanel IsVisible="{Binding IsEditing}" Spacing="8" Margin="12,0,0,6">
-        <Grid ColumnDefinitions="80,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+        <Grid ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="6">
           <TextBlock Text="Username" VerticalAlignment="Center" />
           <TextBox Grid.Column="1" Text="{Binding Username}" MaxLength="64" Width="240" HorizontalAlignment="Left"
                    AutomationProperties.Name="Username" />
@@ -25,6 +25,11 @@
           <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding NewPassword}" PasswordChar="●" Width="240" HorizontalAlignment="Left"
                    PlaceholderText="{Binding PasswordPlaceholder}"
                    AutomationProperties.Name="{Binding DisplayName, StringFormat='New password for {0}'}" />
+          <TextBlock Grid.Row="2" Text="Operates as" VerticalAlignment="Center" />
+          <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding ProfileChoices}" SelectedItem="{Binding SelectedProfileChoice}"
+                    Width="240" HorizontalAlignment="Left"
+                    ToolTip.Tip="The station profile this user operates as: when they take control, Costas switches to it (callsign, log, logbook accounts), but only when the station is idle. The profile in use: they operate as whichever profile is active."
+                    AutomationProperties.Name="{Binding DisplayName, StringFormat='Station profile {0} operates as'}" />
         </Grid>
         <WrapPanel>
           <CheckBox Content="Allowed to sign in" IsChecked="{Binding Enabled}" Margin="0,0,16,4" />

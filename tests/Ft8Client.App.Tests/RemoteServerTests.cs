@@ -251,6 +251,54 @@ public sealed class RemoteServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task HandleAsync_LinkedUserStationIdle_SwitchesThenCarriesOutAndTellsOthers()
+    {
+        AddUser("Ash", "another long password");
+        var token = await LoginAsync("ash", "another long password");
+        var asked = new List<string>();
+        var rc = new RemoteControl(_target, _clock, new DeviceTokens(), _ => { }, users: _users,
+            switchProfile: id => { asked.Add(id); return (null, "AB1CD (Ash profile)"); });
+        var device = rc.SignIn(token)!.DeviceId;
+
+        (await rc.HandleAsync(device, new RemoteCommand("call", "ve7xyz"))).Should().BeNull();
+
+        asked.Should().Equal(_options.Users[0].Id);
+        _target.Calls.Should().Equal("call VE7XYZ");
+        rc.Notices.For("desk-or-other", _clock.UtcNow).Select(n => n.Text)
+            .Should().Equal("Now operating as AB1CD (Ash profile) for Ash.", "Ash took control from the desk.");
+    }
+
+    [Fact]
+    public async Task HandleAsync_LinkedUserStationBusy_RefusedWithoutTakingControl()
+    {
+        AddUser("Ash", "another long password");
+        var token = await LoginAsync("ash", "another long password");
+        var rc = new RemoteControl(_target, _clock, new DeviceTokens(), _ => { }, users: _users,
+            switchProfile: _ => ("Not done: the station is busy while calling CQ as K1ABC.", null));
+        var device = rc.SignIn(token)!.DeviceId;
+
+        (await rc.HandleAsync(device, new RemoteCommand("call", "ve7xyz"))).Should().StartWith("Not done: the station is busy");
+
+        _target.Calls.Should().BeEmpty("nothing goes out under another operator's callsign");
+        rc.Lease.IsHeld.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task HandleAsync_LinkedUserHalts_StopsWithoutSwitching()
+    {
+        AddUser("Ash", "another long password");
+        var token = await LoginAsync("ash", "another long password");
+        var asked = 0;
+        var rc = new RemoteControl(_target, _clock, new DeviceTokens(), _ => { }, users: _users,
+            switchProfile: _ => { asked++; return ("busy", null); });
+
+        await rc.HandleAsync(rc.SignIn(token)!.DeviceId, new RemoteCommand("halt"));
+
+        asked.Should().Be(0, "Stop always works");
+        _target.Halts.Should().HaveCount(1);
+    }
+
+    [Fact]
     public async Task Login_WrongPassword_RefusedThenTooManyTries()
     {
         AddUser("dan", "correct horse battery");

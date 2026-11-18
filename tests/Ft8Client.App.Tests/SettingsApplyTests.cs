@@ -71,6 +71,45 @@ public class SettingsApplyTests
     });
 
     [Fact]
+    public Task RemoteUserProfile_LinkedThenTakesControl_SwitchesAndWindowDoesNotSwitchBack() => WithSettings((host, vm, _) =>
+    {
+        var home = vm.SelectedProfile!;
+        vm.NewOperatorProfileCommand.Execute(null);
+        var guest = vm.SelectedProfile!;
+        vm.Callsign = "K0GST";
+        vm.SelectedProfile = home;
+        vm.AddRemoteUserCommand.Execute(null);
+        var row = vm.RemoteUsers.Single();
+        row.Username = "guest";
+        row.NewPassword = "correct horse battery";
+        row.ProfileChoices.Select(c => c.Label).Should().Equal(ProfileChoice.NoneLabel, "Home (N0CALL)", "Operator (K0GST)");
+        row.SelectedProfileChoice.Should().Be(row.ProfileChoices[0], "a new user operates as the profile in use");
+        row.SelectedProfileChoice = row.ProfileChoices.Single(c => c.Id == guest.Id);
+        vm.ApplyCommand.Execute(null);
+        vm.Message.Should().BeEmpty();
+        host.Settings.Current.ActiveProfile.Should().Be(home.Id);
+        host.Settings.Current.Remote.Users.Single().ProfileId.Should().Be(guest.Id);
+
+        // The guest's phone takes control while the station is idle.
+        host.SwitchProfileForRemoteUser(row.Id).Should().Be(((string?)null, "K0GST (Operator profile)"));
+        host.Settings.Current.Profile.Callsign.Should().Be("K0GST");
+        host.SwitchProfileForRemoteUser(row.Id).Should().Be(((string?)null, (string?)null), "already in use");
+
+        // The desk's Settings window, open since before, saves something else: it keeps the guest's profile.
+        vm.PreferHearsMe = !vm.PreferHearsMe;
+        vm.ApplyCommand.Execute(null);
+        vm.Message.Should().BeEmpty();
+        host.Settings.Current.ActiveProfile.Should().Be(guest.Id);
+
+        // Deleting the profile drops the link: the user then operates as whichever profile is in use.
+        vm.SelectedProfile = vm.Profiles.Single(p => p.Id == guest.Id);
+        vm.DeleteProfileCommand.Execute(null);
+        vm.ApplyCommand.Execute(null);
+        host.Settings.Current.Remote.Users.Single().ProfileId.Should().BeNull();
+        host.SwitchProfileForRemoteUser(row.Id).Should().Be(((string?)null, (string?)null));
+    });
+
+    [Fact]
     public Task NewOperatorProfile_FromHome_KeepsTheStationButNothingOfTheOperator() => WithSettings((host, vm, _) =>
     {
         vm.OperatorName = "Dan";

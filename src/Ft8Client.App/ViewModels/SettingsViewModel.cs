@@ -134,7 +134,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         RemoteSignIn = s.Remote.RequireSignIn;
         RemoteProxyAddress = s.Remote.TrustedProxy ?? string.Empty;
         foreach (var u in s.Remote.Users)
-            RemoteUsers.Add(RemoteUserRow(u.Id, u.Username, u.Enabled, host.Remote.Control.Users?.HasPassword(u.Id) == true));
+            RemoteUsers.Add(RemoteUserRow(u.Id, u.Username, u.Enabled, host.Remote.Control.Users?.HasPassword(u.Id) == true, u.ProfileId));
         RefreshRemote();
         host.Remote.Changed += OnRemoteChanged;
         _remoteLoaded = true;
@@ -1083,8 +1083,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         row.EditCommand.Execute(null);
     }
 
-    private RemoteUserEditViewModel RemoteUserRow(string id, string username, bool enabled, bool hasPassword) =>
-        new(id, username, enabled, hasPassword)
+    private RemoteUserEditViewModel RemoteUserRow(string id, string username, bool enabled, bool hasPassword, string? profileId = null)
+    {
+        var row = new RemoteUserEditViewModel(id, username, enabled, hasPassword, profileId)
         {
             OnRemove = r => RemoteUsers.Remove(r),
             OnSignOut = SignOutRemoteUser,
@@ -1092,8 +1093,20 @@ public sealed partial class SettingsViewModel : ObservableObject
             OnEdit = r =>
             {
                 foreach (var other in RemoteUsers.Where(o => !ReferenceEquals(o, r))) other.IsEditing = false;
+                r.SetProfileChoices(ProfileChoicesNow());
             },
         };
+        row.SetProfileChoices(ProfileChoicesNow());
+        return row;
+    }
+
+    // What a remote user can operate as: whichever profile is in use, or one of the profiles (as edited so far).
+    private List<ProfileChoice> ProfileChoicesNow()
+    {
+        string CallOf(ProfileDraft d) => ((ReferenceEquals(d, _shownProfile) ? Callsign : d.Callsign) ?? string.Empty).Trim().ToUpperInvariant();
+        return [new ProfileChoice(null, ProfileChoice.NoneLabel), .. Profiles.Select(d => new ProfileChoice(d.Id,
+            CallOf(d).Length > 0 ? $"{d.Name} ({CallOf(d)})" : d.Name))];
+    }
 
     // Takes effect at once: a lost or borrowed phone must be cut off without waiting for Save.
     private void SignOutRemoteUser(RemoteUserEditViewModel row)
@@ -1453,9 +1466,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         // owner decisions 2026-11-17). Checked before anything is stored.
         var chosen = SelectedProfile ?? Profiles[0];
         var current = _host.Settings.Current.Profile;
-        var what = chosen.Id != _loadedProfile ? "the station profile"
-            : !string.Equals(chosen.Callsign.Trim().ToUpperInvariant(), current.Callsign, StringComparison.Ordinal) ? "your callsign"
-            : !string.Equals(chosen.Grid.Trim().ToUpperInvariant(), current.Grid.Trim().ToUpperInvariant(), StringComparison.Ordinal) ? "your grid square"
+        // A phone may have switched profile since this window opened (D25): leaving the choice as it was keeps the
+        // profile now in use rather than switching back to the one shown at the start.
+        var inUse = chosen.Id == _loadedProfile ? Profiles.FirstOrDefault(d => d.Id == current.Id) ?? chosen : chosen;
+        var activeId = inUse.Id;
+        var what = activeId != current.Id ? "the station profile"
+            : !string.Equals(inUse.Callsign.Trim().ToUpperInvariant(), current.Callsign, StringComparison.Ordinal) ? "your callsign"
+            : !string.Equals(inUse.Grid.Trim().ToUpperInvariant(), current.Grid.Trim().ToUpperInvariant(), StringComparison.Ordinal) ? "your grid square"
             : null;
         if (what is not null && ProfileSwitch.Refusal(_host.Session.Snapshot, what) is { } busy)
         {
@@ -1479,7 +1496,6 @@ public sealed partial class SettingsViewModel : ObservableObject
             }
         }
         var removedRemote = _host.Settings.Current.Remote.Users.Select(u => u.Id).Where(id => RemoteUsers.All(r => r.Id != id)).ToList();
-        var activeId = (SelectedProfile ?? Profiles[0]).Id;
         var removed = _host.Settings.Current.Profiles.Select(p => p.Id).Where(id => Profiles.All(d => d.Id != id)).ToList();
         _host.Settings.Update(s =>
         {
@@ -1552,7 +1568,12 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Remote.Port = Int(RemotePort, 1024, 65535, 8073);
             s.Remote.RequireSignIn = RemoteSignIn;
             s.Remote.TrustedProxy = string.IsNullOrWhiteSpace(RemoteProxyAddress) ? null : RemoteProxyAddress.Trim();
-            s.Remote.Users = [.. RemoteUsers.Select(r => new RemoteUser { Id = r.Id, Username = r.Username.Trim(), Enabled = r.Enabled })];
+            // A link to a profile deleted here goes with it: that user then operates as whichever profile is in use.
+            s.Remote.Users = [.. RemoteUsers.Select(r => new RemoteUser
+            {
+                Id = r.Id, Username = r.Username.Trim(), Enabled = r.Enabled,
+                ProfileId = r.ProfileId is { } p && Profiles.Any(d => d.Id == p) ? p : null,
+            })];
             s.Files.SaveWav = SaveWav;
             s.Files.RetentionDays = Int(Retention, 1, 3650, 30);
             s.Appearance.Theme = Theme;
