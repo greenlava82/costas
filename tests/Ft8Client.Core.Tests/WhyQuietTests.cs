@@ -139,10 +139,10 @@ public class WhyQuietTests
     }
 
     [Fact]
-    public void Explain_DecoderDegraded_SaysFailingOrRestarting()
+    public void Explain_DecoderDegraded_SaysNotWorking()
     {
         var r = WhyQuiet.Explain(Quiet() with { Decoder = new ServiceStatus(ServiceHealth.Degraded, "jt9 exited with code 2.", T0) })!;
-        r.Text.Should().Be("No decodes: the decoder (jt9) is failing or restarting: jt9 exited with code 2. Diagnostics has the details.");
+        r.Text.Should().Be("No decodes: the decoder (jt9) is not working: jt9 exited with code 2. Diagnostics has the details.");
     }
 
     [Theory]

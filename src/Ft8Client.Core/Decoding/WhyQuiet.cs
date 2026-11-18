@@ -64,7 +64,7 @@ public static class WhyQuiet
         if (f.Decoder is { Health: ServiceHealth.Down or ServiceHealth.Degraded } d)
         {
             var why = d.Message.Trim().TrimEnd('.');
-            var state = d.Health == ServiceHealth.Down ? "is not running" : "is failing or restarting";
+            var state = d.Health == ServiceHealth.Down ? "is not running" : "is not working";
             return new(QuietCause.Decoder, $"No decodes: the decoder (jt9) {state}{(why.Length > 0 ? $": {why}" : string.Empty)}. Diagnostics has the details.");
         }
 

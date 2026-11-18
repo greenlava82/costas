@@ -29,7 +29,7 @@ public enum QuietCause
     /// <summary>The radio reports a mode other than USB or USB data.</summary>
     WrongMode,
 
-    /// <summary>The decoder (jt9) is not running, failing or restarting.</summary>
+    /// <summary>The decoder (jt9) is not running, or failing (as it does while it restarts).</summary>
     Decoder,
 
     /// <summary>The clock is off by more than the clock limit.</summary>
