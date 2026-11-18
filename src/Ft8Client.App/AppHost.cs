@@ -87,7 +87,7 @@ public sealed class AppHost : IAsyncDisposable
         CorrectedClock = new CorrectedClock(SystemClock.Instance);
         Clock = CorrectedClock;
         Guard = new ChildProcessGuard();
-        Secrets = SecretStoreFactory.Create();
+        Secrets = args.Secrets ?? SecretStoreFactory.Create();
         Database = new SqliteDatabase(paths.Database);
         Qsos = new QsoRepository(Database);
         Uploads = new UploadQueueRepository(Database);
