@@ -52,6 +52,10 @@ public class ProfileChipTests
     [Fact]
     public Task SwitchProfile_CallingCq_RefusedOnTheStatusLine() => WithMain(oneProfile: false, (host, vm) =>
     {
+        // CQ clicked in the first few seconds of a slot goes out at once, and "Transmitting" rightly replaces any note on
+        // the status line, so this failed whenever the click landed there (the full suite on the Windows runner). Click
+        // in the middle of a slot instead: the CQ then waits seconds for its slot, long after the assertions.
+        WaitForMidSlot(host);
         host.Session.ToggleCq();
         host.Session.Snapshot.CallingCq.Should().BeTrue();
 
@@ -70,6 +74,19 @@ public class ProfileChipTests
         vm.ProfileText.Should().Be("K1GLV · Home");
         vm.ProfileFlagged.Should().BeTrue("a phone switched whose callsign is on the air");
     });
+
+    // Waits until 5 to 11 s into a 15 s FT8 slot: past the 3 s after Tx start in which a click still sends in that slot,
+    // and at least 4 s before the next one starts.
+    private static void WaitForMidSlot(AppHost host)
+    {
+        static double Into(DateTime t) => (t.TimeOfDay.TotalSeconds % 15 + 15) % 15;
+        var until = DateTime.UtcNow.AddSeconds(30);
+        while (Into(host.Clock.UtcNow) is < 5 or >= 11)
+        {
+            if (DateTime.UtcNow > until) throw new TimeoutException("The slot clock did not move");
+            Thread.Sleep(50);
+        }
+    }
 
     // Two profiles (Ash, K1UTA, in use; Home, K1GLV) and a remote user linked to Home, or one profile alone.
     private static async Task WithMain(bool oneProfile, Action<AppHost, MainViewModel> test)
