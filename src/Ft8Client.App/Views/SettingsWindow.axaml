@@ -849,6 +849,9 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <Button Content="Add a user" Command="{Binding AddRemoteUserCommand}" HorizontalAlignment="Left" />
+                <!-- With sign-in off Costas cannot tell who holds a phone, so the links do nothing (D25). -->
+                <TextBlock Classes="help" TextWrapping="Wrap" IsVisible="{Binding !RemoteSignIn}"
+                           Text="Operates as applies only while Require a username and password is on. With it off, every phone operates as the profile in use." />
                 <TextBlock Classes="help" TextWrapping="Wrap"
                            Text="Use a password of 10 characters or more that you use nowhere else. Changing a password signs that user out on every device. Edit opens a user. Untick Allowed to keep a user but let no device of theirs in; Delete takes them off the list. Both take effect when you save." />
               </StackPanel>
