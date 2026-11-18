@@ -96,13 +96,102 @@ public sealed class CloudlogService(Session session, AppSettingsAccessor setting
     /// <summary>The Wavelog download's latest result, or null before the first (for tests and the indicator).</summary>
     internal ServiceStatus? DownloadStatus => _downloadStatus;
 
+    // One pass at a time: the background loop and the Log view's "now" buttons share the queue and the cursor.
+    private readonly SemaphoreSlim _pass = new(1, 1);
+
+    /// <summary>When the Wavelog log was last downloaded without error, or null.</summary>
+    public DateTime? LastDownloadUtc { get; private set; }
+
+    /// <summary>
+    /// What the Log view offers for the active profile: whether Wavelog/Cloudlog is set up at all, and whether its
+    /// download (a v2 token with the switch on) and upload are on.
+    /// </summary>
+    public (bool Configured, bool CanDownload, bool CanUpload) LogState()
+    {
+        var p = settings.Current.Profile;
+        var o = p.Cloudlog;
+        var key = secrets.Get(SecretNames.CloudlogKey(p.Id));
+        var set = uploadsAllowed && CloudlogClient.SiteUrl(o.Url) is not null && !string.IsNullOrWhiteSpace(key) && o.StationId.Trim().Length > 0;
+        var download = set && o.DownloadForWorked && CloudlogClient.ApiFor(key) == WavelogApi.V2;
+        var upload = set && o.UploadOnComplete;
+        return (download || upload, download, upload);
+    }
+
+    /// <summary>Downloads what is new in the Wavelog log now (the Log view's button). Returns a line for the status.</summary>
+    public async Task<string> DownloadNowAsync(CancellationToken ct)
+    {
+        var profile = settings.Current.Profile;
+        var options = profile.Cloudlog;
+        var key = secrets.Get(SecretNames.CloudlogKey(profile.Id))?.Trim();
+        var site = CloudlogClient.SiteUrl(options.Url);
+        var stationId = options.StationId.Trim();
+        if (!uploadsAllowed) return "Wavelog is not used in simulation.";
+        if (!options.DownloadForWorked) return "Downloading is off: tick Download my Wavelog log for worked-before in Settings › Logbooks › Wavelog / Cloudlog.";
+        if (site is null || string.IsNullOrEmpty(key) || stationId.Length == 0) return "Set the logbook address, API key and station in Settings.";
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _cts.Token);
+        await _pass.WaitAsync(linked.Token).ConfigureAwait(false);
+        try
+        {
+            _downloadDueUtc = DateTime.MinValue;
+            await DownloadIfDueAsync(profile.Id, profile.Callsign, site, key, stationId, linked.Token).ConfigureAwait(false);
+            if (_downloadStatus is { } s) session.SetService(ServiceNames.Cloudlog, s);
+            return (_downloadStatus?.Message ?? "Nothing downloaded") + ".";
+        }
+        finally
+        {
+            _pass.Release();
+        }
+    }
+
+    /// <summary>Sends the contacts waiting for Wavelog/Cloudlog now, without waiting for their retry time.</summary>
+    public async Task<string> UploadNowAsync(CancellationToken ct)
+    {
+        var profile = settings.Current.Profile;
+        var options = profile.Cloudlog;
+        var key = secrets.Get(SecretNames.CloudlogKey(profile.Id))?.Trim();
+        var site = CloudlogClient.SiteUrl(options.Url);
+        var stationId = options.StationId.Trim();
+        if (!uploadsAllowed) return "Wavelog/Cloudlog is not used in simulation.";
+        if (!options.UploadOnComplete) return "Uploading is off: tick Upload each new contact in Settings › Logbooks › Wavelog / Cloudlog.";
+        if (site is null || string.IsNullOrEmpty(key) || stationId.Length == 0) return "Set the logbook address, API key and station in Settings.";
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _cts.Token);
+        await _pass.WaitAsync(linked.Token).ConfigureAwait(false);
+        try
+        {
+            queue.RetryNow(CloudlogUploadService.Target, clock.UtcNow);
+            using var http = HttpFactory.Create(profile.Callsign, handler);
+            var worker = new CloudlogUploadService(new CloudlogClient(http), qsos, queue, clock);
+            var sent = await worker.ProcessDueAsync(profile.Id, profile.Callsign, site, key, stationId, linked.Token).ConfigureAwait(false);
+            if (worker.Status.Health != ServiceHealth.Off) session.SetService(ServiceNames.Cloudlog, worker.Status);
+            if (worker.Status.Health is ServiceHealth.Down or ServiceHealth.Degraded) return worker.Status.Message + ".";
+            return sent == 0 ? $"Nothing is waiting to upload to {site.Host}." : $"Uploaded {sent} contact{(sent == 1 ? "" : "s")} to {site.Host}.";
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // Never log the exception: a request carries the API key.
+            return "The upload failed; it will be tried again.";
+        }
+        finally
+        {
+            _pass.Release();
+        }
+    }
+
     private async Task RunAsync(CancellationToken ct)
     {
         try
         {
             while (!ct.IsCancellationRequested)
             {
-                await RunOnceAsync(ct).ConfigureAwait(false);
+                await _pass.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    await RunOnceAsync(ct).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _pass.Release();
+                }
                 await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
             }
         }
@@ -185,6 +274,7 @@ public sealed class CloudlogService(Session session, AppSettingsAccessor setting
                     : r.Inserted > 0 ? $"{r.Inserted:N0} new contact{(r.Inserted == 1 ? "" : "s")} from {site.Host}"
                     : $"{site.Host} log up to date", clock.UtcNow);
                 _downloadDueUtc = clock.UtcNow + DownloadEvery;
+                LastDownloadUtc = clock.UtcNow;
             }
             else
             {
@@ -209,5 +299,6 @@ public sealed class CloudlogService(Session session, AppSettingsAccessor setting
         await _cts.CancelAsync().ConfigureAwait(false);
         if (_loop is not null) await _loop.ConfigureAwait(false);
         _cts.Dispose();
+        _pass.Dispose();
     }
 }

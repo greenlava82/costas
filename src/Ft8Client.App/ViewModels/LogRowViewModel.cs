@@ -69,7 +69,6 @@ public sealed class LogRowViewModel(QsoRecord q)
     {
         UploadState.Uploaded => q.Source == QsoSource.Qrz ? "From QRZ" : "Uploaded",
         _ when q.Source == QsoSource.Lotw => "From LoTW",
-        _ when q.Source == QsoSource.Wavelog => "From Wavelog",
         UploadState.Queued => "Waiting to upload",
         UploadState.Failed => "Failed: " + q.UploadError,
         _ => q.QrzLogid is null ? "Not uploaded" : "In QRZ",
@@ -88,6 +87,21 @@ public sealed class LogRowViewModel(QsoRecord q)
 
     /// <summary>LoTW colour: confirmed stands out.</summary>
     public TextKind LotwKind { get; } = q.LotwConfirmed ? TextKind.Normal : TextKind.Secondary;
+
+    /// <summary>Wavelog/Cloudlog delivery, separate from QRZ and eQSL: from a download, uploaded, waiting or retrying.</summary>
+    public string Wavelog { get; } = q.Source == QsoSource.Wavelog ? "From Wavelog" : q.WavelogUploadState switch
+    {
+        UploadState.Uploaded => "In Wavelog",
+        UploadState.Queued => q.WavelogUploadError is null ? "Waiting to upload" : "Retrying: " + q.WavelogUploadError,
+        UploadState.Failed => "Failed: " + q.WavelogUploadError,
+        _ => string.Empty,
+    };
+
+    /// <summary>True when the Wavelog column needs attention (waiting or retrying), shown as a tag.</summary>
+    public bool WavelogFlag { get; } = q.Source != QsoSource.Wavelog && q.WavelogUploadState is UploadState.Queued or UploadState.Failed;
+
+    /// <summary>Wavelog tag colour, as the QRZ column's: waiting is a caution, failed is critical.</summary>
+    public TextKind WavelogKind { get; } = q.WavelogUploadState == UploadState.Failed ? TextKind.Critical : TextKind.Caution;
 
     /// <summary>eQSL delivery, separate from QRZ.</summary>
     public string Eqsl { get; } = (q.EqslConfirmed ? (q.EqslUploadState == UploadState.None ? "Confirmed" : "Confirmed · ") : string.Empty) + (q.EqslUploadState switch

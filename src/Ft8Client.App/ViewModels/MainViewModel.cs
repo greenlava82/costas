@@ -77,6 +77,10 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         {
             LotwDownload = host.Lotw.DownloadNowAsync,
             LotwUpload = host.Lotw.UploadNowAsync,
+            WavelogDownload = host.Cloudlog.DownloadNowAsync,
+            WavelogUpload = host.Cloudlog.UploadNowAsync,
+            WavelogState = host.Cloudlog.LogState,
+            WavelogLastDownload = () => host.Cloudlog.LastDownloadUtc,
             SendToLoggers = q => host.Udp?.Resend(q) ?? "Sending to other programs is not available.",
         };
         var heard = new HeardHistoryService(host.Paths.Journal, host.Countries, host.Clock);
@@ -1377,6 +1381,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     {
         var s = _host.Settings.Current;
         UpdateProfile(s);
+        LogView.RefreshWavelog();
         // Another profile may be another callsign, whose log the Log view then shows (Settings' Apply leaves it on screen).
         if (Tab == 3 || IsOut(3)) LogView.Refresh();
         AskExchangeAfterProfileSwitch(s);

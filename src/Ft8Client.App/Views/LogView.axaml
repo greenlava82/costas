@@ -23,6 +23,14 @@
             </MenuFlyout>
           </Button.Flyout>
         </Button>
+        <Button Content="Wavelog ▾" IsEnabled="{Binding !Syncing}" IsVisible="{Binding ShowWavelog}" ToolTip.Tip="Your Wavelog or Cloudlog logbook: download for worked-before, and uploads">
+          <Button.Flyout>
+            <MenuFlyout>
+              <MenuItem Header="Download new contacts" Command="{Binding WavelogDownloadNowCommand}" IsEnabled="{Binding WavelogCanDownload}" />
+              <MenuItem Header="Upload waiting contacts now" Command="{Binding WavelogUploadNowCommand}" IsEnabled="{Binding WavelogCanUpload}" />
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
       </StackPanel>
       <DockPanel Grid.Row="1" Margin="0,10,0,0">
         <!-- Totals for what the filters show, as tiles; the line under the list keeps only the sync state. -->
@@ -60,7 +68,7 @@
       <TextBlock Grid.Row="2" Text="{Binding Message}" Margin="0,6,0,0" TextWrapping="Wrap"
                  IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
       <Border Grid.Row="3" BorderBrush="{DynamicResource RowDividerBrush}" BorderThickness="0,0,0,1" Margin="0,12,0,0" Padding="8,0,0,6">
-        <Grid ColumnDefinitions="92,52,100,64,64,48,48,60,150,130,120,96,*,*">
+        <Grid ColumnDefinitions="92,52,100,64,64,48,48,60,150,130,120,96,*,*,Auto">
           <TextBlock Text="Date" Classes="colhead" /><TextBlock Grid.Column="1" Text="Time" Classes="colhead" />
           <TextBlock Grid.Column="2" Text="Call" Classes="colhead" /><TextBlock Grid.Column="3" Text="Band" Classes="colhead" />
           <TextBlock Grid.Column="4" Text="Mode" Classes="colhead" />
@@ -71,6 +79,8 @@
           <TextBlock Grid.Column="10" Text="Why" Classes="colhead" /><TextBlock Grid.Column="11" Text="LoTW" Classes="colhead" />
           <TextBlock Grid.Column="12" Text="QRZ" Classes="colhead" />
           <TextBlock Grid.Column="13" Text="eQSL" Classes="colhead" />
+          <!-- Wavelog: only for a profile that uses it; the Auto column folds away otherwise. -->
+          <TextBlock Grid.Column="14" Text="Wavelog" Classes="colhead" Width="130" IsVisible="{Binding ShowWavelog}" ToolTip.Tip="Wavelog or Cloudlog" />
         </Grid>
       </Border>
       <ListBox Grid.Row="4" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" Background="Transparent" AutomationProperties.Name="Log">
@@ -85,7 +95,7 @@
             </DockPanel>
           </DataTemplate>
           <DataTemplate DataType="vm:LogRowViewModel">
-            <Grid ColumnDefinitions="92,52,100,64,64,48,48,60,150,130,120,96,*,*" MinHeight="26" Margin="8,0,0,0">
+            <Grid ColumnDefinitions="92,52,100,64,64,48,48,60,150,130,120,96,*,*,Auto" MinHeight="26" Margin="8,0,0,0">
               <TextBlock Text="{Binding Date}" Classes="num secondary" VerticalAlignment="Center" />
               <TextBlock Grid.Column="1" Text="{Binding Time}" Classes="num secondary" VerticalAlignment="Center" />
               <TextBlock Grid.Column="2" Text="{Binding Call}" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -115,6 +125,14 @@
               </Panel>
               <TextBlock Grid.Column="12" Text="{Binding Qrz}" Classes="secondary" VerticalAlignment="Center" IsVisible="{Binding !QrzFlag}" TextTrimming="CharacterEllipsis" />
               <TextBlock Grid.Column="13" Text="{Binding Eqsl}" Classes="secondary" ToolTip.Tip="{Binding Eqsl}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              <!-- Wavelog: waiting and retrying uploads stand out as tags, as in the QRZ column. -->
+              <Panel Grid.Column="14" Width="130" IsVisible="{Binding $parent[UserControl].((vm:LogViewModel)DataContext).ShowWavelog}">
+                <Panel HorizontalAlignment="Left" VerticalAlignment="Center" IsVisible="{Binding WavelogFlag}">
+                  <Border CornerRadius="9" Background="{Binding WavelogKind, Converter={x:Static v:Converters.KindBrush}}" Opacity="0.16" />
+                  <TextBlock Text="{Binding Wavelog}" FontSize="12" Margin="8,1" Foreground="{Binding WavelogKind, Converter={x:Static v:Converters.KindBrush}}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Wavelog}" />
+                </Panel>
+                <TextBlock Text="{Binding Wavelog}" Classes="secondary" VerticalAlignment="Center" IsVisible="{Binding !WavelogFlag}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Wavelog}" />
+              </Panel>
             </Grid>
           </DataTemplate>
         </ListBox.DataTemplates>

@@ -66,6 +66,40 @@ public sealed class CloudlogDownloadServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DownloadNow_NotDue_DownloadsAnywayAndSays()
+    {
+        await using var service = Service("wl2_t", out _);
+        await service.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        var message = await service.DownloadNowAsync(TestContext.Current.CancellationToken);
+
+        _asked.Should().HaveCount(2, "the button does not wait 15 minutes");
+        message.Should().Be("log.example.com log up to date.");
+        service.LastDownloadUtc.Should().Be(Now);
+    }
+
+    [Fact]
+    public async Task UploadNow_ContactWaitingForLater_SendsItNow()
+    {
+        await using var service = Service("wl2_t", out var qsos, upload: true, uploadAnswer: """{"data":{"parsed":1,"imported":1,"skipped":0}}""");
+        var id = qsos.Insert(new QsoRecord { ProfileId = Profile, StationCallsign = "W7LIT", Call = "JA1QRS", Band = "20m", Mode = "FT8", QsoDateOn = Now });
+        new UploadQueueRepository(_db).Enqueue(id, "cloudlog", Now.AddHours(1));
+
+        var message = await service.UploadNowAsync(TestContext.Current.CancellationToken);
+
+        message.Should().Be("Uploaded 1 contact to log.example.com.");
+        qsos.Get(id)!.WavelogUploadState.Should().Be(UploadState.Uploaded);
+    }
+
+    [Fact]
+    public async Task LogState_DownloadOnlyWithV1Key_ConfiguredButNoButtons()
+    {
+        await using var service = Service("cl5f2a9", out _);
+
+        service.LogState().Should().Be((false, false, false), "a v1 key cannot download and upload is off");
+    }
+
+    [Fact]
     public async Task RunOnce_DownloadOnWithV1Key_SaysItNeedsAV2TokenAndAsksNothing()
     {
         await using var service = Service("cl5f2a9", out _);
@@ -77,7 +111,9 @@ public sealed class CloudlogDownloadServiceTests : IDisposable
         service.DownloadStatus.Message.Should().Contain("v2 token");
     }
 
-    private CloudlogService Service(string key, out QsoRepository qsos)
+    private string Profile { get; set; } = string.Empty;
+
+    private CloudlogService Service(string key, out QsoRepository qsos, bool upload = false, string? uploadAnswer = null)
     {
         var store = new SettingsStore(Path.Combine(_dir, "settings.json"));
         var s = new AppSettings();
@@ -85,12 +121,15 @@ public sealed class CloudlogDownloadServiceTests : IDisposable
         s.Profile.Cloudlog.Url = "https://log.example.com";
         s.Profile.Cloudlog.StationId = "3";
         s.Profile.Cloudlog.DownloadForWorked = true;
+        s.Profile.Cloudlog.UploadOnComplete = upload;
+        Profile = s.Profile.Id;
         var settings = new AppSettingsAccessor(store, s);
         var secrets = new InMemorySecretStore();
         secrets.Set(SecretNames.CloudlogKey(s.Profile.Id), key);
         qsos = new QsoRepository(_db);
         var handler = new Handler(request =>
         {
+            if (request.Method == HttpMethod.Post) return new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent(uploadAnswer ?? "{}") };
             _asked.Add(request.RequestUri!.PathAndQuery);
             var body = _asked.Count == 1
                 ? """{"data":{"exported":1,"lastfetchedid":5,"adif":"<call:5>K1ABC<qso_date:8>20261101<time_on:4>1200<band:3>20m<mode:3>FT8<station_callsign:5>W7LIT<eor>"},"meta":{"has_more":false}}"""
