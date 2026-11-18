@@ -8,26 +8,17 @@
 
 namespace Ft8Client.Data.Settings;
 
-/// <summary>LoTW: confirmations, uploads through TQSL, and the list of LoTW users. The password is in the credential store.</summary>
+/// <summary>
+/// LoTW settings the whole station shares: where TQSL is, how often to download, and ARRL's list of LoTW users. Each
+/// station profile's own account (login, Station Location, upload on log) is <see cref="StationProfile.Lotw"/>.
+/// </summary>
 public sealed class LotwOptions
 {
-    /// <summary>Download LoTW confirmations.</summary>
-    public bool Enabled { get; set; }
-
-    /// <summary>LoTW login name (usually the callsign).</summary>
-    public string? Username { get; set; }
-
     /// <summary>Hours between confirmation downloads.</summary>
     public int DownloadHours { get; set; } = 12;
 
     /// <summary>Path to <c>tqsl.exe</c>; null to look in the usual install folders.</summary>
     public string? TqslPath { get; set; }
-
-    /// <summary>The TQSL Station Location to sign with; null when TQSL has only one.</summary>
-    public string? StationLocation { get; set; }
-
-    /// <summary>Sign and upload each contact through TQSL when it is logged.</summary>
-    public bool UploadOnComplete { get; set; }
 
     /// <summary>Download ARRL's list of LoTW users once a week (for "Uses LoTW").</summary>
     public bool UserList { get; set; } = true;

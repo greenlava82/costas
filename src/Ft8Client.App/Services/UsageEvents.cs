@@ -31,7 +31,7 @@ public static class UsageEvents
             ["theme"] = s.Appearance.Theme,
             ["units"] = s.Appearance.Units,
             ["qrz_logbook"] = OnOff(s.Qrz.LogbookEnabled),
-            ["lotw"] = OnOff(s.Lotw.Enabled),
+            ["lotw"] = OnOff(s.Profile.Lotw.Enabled),
             ["eqsl"] = OnOff(s.Profile.Eqsl.UploadOnComplete || s.Profile.Eqsl.SyncEnabled),
             ["psk_feed"] = OnOff(s.PskReporter.FeedEnabled),
             ["psk_upload"] = OnOff(s.PskReporter.UploadSpots),

@@ -18,10 +18,10 @@
 <title>Costas remote</title>
 <style>
 :root{--bg:#141414;--card:#202020;--line:#333;--tx:#eee;--mut:#9a9a9a;--btn:#3a3a3a;--red:#e8584e;--halt:#b3261e;--grn:#4caf6a;--amb:#e0a83a;
-  --tag-bg:#2f4a36;--tag-tx:#9fe0b0;--warn-bg:#3b2a12;--warn-line:#6b4a1a;--warn-tx:#f3c77a;--accent:#58a6ff;
+  --tag-bg:#2f4a36;--tag-tx:#9fe0b0;--warn-bg:#3b2a12;--warn-line:#6b4a1a;--warn-tx:#f3c77a;--accent:#58a6ff;--note-bg:#3a3612;--note-line:#8a7a22;--note-tx:#f7ea8f;
   --fox-bg:#2c2240;--fox-line:#5b4585;--fox-tx:#c9aef5;--fox-chip:#7e57c2}
 @media (prefers-color-scheme: light){:root{--bg:#f3f3f3;--card:#fff;--line:#ddd;--tx:#1a1a1a;--mut:#666;--btn:#e4e4e4;--tag-bg:#dcf1e1;--tag-tx:#1f6b34;
-  --warn-bg:#fff4e0;--warn-line:#e8c27a;--warn-tx:#7a4d00;--accent:#0a66c2;--fox-bg:#f3ecfc;--fox-line:#c9b3e8;--fox-tx:#6b3fa0;--fox-chip:#6b3fa0}}
+  --warn-bg:#fff4e0;--warn-line:#e8c27a;--warn-tx:#7a4d00;--accent:#0a66c2;--note-bg:#fff8c2;--note-line:#e3cf5a;--note-tx:#4d3f00;--fox-bg:#f3ecfc;--fox-line:#c9b3e8;--fox-tx:#6b3fa0;--fox-chip:#6b3fa0}}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.35 "Segoe UI",system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent}
 body{min-height:100vh;display:flex;flex-direction:column}
@@ -70,6 +70,9 @@ main{padding:12px 14px 120px;display:flex;flex-direction:column;gap:12px;flex:1}
 .hband b{display:block;color:var(--fox-tx)}.hband span{color:var(--mut)}
 .hero.tx .hband{background:rgba(0,0,0,.25);border-color:rgba(255,255,255,.4)}.hero.tx .hband b,.hero.tx .hband span{color:#fff}
 .banner{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-tx);border-radius:12px;padding:12px;font-size:14px}
+.banner.info{background:var(--card);border-color:var(--accent);color:var(--tx)}
+.banner.opnote{background:var(--note-bg);border-color:var(--note-line);color:var(--note-tx);font-weight:600}
+.notice{display:flex;align-items:center;gap:8px}.notice+.notice{margin-top:8px}.notice .t{flex:1}.notice .s{color:var(--mut);font-size:12px}
 .note{position:fixed;left:14px;right:14px;bottom:110px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;display:none;z-index:3}
 /* The "Logged" notice: one slim line above HALT TX with a countdown bar; it closes itself after 5 s. */
 .logged{position:fixed;left:14px;right:14px;bottom:110px;background:var(--card);border:1px solid var(--grn);border-radius:12px;padding:9px 10px 0;z-index:3;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.35)}
@@ -266,6 +269,8 @@ body.dashon #slot,body.dashon #onair{display:none!important}
     <div id="fault" class="banner hidden"></div>
     <div id="hunt" class="banner hidden" aria-live="polite"></div>
     <div id="quiet" class="banner quiet hidden" aria-live="polite"><span id="quietText"></span><span id="quietBtn"></span></div>
+    <div id="notices" class="banner info hidden" role="status" aria-live="polite"></div>
+    <div id="profileNote" class="banner opnote hidden" role="status"></div>
     <div id="meter" class="banner warnline hidden"></div>
     <div id="services" class="mini hidden"></div>
     <div id="board" class="board"><div class="col">
@@ -525,6 +530,10 @@ function render() {
   renderTune(s);
   renderRadio(s);
   renderLogged(s);
+  renderNotices(s);
+  const pn = $("profileNote");
+  pn.classList.toggle("hidden", !s.profileNote);
+  pn.textContent = s.profileNote || "";
   if (!wide) renderDash(s);
 
   const busy = s.transmitting || s.callingCq || (s.contact && s.contact.active);
@@ -1232,6 +1241,28 @@ setInterval(renderSlot, 200);
 // The "Logged" notice. The station sends the contact only while its notice should show, with the time left; the
 // phone counts down between states and shows each contact once, so ✕ keeps it closed.
 let loggedId = 0, loggedUntil = 0;
+// Someone else signed in or took control: shown until dismissed (or ten minutes old), so the people already here know
+// to share. Dismissed notices are remembered in this browser.
+const NOTICES_KEY = "costas-remote-notices-seen";
+let noticesSeen = new Set();
+try { noticesSeen = new Set(JSON.parse(localStorage.getItem(NOTICES_KEY) || "[]")); } catch { }
+function renderNotices(s) {
+  const box = $("notices");
+  const list = (s.notices || []).filter(n => !noticesSeen.has(n.id));
+  box.replaceChildren();
+  for (const n of list) {
+    const row = el("div", "notice");
+    row.append(el("span", "t", n.text), el("span", "s", n.time), button("✕", "x", () => dismissNotice(n.id)));
+    box.append(row);
+  }
+  box.classList.toggle("hidden", list.length === 0);
+}
+function dismissNotice(id) {
+  noticesSeen.add(id);
+  try { localStorage.setItem(NOTICES_KEY, JSON.stringify([...noticesSeen].slice(-50))); } catch { }
+  if (state) renderNotices(state);
+}
+
 function renderLogged(s) {
   const l = s.logged;
   if (!l || l.id === loggedId) return;

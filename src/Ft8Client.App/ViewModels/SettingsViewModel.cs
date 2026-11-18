@@ -28,8 +28,8 @@ namespace Ft8Client.App.ViewModels;
 public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly AppHost _host;
-    private readonly string _loadedTxGain;
-    private readonly string _loadedProfile;
+    private string _loadedTxGain;
+    private string _loadedProfile;
     private ProfileDraft? _shownProfile;
 
     /// <summary>Creates the view model from current settings.</summary>
@@ -43,6 +43,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Profiles.Add(new ProfileDraft
             {
                 Id = p.Id, Name = p.Name, Callsign = p.Callsign, Grid = p.Grid, Licence = SettingsMapper.Licence(p, s.Operating), Power = p.PowerWatts.ToString(CultureInfo.InvariantCulture),
+                OperatorName = p.OperatorName, Qth = p.Qth, RigDescription = p.RigDescription, Antenna = p.Antenna,
                 MaxPower = p.Rig.MaxPowerWatts?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 LogbookKey = host.Secrets.Get(SecretNames.QrzLogbookKey(p.Id)) ?? string.Empty,
                 EqslUser = host.Secrets.Get(SecretNames.EqslUsername(p.Id)) ?? string.Empty,
@@ -54,6 +55,9 @@ public sealed partial class SettingsViewModel : ObservableObject
                 ClubLogPassword = host.Secrets.Get(SecretNames.ClubLogPassword(p.Id)) ?? string.Empty,
                 ClubLogPasswordSaved = host.Secrets.Get(SecretNames.ClubLogPassword(p.Id)) ?? string.Empty,
                 ClubLogStop = p.ClubLog.Stop,
+                LotwEnabled = p.Lotw.Enabled, LotwUser = p.Lotw.Username ?? string.Empty,
+                LotwPassword = host.Secrets.Get(SecretNames.LotwPassword(p.Id)) ?? string.Empty,
+                LotwStationLocation = p.Lotw.StationLocation ?? string.Empty, LotwUpload = p.Lotw.UploadOnComplete,
             });
         }
         _loadedProfile = s.Profile.Id;
@@ -83,10 +87,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         RttyReverse = rtty.Reverse;
         RttyUnshiftOnSpace = s.Operating.RttyUnshiftOnSpace;
         RttyPowerPercent = s.Operating.RttyPowerPercent.ToString(CultureInfo.InvariantCulture);
-        OperatorName = s.Profile.OperatorName;
-        Qth = s.Profile.Qth;
-        RigDescription = s.Profile.RigDescription;
-        Antenna = s.Profile.Antenna;
         LoadMacros(SettingsMapper.Macros(s.Operating));
         CqParity = s.Operating.CqParity;
         ClockBlock = s.Operating.ClockBlockSeconds.ToString("0.0", CultureInfo.InvariantCulture);
@@ -101,13 +101,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         SkipLongShots = s.Ranking.SkipLongShots;
         ConfirmedOnly = s.Ranking.ConfirmedOnly;
         ConfirmedByLotw = !string.Equals(s.Ranking.ConfirmedBy, "any", StringComparison.OrdinalIgnoreCase);
-        LotwEnabled = s.Lotw.Enabled;
-        LotwUser = s.Lotw.Username ?? string.Empty;
-        LotwPassword = host.Secrets.Get(SecretNames.LotwPassword) ?? string.Empty;
-        LotwUploadOnComplete = s.Lotw.UploadOnComplete;
         LotwUserList = s.Lotw.UserList;
         TqslPath = s.Lotw.TqslPath ?? string.Empty;
-        StationLocation = s.Lotw.StationLocation ?? string.Empty;
         TqslFound = host.Lotw.TqslPath is { } tq ? $"TQSL found: {tq}" : "TQSL not found. Install it from ARRL, or type where tqsl.exe is.";
         foreach (var t in HuntService.ToTargets(s.Hunt.Targets)) HuntRows.Add(new HuntRowViewModel(t, t.Describe(host.Countries)));
         HuntEmpty = HuntRows.Count == 0;
@@ -150,7 +145,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         RemoteSignIn = s.Remote.RequireSignIn;
         RemoteProxyAddress = s.Remote.TrustedProxy ?? string.Empty;
         foreach (var u in s.Remote.Users)
-            RemoteUsers.Add(RemoteUserRow(u.Id, u.Username, u.Enabled, host.Remote.Control.Users?.HasPassword(u.Id) == true));
+            RemoteUsers.Add(RemoteUserRow(u.Id, u.Username, u.Enabled, host.Remote.Control.Users?.HasPassword(u.Id) == true, u.ProfileId));
         RefreshRemote();
         host.Remote.Changed += OnRemoteChanged;
         _remoteLoaded = true;
@@ -234,9 +229,13 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private static void OpenQrz() => Services.Browser.Open(Services.Browser.QrzLogbook);
 
-    /// <summary>Message line.</summary>
+    /// <summary>Message line: why Save or Apply stopped.</summary>
     [ObservableProperty]
     public partial string Message { get; set; } = string.Empty;
+
+    /// <summary>Said after Apply stored everything, until the next change is applied or refused.</summary>
+    [ObservableProperty]
+    public partial string AppliedNote { get; set; } = string.Empty;
 
     /// <summary>Station profiles as edited here.</summary>
     public ObservableCollection<ProfileDraft> Profiles { get; } = [];
@@ -268,6 +267,29 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, Name = NewProfileName(Profiles.Select(p => p.Name)),
             Callsign = from.Callsign, Grid = from.Grid, Licence = from.Licence, Power = from.Power, MaxPower = from.MaxPower,
+            OperatorName = from.OperatorName, Qth = from.Qth, RigDescription = from.RigDescription, Antenna = from.Antenna,
+        };
+        Profiles.Add(draft);
+        SelectedProfile = draft;
+        DeleteProfileCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Adds a profile for another operator at this station and shows it: the same radio, audio, power, grid, QTH, rig and
+    /// antenna as the one shown, but no callsign, name or logbook accounts, so nothing of the first operator's goes with
+    /// it. Save asks for the callsign.
+    /// </summary>
+    [RelayCommand]
+    private void NewOperatorProfile()
+    {
+        StoreFields();
+        var from = SelectedProfile ?? Profiles[0];
+        var draft = new ProfileDraft
+        {
+            Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, ForAnotherOperator = true,
+            Name = NewProfileName(Profiles.Select(p => p.Name), "Operator"),
+            Grid = from.Grid, Power = from.Power, MaxPower = from.MaxPower,
+            Qth = from.Qth, RigDescription = from.RigDescription, Antenna = from.Antenna,
         };
         Profiles.Add(draft);
         SelectedProfile = draft;
@@ -287,14 +309,14 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private bool CanDeleteProfile() => Profiles.Count > 1;
 
-    /// <summary>"Portable", then "Portable 2", "Portable 3"… avoiding names in use.</summary>
-    public static string NewProfileName(IEnumerable<string> taken)
+    /// <summary>"Portable", then "Portable 2", "Portable 3"… (or another base name) avoiding names in use.</summary>
+    public static string NewProfileName(IEnumerable<string> taken, string baseName = "Portable")
     {
         var names = new HashSet<string>(taken, StringComparer.OrdinalIgnoreCase);
-        if (!names.Contains("Portable")) return "Portable";
+        if (!names.Contains(baseName)) return baseName;
         for (var i = 2; ; i++)
         {
-            var n = $"Portable {i}";
+            var n = $"{baseName} {i}";
             if (!names.Contains(n)) return n;
         }
     }
@@ -307,6 +329,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         _shownProfile.Licence = LicenceOf(LicenceChoice);
         _shownProfile.Power = Power;
         _shownProfile.MaxPower = MaxPower;
+        _shownProfile.OperatorName = OperatorName;
+        _shownProfile.Qth = Qth;
+        _shownProfile.RigDescription = RigDescription;
+        _shownProfile.Antenna = Antenna;
         _shownProfile.LogbookKey = LogbookKey;
         _shownProfile.EqslUser = EqslUser;
         _shownProfile.EqslPassword = EqslPassword;
@@ -320,6 +346,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         _shownProfile.ClubLogEmail = ClubLogEmail;
         _shownProfile.ClubLogPassword = ClubLogPassword;
         _shownProfile.ClubLogUpload = ClubLogUploadOnComplete;
+        _shownProfile.LotwEnabled = LotwEnabled;
+        _shownProfile.LotwUser = LotwUser;
+        _shownProfile.LotwPassword = LotwPassword;
+        _shownProfile.LotwStationLocation = StationLocation;
+        _shownProfile.LotwUpload = LotwUploadOnComplete;
     }
 
     private void ShowEqsl(ProfileDraft d)
@@ -330,6 +361,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         CloudlogStatus = string.Empty;
         (ClubLogEmail, ClubLogPassword, ClubLogUploadOnComplete) = (d.ClubLogEmail, d.ClubLogPassword, d.ClubLogUpload);
         ClubLogStopText = d.ClubLogStop is { } stop && !d.ClubLogResume ? Ft8Client.Integrations.ClubLog.ClubLogUploadService.Describe(stop) : string.Empty;
+        (LotwEnabled, LotwUser, LotwPassword, StationLocation, LotwUploadOnComplete) = (d.LotwEnabled, d.LotwUser, d.LotwPassword, d.LotwStationLocation, d.LotwUpload);
+        (OperatorName, Qth, RigDescription, Antenna) = (d.OperatorName, d.Qth, d.RigDescription, d.Antenna);
     }
 
     /// <summary>
@@ -350,10 +383,15 @@ public sealed partial class SettingsViewModel : ObservableObject
             {
                 var source = old.FirstOrDefault(x => x.Id == d.CopyOf) ?? old.FirstOrDefault() ?? new StationProfile();
                 p = source.CopyAs(d.Id, d.Name);
+                if (d.ForAnotherOperator) p.ContestExchanges = [];
             }
             p.Name = string.IsNullOrWhiteSpace(d.Name) ? p.Name : d.Name.Trim();
             p.Callsign = d.Callsign.Trim().ToUpperInvariant();
             p.Grid = d.Grid.Trim().ToUpperInvariant();
+            p.OperatorName = d.OperatorName.Trim();
+            p.Qth = d.Qth.Trim();
+            p.RigDescription = d.RigDescription.Trim();
+            p.Antenna = d.Antenna.Trim();
             p.LicenceClass = SettingsMapper.LicenceKey(d.Licence);
             p.PowerWatts = Watts(d.Power, p.PowerWatts);
             p.Rig.MaxPowerWatts = string.IsNullOrWhiteSpace(d.MaxPower) ? null : Watts(d.MaxPower, p.Rig.MaxPowerWatts ?? 100);
@@ -366,6 +404,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             if (ClubLogStopEnds(p.ClubLog.Stop, d)) p.ClubLog.Stop = null;
             p.ClubLog.Email = d.ClubLogEmail.Trim();
             p.ClubLog.UploadOnComplete = d.ClubLogUpload;
+            p.Lotw.Enabled = d.LotwEnabled;
+            p.Lotw.Username = string.IsNullOrWhiteSpace(d.LotwUser) ? null : d.LotwUser.Trim();
+            p.Lotw.StationLocation = string.IsNullOrWhiteSpace(d.LotwStationLocation) ? null : d.LotwStationLocation.Trim();
+            p.Lotw.UploadOnComplete = d.LotwUpload;
             result.Add(p);
         }
         s.Profiles = result;
@@ -537,19 +579,19 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     /// <summary>My first name, for {MYNAME}.</summary>
     [ObservableProperty]
-    public partial string OperatorName { get; set; }
+    public partial string OperatorName { get; set; } = string.Empty;
 
     /// <summary>Where I am, for {MYQTH}.</summary>
     [ObservableProperty]
-    public partial string Qth { get; set; }
+    public partial string Qth { get; set; } = string.Empty;
 
     /// <summary>My radio, for {MYRIG}.</summary>
     [ObservableProperty]
-    public partial string RigDescription { get; set; }
+    public partial string RigDescription { get; set; } = string.Empty;
 
     /// <summary>My antenna, for {MYANT}.</summary>
     [ObservableProperty]
-    public partial string Antenna { get; set; }
+    public partial string Antenna { get; set; } = string.Empty;
 
     /// <summary>The PSK and RTTY macros, F1 up.</summary>
     public ObservableCollection<MacroEditViewModel> Macros { get; } = [];
@@ -1114,8 +1156,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         row.EditCommand.Execute(null);
     }
 
-    private RemoteUserEditViewModel RemoteUserRow(string id, string username, bool enabled, bool hasPassword) =>
-        new(id, username, enabled, hasPassword)
+    private RemoteUserEditViewModel RemoteUserRow(string id, string username, bool enabled, bool hasPassword, string? profileId = null)
+    {
+        var row = new RemoteUserEditViewModel(id, username, enabled, hasPassword, profileId)
         {
             OnRemove = r => RemoteUsers.Remove(r),
             OnSignOut = SignOutRemoteUser,
@@ -1123,8 +1166,20 @@ public sealed partial class SettingsViewModel : ObservableObject
             OnEdit = r =>
             {
                 foreach (var other in RemoteUsers.Where(o => !ReferenceEquals(o, r))) other.IsEditing = false;
+                r.SetProfileChoices(ProfileChoicesNow());
             },
         };
+        row.SetProfileChoices(ProfileChoicesNow());
+        return row;
+    }
+
+    // What a remote user can operate as: whichever profile is in use, or one of the profiles (as edited so far).
+    private List<ProfileChoice> ProfileChoicesNow()
+    {
+        string CallOf(ProfileDraft d) => ((ReferenceEquals(d, _shownProfile) ? Callsign : d.Callsign) ?? string.Empty).Trim().ToUpperInvariant();
+        return [new ProfileChoice(null, ProfileChoice.NoneLabel), .. Profiles.Select(d => new ProfileChoice(d.Id,
+            CallOf(d).Length > 0 ? $"{d.Name} ({CallOf(d)})" : d.Name))];
+    }
 
     // Takes effect at once: a lost or borrowed phone must be cut off without waiting for Save.
     private void SignOutRemoteUser(RemoteUserEditViewModel row)
@@ -1479,6 +1534,23 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
+        if (Commit()) Close?.Invoke();
+    }
+
+    /// <summary>Saves and stays open, so more changes can follow.</summary>
+    [RelayCommand]
+    private void Apply()
+    {
+        AppliedNote = string.Empty;
+        if (!Commit()) return;
+        Message = string.Empty;
+        AppliedNote = $"Applied at {DateTime.Now:HH:mm:ss}.";
+    }
+
+    // Stores everything shown. False when something was refused (the reason is in Message, on its page) or a secret could
+    // not be kept; the window then stays open either way.
+    private bool Commit()
+    {
         static int Int(string s, int min, int max, int fallback) =>
             int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? Math.Clamp(v, min, max) : fallback;
         static double Dbl(string s, double min, double max, double fallback) =>
@@ -1488,7 +1560,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             Message = problem;
             SelectedPage = ContactsPage;
-            return;
+            return false;
         }
         var oldHamlibDir = _host.Settings.Current.Paths.HamlibDir;
 
@@ -1498,20 +1570,38 @@ public sealed partial class SettingsViewModel : ObservableObject
             Message = Profiles.Count > 1 ? $"Enter a valid callsign for the {bad.Name} profile (Station page)." : "Enter a valid callsign (Station page).";
             SelectedProfile = bad;
             SelectedPage = 0;
-            return;
+            return false;
         }
         if (MacroCheck(Macros) is { } check && (check.Blocking || check.Text != _macroWarning))
         {
             Message = check.Text;
             _macroWarning = check.Blocking ? null : check.Text;
             SelectedPage = KeyboardPage;
-            return;
+            return false;
         }
         if ((RemoteUsersCheck(RemoteSignIn, RemoteUsers) ?? ProxyAddressCheck(RemoteProxyAddress)) is { } remoteProblem)
         {
             Message = remoteProblem;
             SelectedPage = MobilePage;
-            return;
+            return false;
+        }
+        // A different profile, or a new callsign or grid for the one in use, changes what goes out: only when idle (D25,
+        // owner decisions 2026-11-17). Checked before anything is stored.
+        var chosen = SelectedProfile ?? Profiles[0];
+        var current = _host.Settings.Current.Profile;
+        // A phone may have switched profile since this window opened (D25): leaving the choice as it was keeps the
+        // profile now in use rather than switching back to the one shown at the start.
+        var inUse = chosen.Id == _loadedProfile ? Profiles.FirstOrDefault(d => d.Id == current.Id) ?? chosen : chosen;
+        var activeId = inUse.Id;
+        var what = activeId != current.Id ? "the station profile"
+            : !string.Equals(inUse.Callsign.Trim().ToUpperInvariant(), current.Callsign, StringComparison.Ordinal) ? "your callsign"
+            : !string.Equals(inUse.Grid.Trim().ToUpperInvariant(), current.Grid.Trim().ToUpperInvariant(), StringComparison.Ordinal) ? "your grid square"
+            : null;
+        if (what is not null && ProfileSwitch.Refusal(_host.Session.Snapshot, what) is { } busy)
+        {
+            Message = busy;
+            SelectedPage = 0;
+            return false;
         }
         // Passwords first, so sign-in never comes on before the password that lets a phone in is stored.
         var remoteUsers = _host.Remote.Control.Users;
@@ -1525,11 +1615,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             {
                 Message = SecretStoreProblem.Describe(ex.Message);
                 SelectedPage = MobilePage;
-                return;
+                return false;
             }
         }
         var removedRemote = _host.Settings.Current.Remote.Users.Select(u => u.Id).Where(id => RemoteUsers.All(r => r.Id != id)).ToList();
-        var activeId = (SelectedProfile ?? Profiles[0]).Id;
         var removed = _host.Settings.Current.Profiles.Select(p => p.Id).Where(id => Profiles.All(d => d.Id != id)).ToList();
         _host.Settings.Update(s =>
         {
@@ -1541,12 +1630,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Ranking.SkipLongShots = SkipLongShots;
             s.Ranking.ConfirmedOnly = ConfirmedOnly;
             s.Ranking.ConfirmedBy = ConfirmedByLotw ? "lotw" : "any";
-            s.Lotw.Enabled = LotwEnabled;
-            s.Lotw.Username = string.IsNullOrWhiteSpace(LotwUser) ? null : LotwUser.Trim();
-            s.Lotw.UploadOnComplete = LotwUploadOnComplete;
             s.Lotw.UserList = LotwUserList;
             s.Lotw.TqslPath = string.IsNullOrWhiteSpace(TqslPath) ? null : TqslPath.Trim();
-            s.Lotw.StationLocation = string.IsNullOrWhiteSpace(StationLocation) ? null : StationLocation.Trim();
             s.Hunt.Targets = HuntRows.Select(r => HuntService.ToEntry(r.Target)).ToList();
             s.Hunt.WatchAllBands = HuntAllBands;
             s.Hunt.Sound = HuntSound;
@@ -1582,10 +1667,6 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Operating.RttyReverse = RttyReverse;
             s.Operating.RttyUnshiftOnSpace = RttyUnshiftOnSpace;
             s.Operating.RttyPowerPercent = Int(RttyPowerPercent, 10, 100, 50);
-            s.Profile.OperatorName = OperatorName.Trim();
-            s.Profile.Qth = Qth.Trim();
-            s.Profile.RigDescription = RigDescription.Trim();
-            s.Profile.Antenna = Antenna.Trim();
             s.Operating.Macros = [.. Macros.Where(m => !string.IsNullOrWhiteSpace(m.Text))
                 .Select(m => new MacroOptions { Key = m.Key, Label = m.Label.Trim(), Text = m.Text.Trim() })];
             s.Operating.CqParity = CqParity;
@@ -1613,7 +1694,12 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Remote.Port = Int(RemotePort, 1024, 65535, 8073);
             s.Remote.RequireSignIn = RemoteSignIn;
             s.Remote.TrustedProxy = string.IsNullOrWhiteSpace(RemoteProxyAddress) ? null : RemoteProxyAddress.Trim();
-            s.Remote.Users = [.. RemoteUsers.Select(r => new RemoteUser { Id = r.Id, Username = r.Username.Trim(), Enabled = r.Enabled })];
+            // A link to a profile deleted here goes with it: that user then operates as whichever profile is in use.
+            s.Remote.Users = [.. RemoteUsers.Select(r => new RemoteUser
+            {
+                Id = r.Id, Username = r.Username.Trim(), Enabled = r.Enabled,
+                ProfileId = r.ProfileId is { } p && Profiles.Any(d => d.Id == p) ? p : null,
+            })];
             s.Files.SaveWav = SaveWav;
             s.Files.RetentionDays = Int(Retention, 1, 3650, 30);
             s.Appearance.Theme = Theme;
@@ -1639,6 +1725,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Set(SecretNames.EqslPassword(d.Id), d.EqslPassword);
             Set(SecretNames.CloudlogKey(d.Id), d.CloudlogKey.Trim());
             Set(SecretNames.ClubLogPassword(d.Id), d.ClubLogPassword.Trim());
+            Set(SecretNames.LotwPassword(d.Id), d.LotwPassword);
         }
         foreach (var id in removedRemote)
         {
@@ -1658,24 +1745,30 @@ public sealed partial class SettingsViewModel : ObservableObject
             _host.Secrets.Delete(SecretNames.EqslPassword(id));
             _host.Secrets.Delete(SecretNames.CloudlogKey(id));
             _host.Secrets.Delete(SecretNames.ClubLogPassword(id));
+            _host.Secrets.Delete(SecretNames.LotwPassword(id));
         }
         Set(SecretNames.QrzUsername, QrzUser.Trim());
         Set(SecretNames.QrzPassword, QrzPassword);
-        Set(SecretNames.LotwPassword, LotwPassword);
         _host.TxLevel.Apply();
         _host.RebuildLogIndex();
         // Another profile may use another radio or audio device. A new Hamlib folder is where rigctld is found: Setup
         // tells the operator to set it here when rigctld is missing, so it must take effect without a restart.
         if (activeId != _loadedProfile || !string.Equals(oldHamlibDir, _host.Settings.Current.Paths.HamlibDir, StringComparison.Ordinal))
             _ = _host.ReopenDevicesAsync();
+        // What is now saved becomes what the next Apply compares with: the same profile does not reopen the radio again,
+        // a level left as it was does not overwrite one automatic level set meanwhile, and a remote password is not set
+        // a second time (which would sign that user out everywhere again).
+        _loadedProfile = activeId;
+        _loadedTxGain = TxGain.Trim();
+        foreach (var r in RemoteUsers) r.PasswordSaved();
         // Everything else is saved; the window stays open on the reason so the operator knows the key is not kept.
         if (_secretProblem is { } why)
         {
             _secretProblem = null;
             Message = SecretStoreProblem.Describe(why);
-            return;
+            return false;
         }
-        Close?.Invoke();
+        return true;
     }
 
     /// <summary>Closes without saving.</summary>

@@ -46,8 +46,10 @@ public sealed class RemoteControlService : IAsyncDisposable
     /// <param name="context">The log, QRZ, country file and bands the phone's state is built from.</param>
     /// <param name="power">The radio's power setting, which the phone shows and can change.</param>
     /// <param name="controls">The radio's receive and tuner settings, which the phone's Radio tab shows and can change.</param>
+    /// <param name="switchProfile">Switches to a signed-in user's own station profile as they take control (D25).</param>
     public RemoteControlService(Session session, AppSettingsAccessor settings, ISecretStore secrets, IClock clock, IRemoteTuning? tuning = null,
-                                Func<RemoteContext>? context = null, RadioPowerService? power = null, RadioControlsService? controls = null)
+                                Func<RemoteContext>? context = null, RadioPowerService? power = null, RadioControlsService? controls = null,
+                                Func<string, (string? Refusal, string? NowAs)>? switchProfile = null)
     {
         if (power is not null) power.Changed += () => _dirty = true;
         if (controls is not null) controls.Changed += () => _dirty = true;
@@ -59,7 +61,7 @@ public sealed class RemoteControlService : IAsyncDisposable
         {
             if (t.Length == 0) secrets.Delete(SecretNames.RemoteDevices);
             else secrets.Set(SecretNames.RemoteDevices, t);
-        }, tuning: tuning, power: power, controls: controls, users: new RemoteUsers(() => settings.Current.Remote, secrets, clock));
+        }, tuning: tuning, power: power, controls: controls, users: new RemoteUsers(() => settings.Current.Remote, secrets, clock), switchProfile: switchProfile);
         Control.Changed += () =>
         {
             _dirty = true;
@@ -184,7 +186,8 @@ public sealed class RemoteControlService : IAsyncDisposable
     {
         var s = _session.Snapshot;
         return RemoteStateBuilder.Build(s, _clock.UtcNow, _context(), Control.ControlFor(deviceId), Control.ViewingFor(deviceId))
-            with { Power = Control.PowerFor(), RadioTab = Control.RadioFor(s) };
+            with { Power = Control.PowerFor(), RadioTab = Control.RadioFor(s), Notices = Control.Notices.For(deviceId, _clock.UtcNow),
+                   ProfileNote = RemoteProfileNote.For(_settings.Current, Control.UserIdOf(deviceId)) };
     }
 
     private async Task LoopAsync()

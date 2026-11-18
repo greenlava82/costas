@@ -11,7 +11,7 @@ using Ft8Client.Core.Logbook;
 
 namespace Ft8Client.Data.Log;
 
-/// <summary>What the Log view shows: search text plus band, mode, date and confirmation filters. Null means any.</summary>
+/// <summary>What the Log view shows: search text plus station, band, mode, date and confirmation filters. Null means any.</summary>
 /// <param name="Search">Part of a call, grid, country or name.</param>
 /// <param name="Band">ADIF band, e.g. <c>20m</c>.</param>
 /// <param name="ModeKey">
@@ -20,7 +20,9 @@ namespace Ft8Client.Data.Log;
 /// </param>
 /// <param name="FromUtc">Only contacts on or after this time.</param>
 /// <param name="Confirmed">True for confirmed only (by QRZ, the ADIF or LoTW), false for unconfirmed only.</param>
-public sealed record LogFilter(string? Search = null, string? Band = null, string? ModeKey = null, DateTime? FromUtc = null, bool? Confirmed = null)
+/// <param name="StationCallsign">Only contacts made as this callsign (one station profile's log), ignoring case.</param>
+public sealed record LogFilter(string? Search = null, string? Band = null, string? ModeKey = null, DateTime? FromUtc = null, bool? Confirmed = null,
+                               string? StationCallsign = null)
 {
     /// <summary>No filter: every contact.</summary>
     public static LogFilter All { get; } = new();
@@ -45,8 +47,9 @@ public sealed record LogFilter(string? Search = null, string? Band = null, strin
         else if (ModeKey is not null) parts.Add("UPPER(mode) = @mode AND NOT (UPPER(mode) = 'MFSK' AND UPPER(COALESCE(submode, '')) = 'FT4')");
         if (FromUtc is not null) parts.Add("qso_date_on >= @from");
         if (Confirmed is not null) parts.Add($"{ConfirmedSql} = @confirmed");
+        if (StationCallsign is not null) parts.Add("station_callsign = @station COLLATE NOCASE");
         var sql = parts.Count == 0 ? "1=1" : string.Join(" AND ", parts);
-        return (sql, new { like, band = Band, mode = ModeKey, from = FromUtc, confirmed = Confirmed });
+        return (sql, new { like, band = Band, mode = ModeKey, from = FromUtc, confirmed = Confirmed, station = StationCallsign });
     }
 
     // Fixed mode names from ModeGroups, never operator text.

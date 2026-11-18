@@ -61,6 +61,26 @@ public static class LegacyMigration
         return moved;
     }
 
+    /// <summary>
+    /// Gives each station profile without a LoTW password of its own a copy of the one they all shared (settings schema 3
+    /// copied the account the same way), then deletes the shared one. Run after <see cref="MigrateSecrets"/>, which may
+    /// have just moved the shared one to its Costas name. Returns how many profiles got a copy.
+    /// </summary>
+    public static int SplitLotwPassword(ISecretStore store, IEnumerable<string> profileIds)
+    {
+        var shared = store.Get(SecretNames.SharedLotwPassword);
+        if (shared is null) return 0;
+        var copied = 0;
+        foreach (var id in profileIds)
+        {
+            if (store.Get(SecretNames.LotwPassword(id)) is not null) continue;
+            store.Set(SecretNames.LotwPassword(id), shared);
+            copied++;
+        }
+        store.Delete(SecretNames.SharedLotwPassword);
+        return copied;
+    }
+
     private static bool RenameDatabase(string root)
     {
         var legacy = Path.Combine(root, AppPaths.LegacyDatabaseFileName);

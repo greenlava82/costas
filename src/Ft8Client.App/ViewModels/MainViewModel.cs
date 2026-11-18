@@ -144,6 +144,12 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     private void UpdateRemote()
     {
         var r = _host.Remote;
+        // Someone signing in or taking control shows here for a minute, so the operator at the desk knows to share.
+        if (r.Running && r.Control.Notices.ForDesk(_host.Clock.UtcNow) is { } notice)
+        {
+            (RemoteText, RemoteTip) = (notice, notice + " Phones that are signed in are told too.");
+            return;
+        }
         (RemoteText, RemoteTip) = !r.Running ? (string.Empty, string.Empty)
             : r.Control.Lease.IsHeld ? ("Phone in control", "A phone is the control point. Transmit stops if it loses touch for 15 seconds. Click or press a key here to take control back.")
             : r.Connected > 0 ? ("Phone connected", "A phone has the remote page open. It takes control when it sends a command.")
@@ -538,6 +544,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
             if (s.LastLogged is not null && IsOut(4)) Awards.Refresh();
         }
         Frequency = FormatFrequency(s.DialHz);
+        UpdateRemote(); // a sign-in notice on the remote indicator clears after a minute
         FollowBand(s.Band);
         Transmitting = s.Transmitting;
         OnAirText = s.TransmittingMessage is { Length: > 0 } msg ? $"ON AIR · {msg}" : "ON AIR";
@@ -1036,7 +1043,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
             return;
         }
         var o = _host.Settings.Current;
-        var saved = o.Operating.ContestExchanges.GetValueOrDefault(contest.ToString());
+        var saved = o.Profile.ContestExchanges.GetValueOrDefault(contest.ToString());
         // Asked once: a saved exchange that can still be sent starts the contest at once.
         if (info.Exchange != Core.Contests.ContestExchangeKind.Grid && (saved is null || Core.Contests.ContestExchange.Problem(info, saved, o.Profile.Grid) is not null))
         {
@@ -1055,13 +1062,34 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         _host.Settings.Update(s =>
         {
             s.Operating.Contest = name;
-            s.Operating.ContestExchanges[name] = Core.Contests.ContestExchange.Tidy(exchange);
+            s.Profile.ContestExchanges[name] = Core.Contests.ContestExchange.Tidy(exchange);
             if (s.Operating.ContestSinceFor != name || s.Operating.ContestSinceUtc is not { } since || now - since > TimeSpan.FromDays(4))
             {
                 s.Operating.ContestSinceUtc = now;
                 s.Operating.ContestSinceFor = name;
             }
         });
+    }
+
+    private string? _profileShown;
+
+    // A switch to another profile (another operator) during a contest sends that profile's exchange. One it has no
+    // exchange for, or one it cannot send, would only be refused when transmitting, so it is asked for at once.
+    private void AskExchangeAfterProfileSwitch(AppSettings s)
+    {
+        var changed = _profileShown is not null && _profileShown != s.Profile.Id;
+        _profileShown = s.Profile.Id;
+        if (changed && ExchangeMissing(s) is { } id) ContestExchangeNeeded?.Invoke(id);
+    }
+
+    /// <summary>The contest running when the active profile has no exchange for it that can be sent; else null.</summary>
+    internal static Core.Contests.ContestId? ExchangeMissing(AppSettings s)
+    {
+        var id = SettingsMapper.ContestOf(s.Operating.Contest);
+        if (id == Core.Contests.ContestId.None) return null;
+        if (Core.Contests.ContestInfo.Of(id) is not { } info || info.Exchange == Core.Contests.ContestExchangeKind.Grid) return null;
+        var saved = s.Profile.ContestExchanges.GetValueOrDefault(id.ToString());
+        return saved is null || Core.Contests.ContestExchange.Problem(info, saved, s.Profile.Grid) is not null ? id : null;
     }
 
     /// <inheritdoc />
@@ -1259,6 +1287,9 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     private void ApplySettings()
     {
         var s = _host.Settings.Current;
+        // Another profile may be another callsign, whose log the Log view then shows (Settings' Apply leaves it on screen).
+        if (Tab == 3 || IsOut(3)) LogView.Refresh();
+        AskExchangeAfterProfileSwitch(s);
         Operate.ShowRttyReverse(s.Operating.RttyReverse);
         Operate.ShowKeyboardAfc(s.Operating.KeyboardAfc);
         Operate.Layout = OperateViewModel.Layouts.Contains(s.Appearance.Layout) ? s.Appearance.Layout : "automatic";
@@ -1345,7 +1376,11 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     {
         if (s.Tonight.Count == 0) return ([], 0);
         var since = s.Tonight.Min(t => t.TimeUtc).AddMinutes(-30);
-        var rows = _host.Qsos.Since(since).Where(q => q.Source == QsoSource.Local).OrderByDescending(q => q.QsoDateOn).ToList();
+        // Only this station's: after a switch to another operator's profile, their evening starts empty.
+        var station = _host.Settings.Current.Profile.Callsign;
+        var rows = _host.Qsos.Since(since)
+            .Where(q => q.Source == QsoSource.Local && string.Equals(q.StationCallsign, station, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(q => q.QsoDateOn).ToList();
         var list = rows.Take(3).Select(q =>
         {
             var tag = q.NeedTier is { } t and >= 1 and <= 5 ? (Core.Logbook.NeedTag)(t - 1) : Core.Logbook.NeedTag.NewCall;

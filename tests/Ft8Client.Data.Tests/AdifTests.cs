@@ -59,6 +59,20 @@ public sealed class AdifTests : IDisposable
         back.EntityKey.Should().Be("ZL");
     }
 
+    // Owner decision D25 (2026-11-18): OPERATOR names the person, STATION_CALLSIGN the call on the air.
+    [Theory]
+    [InlineData("W7LIT", "W7LIT")]
+    [InlineData("W7LIT/P", "W7LIT")]
+    [InlineData("VE3/W7LIT", "W7LIT")]
+    public void ToAdif_StationCallsign_OperatorIsItsBaseCall(string station, string op)
+    {
+        var q = Sample();
+        q.StationCallsign = station;
+        var r = AdifMapper.ToAdif(q);
+        r["station_callsign"].Should().Be(station);
+        r["operator"].Should().Be(op);
+    }
+
     [Fact]
     public void ToAdif_Ft4_UsesMfskAndSubmode()
     {

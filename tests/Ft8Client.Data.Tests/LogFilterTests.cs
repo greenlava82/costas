@@ -123,4 +123,18 @@ public class LogFilterTests
         new LogFilter(Search: "K1").Narrowed.Should().BeFalse();
         new LogFilter(Band: "20m").Narrowed.Should().BeTrue();
     }
+
+    [Fact]
+    public void List_StationFilter_OnlyThatCallsignIgnoringCase()
+    {
+        var repo = Seeded(out var keep);
+        using var _ = keep;
+        repo.Insert(new QsoRecord { Call = "VK3ABC", Band = "20m", Mode = "FT8", QsoDateOn = T0.AddDays(5), StationCallsign = "K0GST" });
+
+        repo.List(new LogFilter(StationCallsign: "k0gst")).Select(q => q.Call).Should().Equal("VK3ABC");
+        repo.List(new LogFilter(StationCallsign: "N0CALL")).Should().HaveCount(4).And.NotContain(q => q.Call == "VK3ABC");
+        repo.List(new LogFilter(Band: "20m", StationCallsign: "N0CALL")).Select(q => q.Call).Should().Equal("K2ABC", "K1ABC");
+        repo.List(LogFilter.All).Should().HaveCount(5);
+        repo.Totals(new LogFilter(StationCallsign: "K0GST")).Contacts.Should().Be(1);
+    }
 }

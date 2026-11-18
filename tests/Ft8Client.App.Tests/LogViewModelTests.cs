@@ -186,4 +186,64 @@ public class LogViewModelTests
         vm.Selected!.Call.Should().Be("K1ABC");
         vm.SelectedItem.Should().BeSameAs(vm.Selected);
     }
+
+    [Fact]
+    public void Refresh_TwoStations_ShowsOnlyTheProfilesCallsignUntilAllStations()
+    {
+        var db = SqliteDatabase.InMemory(out var keep);
+        using var _ = keep;
+        var repo = new QsoRepository(db);
+        var on = DateTime.UtcNow.Date.AddHours(1);
+        foreach (var (call, station) in new[] { ("K1ABC", "W7LIT"), ("JA1XYZ", "W7LIT"), ("VK3ABC", "K0GST") })
+            repo.Insert(new QsoRecord { ProfileId = "p", Call = call, QsoDateOn = on, Band = "20m", Mode = "FT8", StationCallsign = station, CreatedUtc = on, ModifiedUtc = on });
+        var profile = ("p", "W7LIT");
+        var vm = new LogViewModel(repo, CountryFile.Parse("United States:  05:  08:  NA:   37.53:    91.67:     5.0:  K:\n    K,W;\n"), () => profile,
+            _ => Task.FromResult(""), () => null, () => { });
+
+        vm.Refresh();
+        vm.StationChoices.Should().Equal("W7LIT", LogViewModel.AllStations);
+        vm.StationFilter.Should().Be("W7LIT");
+        vm.Rows.Select(r => r.Call).Should().BeEquivalentTo(["K1ABC", "JA1XYZ"]);
+        vm.ContactsTotal.Should().Be("2");
+        vm.ContactsOf.Should().BeEmpty("the other station's contacts are not part of this log's total");
+
+        // Another operator's profile: their log, under their callsign.
+        profile = ("p2", "k0gst");
+        vm.Refresh();
+        vm.StationChoices[0].Should().Be("K0GST");
+        vm.StationFilter.Should().Be("K0GST");
+        vm.Rows.Select(r => r.Call).Should().Equal("VK3ABC");
+
+        vm.StationFilter = LogViewModel.AllStations;
+        vm.Rows.Should().HaveCount(3);
+        profile = ("p", "W7LIT");
+        vm.Refresh();
+        vm.StationFilter.Should().Be(LogViewModel.AllStations, "a choice of every station survives a profile switch");
+        vm.Rows.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task ExportAsync_ThisStation_WritesOnlyItsContacts()
+    {
+        var db = SqliteDatabase.InMemory(out var keep);
+        using var _ = keep;
+        var repo = new QsoRepository(db);
+        var on = DateTime.UtcNow.Date.AddHours(1);
+        foreach (var (call, station) in new[] { ("K1ABC", "W7LIT"), ("VK3ABC", "K0GST") })
+            repo.Insert(new QsoRecord { ProfileId = "p", Call = call, QsoDateOn = on, Band = "20m", Mode = "FT8", StationCallsign = station, CreatedUtc = on, ModifiedUtc = on });
+        var vm = new LogViewModel(repo, CountryFile.Parse("United States:  05:  08:  NA:   37.53:    91.67:     5.0:  K:\n    K,W;\n"), () => ("p2", "K0GST"),
+            _ => Task.FromResult(""), () => null, () => { });
+        var path = Path.Combine(Directory.CreateTempSubdirectory("costas-export").FullName, "log.adi");
+
+        await vm.ExportAsync(path);
+
+        var text = File.ReadAllText(path);
+        text.Should().Contain("VK3ABC").And.NotContain("K1ABC");
+        vm.Message.Should().Be("Exported 1 contacts made as K0GST.");
+        vm.StationFilter = LogViewModel.AllStations;
+        await vm.ExportAsync(path);
+        var folder = Path.GetDirectoryName(path)!;
+        File.ReadAllText(Path.Combine(folder, "log-W7LIT.adi")).Should().Contain("K1ABC").And.NotContain("VK3ABC");
+        File.ReadAllText(Path.Combine(folder, "log-K0GST.adi")).Should().Contain("VK3ABC");
+    }
 }

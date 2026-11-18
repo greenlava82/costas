@@ -217,7 +217,11 @@ public sealed class RemoteServer : IAsyncDisposable
         var address = proxy.Client?.ToString() ?? "unknown";
         // The hash takes about a tenth of a second: not on the request thread.
         var r = await Task.Run(() => users.Login(body?.Username, body?.Password, address)).ConfigureAwait(false);
-        if (r.Token is not null) return Results.Json(new { token = r.Token, username = r.Username });
+        if (r.Token is not null)
+        {
+            _control.SignedIn(r.Token, r.Username ?? body?.Username?.Trim() ?? "Someone");
+            return Results.Json(new { token = r.Token, username = r.Username });
+        }
         if (r.Wait > TimeSpan.Zero)
         {
             var seconds = (int)Math.Ceiling(r.Wait.TotalSeconds);

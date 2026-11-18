@@ -48,6 +48,8 @@
           </Border>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <ComboBox ItemsSource="{Binding StationChoices}" SelectedItem="{Binding StationFilter}" MinWidth="120" AutomationProperties.Name="Station filter"
+                    ToolTip.Tip="Contacts made as this station profile's callsign (what worked-before and Awards count), or every station's. Export ADIF follows this choice." />
           <ComboBox ItemsSource="{Binding BandChoices}" SelectedItem="{Binding BandFilter}" MinWidth="110" AutomationProperties.Name="Band filter" />
           <ComboBox ItemsSource="{Binding ModeChoices}" SelectedItem="{Binding ModeFilter}" MinWidth="110" AutomationProperties.Name="Mode filter" />
           <ComboBox ItemsSource="{Binding DateChoices}" SelectedItem="{Binding DateFilter}" MinWidth="130" AutomationProperties.Name="Date filter" />

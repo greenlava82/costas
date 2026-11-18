@@ -104,14 +104,17 @@
                       <DataTemplate x:DataType="vm:ProfileDraft"><TextBlock Text="{Binding Name}" /></DataTemplate>
                     </ComboBox.ItemTemplate>
                   </ComboBox>
-                  <Button Content="New profile" Command="{Binding NewProfileCommand}" />
+                  <Button Content="New profile" Command="{Binding NewProfileCommand}"
+                          ToolTip.Tip="A copy of the profile shown, for a portable or park setup with a /P call or another grid" />
+                  <Button Content="New operator" Command="{Binding NewOperatorProfileCommand}"
+                          ToolTip.Tip="A profile for another licensed operator at this station: the same radio and audio, with no callsign, name or logbook accounts" />
                   <Button Content="Delete" Command="{Binding DeleteProfileCommand}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8" DataContext="{Binding SelectedProfile}" x:DataType="vm:ProfileDraft">
                   <TextBlock Text="Name" VerticalAlignment="Center" />
                   <TextBox Text="{Binding Name}" Width="160" AutomationProperties.Name="Profile name" />
                 </StackPanel>
-                <TextBlock Classes="help" Text="Each profile keeps its own callsign, grid, power, radio, audio devices and QRZ logbook key, for example a portable or park setup with a /P call or another grid. A new profile starts as a copy of the one shown. The profile shown when you press Save is the one Costas uses; set its radio and audio in Station setup." />
+                <TextBlock Classes="help" Text="Each profile keeps its own callsign, grid, power, radio, audio devices, QRZ logbook key and LoTW, eQSL, Club Log and Wavelog accounts, for example a portable or park setup with a /P call or another grid. New profile starts as a copy of the one shown. New operator is for another licensed operator using this station: it keeps the radio, audio, power, grid and QTH, and starts with no callsign, name or logbook accounts, so they enter their own. The profile shown when you press Save or Apply is the one Costas uses; set its radio and audio in Station setup." />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
@@ -325,7 +328,7 @@
         <ScrollViewer>
           <StackPanel>
             <TextBlock Classes="page" Text="PSK and RTTY" />
-            <TextBlock Classes="intro" Text="Your details for the macros, the macros themselves, and how RTTY is sent and read." />
+            <TextBlock Classes="intro" Text="Your details for the macros, the macros themselves, and how RTTY is sent and read. Your name, QTH, radio and antenna belong to the station profile shown on the Station page." />
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Your name" />
               <StackPanel Grid.Column="1">
@@ -613,7 +616,7 @@
                 </StackPanel>
               </Expander.Header>
               <StackPanel>
-                <TextBlock Classes="intro service" Text="ARRL's Logbook of the World is where DXCC and WAS credit comes from. Costas downloads your LoTW confirmations with your LoTW website login, and uploads your contacts through TQSL, which signs them with your callsign certificate. Both are optional." />
+                <TextBlock Classes="intro service" Text="ARRL's Logbook of the World is where DXCC and WAS credit comes from. Costas downloads your LoTW confirmations with your LoTW website login, and uploads your contacts through TQSL, which signs them with your callsign certificate. Both are optional. The login, Station Location and automatic upload belong to the current station profile, so each operator uses their own; where TQSL is installed and the list of LoTW users are shared by all profiles." />
                 <Grid Classes="field" ColumnDefinitions="210,*">
                   <TextBlock Classes="label" Text="Confirmations" />
                   <StackPanel Grid.Column="1" Spacing="6">
@@ -629,7 +632,7 @@
                     <TextBox Text="{Binding TqslPath}" Width="420" HorizontalAlignment="Left" PlaceholderText="Leave blank to find TQSL in its usual folder" />
                     <TextBlock Classes="help" Text="{Binding TqslFound}" />
                     <TextBox Text="{Binding StationLocation}" Width="260" HorizontalAlignment="Left" PlaceholderText="TQSL Station Location" Margin="0,6,0,0" />
-                    <TextBlock Classes="help" Text="The Station Location name exactly as it is in TQSL. Leave blank if TQSL has only one." />
+                    <TextBlock Classes="help" Text="The Station Location name exactly as it is in TQSL, for this profile's callsign. Leave blank if TQSL has only one." />
                     <CheckBox Content="Sign and upload each contact as soon as it is logged" IsChecked="{Binding LotwUploadOnComplete}" Margin="0,6,0,0" />
                     <TextBlock Classes="help" Text="Otherwise use Upload new contacts with TQSL in the Log view. TQSL skips contacts LoTW already has. Your certificate must not have a password, or TQSL will ask for it." />
                   </StackPanel>
@@ -895,6 +898,9 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <Button Content="Add a user" Command="{Binding AddRemoteUserCommand}" HorizontalAlignment="Left" />
+                <!-- With sign-in off Costas cannot tell who holds a phone, so the links do nothing (D25). -->
+                <TextBlock Classes="help" TextWrapping="Wrap" IsVisible="{Binding !RemoteSignIn}"
+                           Text="Operates as applies only while Require a username and password is on. With it off, every phone operates as the profile in use." />
                 <TextBlock Classes="help" TextWrapping="Wrap"
                            Text="Use a password of 10 characters or more that you use nowhere else. Changing a password signs that user out on every device. Edit opens a user. Untick Allowed to keep a user but let no device of theirs in; Delete takes them off the list. Both take effect when you save." />
               </StackPanel>
@@ -1153,10 +1159,18 @@
     <Border Grid.Row="1" Grid.ColumnSpan="2" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0">
       <DockPanel Margin="20,12">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
-          <Button Content="Cancel" Command="{Binding CancelCommand}" />
+          <Button Content="Cancel" Command="{Binding CancelCommand}"
+                  ToolTip.Tip="Close without saving the changes made since Save or Apply" />
+          <Button Content="Apply" Command="{Binding ApplyCommand}" MinWidth="80"
+                  ToolTip.Tip="Save the changes and keep Settings open" />
           <Button Content="Save" Command="{Binding SaveCommand}" Classes="accent" MinWidth="80" />
         </StackPanel>
-        <TextBlock Text="{Binding Message}" Foreground="{DynamicResource CriticalBrush}" VerticalAlignment="Center" TextWrapping="Wrap" />
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="{Binding Message}" Foreground="{DynamicResource CriticalBrush}" TextWrapping="Wrap"
+                     IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <TextBlock Classes="help" Text="{Binding AppliedNote}" Margin="0"
+                     IsVisible="{Binding AppliedNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
       </DockPanel>
     </Border>
   </Grid>

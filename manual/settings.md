@@ -18,9 +18,15 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
 - **Station profile**: which setup you are operating from. Each profile keeps its own callsign, grid, power, radio,
   audio devices and QRZ logbook key, so a portable or park setup with a `/P` call or another grid is one choice away.
   **New profile** adds a copy of the profile shown (same radio and audio) called *Portable*; rename it in **Name**.
+  **New operator** adds a profile called *Operator* for another licensed operator using this station: it keeps the
+  radio, audio, power, grid, QTH, rig and antenna, and starts with no callsign, name, QRZ key or LoTW, eQSL, Club Log
+  or Wavelog account, so they enter their own. Costas asks for the callsign before it saves. Your name, QTH, radio
+  and antenna on the PSK and RTTY page also belong to the profile shown.
   **Delete** removes the profile shown (the last one cannot be removed). The profile shown when you press **Save** is
-  the one Costas uses from then on; if it uses another radio or sound card, Costas reconnects to it. Set a profile's
-  radio and audio in **Station setup** while it is the active one. Worked-before and log totals count the contacts
+  the one Costas uses from then on; if it uses another radio or sound card, Costas reconnects to it. Changing the
+  profile, or the callsign or grid square of the profile in use, changes what you send, so it only happens when the station is idle: while transmitting, during a
+  contact, or with CQ or Auto-call on, **Save** and **Apply** refuse and say why, and nothing is saved until you try
+  again once the station is idle. Set a profile's radio and audio in **Station setup** while it is the active one. Worked-before and log totals count the contacts
   logged under that profile's callsign.
 - **Callsign** and **Grid square** (4 or 6 characters). Used in every message you send and to work out distances.
   A `/P` or `/R` call is sent like any other. A compound call such as `VE3/W7LIT` or `W7LIT/7` does not fit a
@@ -209,7 +215,9 @@ The key and password are kept in Windows Credential Manager.
 
 ### LoTW
 
-Logbook of the World confirmations, uploads through TQSL, and the list of LoTW users. See [LoTW](log.md#lotw).
+Logbook of the World confirmations, uploads through TQSL, and the list of LoTW users. See [LoTW](log.md#lotw). The
+login, Station Location and automatic upload belong to the current station profile, so each operator uses their own
+account; where TQSL is and the list of LoTW users are shared by all profiles.
 
 - **Confirmations**: **Download my LoTW confirmations**, your LoTW login (usually your call) and LoTW website
   password. This is the website password, not the TQSL certificate password.
@@ -217,7 +225,7 @@ Logbook of the World confirmations, uploads through TQSL, and the list of LoTW u
   to sign with (blank if TQSL has only one), and **Sign and upload each contact as soon as it is logged** (off).
 - **Who uses LoTW**: **Download ARRL's list of LoTW users once a week** (on, about 6 MB, no login).
 
-The password is kept in Windows Credential Manager.
+The password is kept in Windows Credential Manager, one for each station profile.
 
 ### eQSL
 
@@ -320,7 +328,8 @@ The page is called **PSK Reporter and RBN** in Settings.
   home Wi-Fi), and Costas allows a reverse proxy such as nginx. Takes effect when you save.
 - **Proxy address**: leave empty when the proxy runs on this computer; otherwise the address of the computer that runs
   it.
-- **Add a user**, **Edit**, **Allowed to sign in**, **Sign out everywhere**, **Delete**: who may sign in. See
+- **Add a user**, **Edit**, **Allowed to sign in**, **Operates as**, **Sign out everywhere**, **Delete**: who may sign
+  in, and the station profile each operates as. See
   [Requiring a username and password](phone.md#requiring-a-username-and-password).
 
 See [Operating from a phone](phone.md).

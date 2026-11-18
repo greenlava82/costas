@@ -36,7 +36,7 @@ public class PowerBoxStartupTests
         SqliteDatabase? database = null;
         try
         {
-            await using var host = await AppHost.StartAsync(new CommandLine { Home = dir, SimulateFolder = Path.Combine(TestPaths.Samples, "ft8") });
+            await using var host = await AppHost.StartAsync(TestHost.Args(dir));
             database = host.Database;
             ((SimulatedRig)host.Rig).PowerWatts = 25;
             // A refresh is skipped while the service's own loop is reading, so ask until the reading is in.

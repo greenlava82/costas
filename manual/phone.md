@@ -110,6 +110,11 @@ The phone page then shows a sign-in form. A sign-in lasts 30 days from the last 
 out** at the top of the page ends it. After five wrong passwords Costas makes you wait, starting at 30 seconds and
 growing to 15 minutes.
 
+Turning it off again also takes effect when you save: every signed-in phone is disconnected. One on your home network
+or Tailscale reconnects at once with no password, as an unnamed phone that operates as the active profile. One that
+comes through a reverse proxy is refused, because Costas never lets a proxy in without sign-in. Your users, their
+passwords and their profile links are kept for when you turn it back on, and every phone then signs in again.
+
 !!! warning "A password is only accepted where it travels encrypted"
     The page itself is plain HTTP, so Costas takes a password only through Tailscale or through your proxy over
     https. **A phone on plain home Wi-Fi cannot sign in**: open the Tailscale address instead (it works at home too,
@@ -122,6 +127,22 @@ Managing users, in the list under **Sign-in**:
 - Untick **Allowed to sign in** to keep a user but let none of their devices in.
 - **Sign out everywhere** ends all of that user's sign-ins; they can sign in again.
 - **Delete** takes the user off the list.
+- **Operates as** links the user to a station profile, so another licensed operator works under their own callsign,
+  log, contest exchanges and logbook accounts (QRZ, LoTW, eQSL, Club Log, Wavelog). Make the profile first with
+  **New operator** on the Station page. Leave it on **The profile in use** and the user operates as whichever
+  profile is active.
+
+**Operates as** needs sign-in: with **Require a username and password** off, Costas cannot tell who is holding a
+phone, so the links are kept but do nothing, and every phone operates as whichever profile is active at the desk.
+
+Signing in does not switch the profile, so someone can sign in just to watch. While another profile is in use, the
+linked user's page says *You will operate as K1UTA (Ash profile) when you take control, if the station is idle.*
+When a linked user's command takes control, Costas switches to their profile first, but only when the station is
+idle. While it is transmitting, in a contact, or has CQ or Auto-call on, the command is refused with the reason
+(*Not done: the station is busy during the contact with JA1AAA as K1ABC…*), so nothing goes out under someone
+else's callsign and the contact in progress is left alone. **Stop** always works and never switches. Everyone else
+sees *Now operating as AB1CD (Ash profile) for Ash.* A click at the desk takes control back but keeps that profile;
+switch it in Settings if you want your own back.
 
 Changes take effect when you press **Save**. Passwords are never stored: Costas keeps only a scrambled check value
 (a PBKDF2 hash) in the Windows credential store, so a forgotten password cannot be shown, only replaced.
@@ -273,8 +294,19 @@ take control; calling, answering, Tune, and band, offset, power and radio settin
 ## Who is in control
 
 The phone takes control as soon as it sends a command, and the desk shows **Phone in control** in the bottom bar.
-A click or key press at the desk takes control back. The top of the phone page says **You control** or
-**Desk controls**.
+A click or key press at the desk takes control back. The top of the phone page says **You control**,
+**Another phone controls** or **Desk controls**.
+
+So that the station is shared knowingly, everyone already using it is told when someone else arrives:
+
+- **Signing in.** When a user signs in on a new device (or, with sign-in off, a new phone opens the page), every
+  other phone shows a notice such as *Ash signed in on another device.* under the top bar, and the desk's bottom bar
+  shows it for a minute.
+- **Taking control.** When someone takes control, the others see *Ash took control from Dan.* or *The desk took
+  control.* With sign-in off the phones have no names: *A phone took control from the desk.* or *A phone took control
+  from another phone.*
+
+The notices only inform; nothing has to be approved. Tap **✕** to dismiss one; they also go after ten minutes.
 
 ## Safety
 

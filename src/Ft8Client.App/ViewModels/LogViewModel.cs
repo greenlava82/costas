@@ -54,6 +54,14 @@ public sealed partial class LogViewModel : ObservableObject
     /// <summary>Unconfirmed contacts only.</summary>
     public const string NotConfirmed = "Not confirmed";
 
+    /// <summary>Every station profile's contacts, whatever callsign they were made as.</summary>
+    public const string AllStations = "All stations";
+
+    /// <summary>The first station choice while the profile has no callsign yet (then nothing is filtered).</summary>
+    public const string ThisStation = "This station";
+
+    private bool _stationUpdating;
+
     private const int MaxRows = 5000;
 
     private readonly QsoRepository _qsos;
@@ -92,6 +100,16 @@ public sealed partial class LogViewModel : ObservableObject
 
     /// <summary>Confirmation filter choices.</summary>
     public IReadOnlyList<string> ConfirmedChoices { get; } = [AnyConfirmation, ConfirmedOnly, NotConfirmed];
+
+    /// <summary>
+    /// Station choices: the current profile's callsign (its own log, the default, the same contacts worked-before and
+    /// Awards count) and <see cref="AllStations"/>.
+    /// </summary>
+    public ObservableCollection<string> StationChoices { get; } = [ThisStation, AllStations];
+
+    /// <summary>Selected station choice. Anything but <see cref="AllStations"/> means the current profile's callsign.</summary>
+    [ObservableProperty]
+    public partial string? StationFilter { get; set; } = ThisStation;
 
     /// <summary>Selected band filter.</summary>
     [ObservableProperty]
@@ -194,6 +212,28 @@ public sealed partial class LogViewModel : ObservableObject
 
     partial void OnConfirmedFilterChanged(string value) => Refresh();
 
+    partial void OnStationFilterChanged(string? value)
+    {
+        if (!_stationUpdating) Refresh();
+    }
+
+    // The callsign to show contacts for, or null for every station. The first choice is relabelled when the profile
+    // (and so the callsign) changes; replacing a selected item can clear the selection for a moment, so it is set back.
+    private string? Station()
+    {
+        var call = _profile().Callsign.Trim().ToUpperInvariant();
+        var label = call.Length == 0 ? ThisStation : call;
+        var all = StationFilter == AllStations;
+        if (StationChoices[0] != label || StationFilter is null)
+        {
+            _stationUpdating = true;
+            StationChoices[0] = label;
+            StationFilter = all ? AllStations : label;
+            _stationUpdating = false;
+        }
+        return all || call.Length == 0 ? null : call;
+    }
+
     partial void OnSelectedChanged(LogRowViewModel? value) => ConfirmingDelete = false;
 
 
@@ -201,7 +241,8 @@ public sealed partial class LogViewModel : ObservableObject
     public void Refresh()
     {
         RefreshBandChoices();
-        var filter = BuildFilter(Search, BandFilter, ModeFilter, DateFilter, ConfirmedFilter, DateTime.UtcNow);
+        var station = Station();
+        var filter = BuildFilter(Search, BandFilter, ModeFilter, DateFilter, ConfirmedFilter, DateTime.UtcNow, station);
         // "All digital" is the default, so it alone is not a filter to clear.
         Filtered = BandFilter != AllBands || ModeFilter != AllDigital || DateFilter != AllTime || ConfirmedFilter != AnyConfirmation;
         var rows = _qsos.List(filter, MaxRows);
@@ -216,7 +257,8 @@ public sealed partial class LogViewModel : ObservableObject
             foreach (var r in dayRows) Items.Add(r);
         }
         var shown = _qsos.Totals(filter);
-        var total = filter == LogFilter.All ? shown.Contacts : _qsos.Count();
+        var everything = new LogFilter(StationCallsign: station);
+        var total = filter == everything ? shown.Contacts : _qsos.Totals(everything).Contacts;
         var last = _lastSync();
         var sync = last is { } t ? $"last synced with QRZ {t:HH:mm} UTC" : "not synced with QRZ";
         Status = StatusText(shown, total, rows.Count) + " · " + sync;
@@ -239,12 +281,14 @@ public sealed partial class LogViewModel : ObservableObject
     }
 
     /// <summary>The filter for the chosen search text and filter choices.</summary>
-    public static LogFilter BuildFilter(string search, string band, string mode, string date, string confirmed, DateTime nowUtc) => new(
+    public static LogFilter BuildFilter(string search, string band, string mode, string date, string confirmed, DateTime nowUtc,
+                                        string? station = null) => new(
         string.IsNullOrWhiteSpace(search) ? null : search,
         band == AllBands || string.IsNullOrEmpty(band) ? null : band,
         mode == AllModes || string.IsNullOrEmpty(mode) ? null : mode,
         FromFor(date, nowUtc),
-        confirmed switch { ConfirmedOnly => true, NotConfirmed => false, _ => null });
+        confirmed switch { ConfirmedOnly => true, NotConfirmed => false, _ => null },
+        station);
 
     /// <summary>The earliest time a date choice includes, or null for all time. Days are UTC days, as the log shows them.</summary>
     public static DateTime? FromFor(string date, DateTime nowUtc) => date switch
@@ -377,10 +421,11 @@ public sealed partial class LogViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Exports the log to ADIF with QSL state, one file per station callsign (<see cref="AdifLogExport"/>): a log with one
-    /// callsign goes to <paramref name="path"/>; with several, each goes beside it with the callsign added to the name
-    /// (<c>log-W7LIT.adi</c>), so no file mixes callsigns. The work runs on a worker thread; a file or database error is
-    /// reported in <see cref="Message"/> rather than thrown.
+    /// Exports the log to ADIF with QSL state, one file per station callsign (<see cref="AdifLogExport"/>): the contacts
+    /// made as the current profile's callsign, or every station's when <see cref="AllStations"/> is chosen (another
+    /// operator's export holds only their own contacts). One callsign goes to <paramref name="path"/>; with several, each
+    /// goes beside it with the callsign added to the name (<c>log-W7LIT.adi</c>), so no file mixes callsigns. The work runs
+    /// on a worker thread; a file or database error is reported in <see cref="Message"/> rather than thrown.
     /// </summary>
     public async Task ExportAsync(string path)
     {
@@ -388,17 +433,20 @@ public sealed partial class LogViewModel : ObservableObject
         Syncing = true;
         Message = $"Exporting to {Path.GetFileName(path)}…";
         var callsign = _profile().Callsign;
+        var station = Station();
         try
         {
             Message = await Task.Run(() =>
             {
                 var now = DateTime.UtcNow;
-                var groups = AdifLogExport.ByStation(_qsos.List());
+                var groups = AdifLogExport.ByStation(_qsos.List(new LogFilter(StationCallsign: station)));
                 if (groups.Count <= 1)
                 {
-                    var only = groups.Count == 1 ? groups[0] : new AdifLogExport.Group(callsign, []);
+                    var only = groups.Count == 1 ? groups[0] : new AdifLogExport.Group(station ?? callsign, []);
                     Ft8Client.Data.Files.AtomicFile.WriteAllText(path, AdifLogExport.Document(only, now, "ADIF export"));
-                    return $"Exported {only.Contacts.Count} contacts.";
+                    return station is null
+                        ? $"Exported {only.Contacts.Count} contacts."
+                        : $"Exported {only.Contacts.Count} contacts made as {station}.";
                 }
                 var folder = Path.GetDirectoryName(path) ?? ".";
                 var stem = Path.GetFileNameWithoutExtension(path);

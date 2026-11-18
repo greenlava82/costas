@@ -49,10 +49,15 @@ public sealed class RemoteControl
     /// <param name="power">The radio's power setting; without it the phone cannot change it.</param>
     /// <param name="controls">The radio's receive and tuner settings; without them the Radio tab shows only Tune and meters.</param>
     /// <param name="users">Username and password sign-in; without it phones only pair.</param>
+    /// <param name="switchProfile">
+    /// Switches to a signed-in user's own station profile (by user id) as their command takes control: the refusal while the
+    /// station is busy, or the callsign now in use. Without it everyone operates as the active profile.
+    /// </param>
     public RemoteControl(IRemoteTarget target, IClock clock, DeviceTokens tokens, Action<string> saveTokens,
                          IRemoteTuning? tuning = null, RadioPowerService? power = null, RadioControlsService? controls = null,
-                         RemoteUsers? users = null)
+                         RemoteUsers? users = null, Func<string, (string? Refusal, string? NowAs)>? switchProfile = null)
     {
+        _switchProfile = switchProfile;
         _target = target;
         _tuning = tuning;
         _power = power;
@@ -84,9 +89,39 @@ public sealed class RemoteControl
     /// </summary>
     public RemoteIdentity? SignIn(string? token)
     {
-        if (SignInRequired) return Users!.SignIn(token);
+        if (SignInRequired)
+        {
+            var who = Users!.SignIn(token);
+            if (who?.Username is { } name) _names[who.DeviceId] = name;
+            if (who?.UserId is { } user) _userIds[who.DeviceId] = user;
+            return who;
+        }
         if (!Tokens.Verify(token)) return null;
         return new RemoteIdentity(RemoteIdentity.DeviceIdFor(token!));
+    }
+
+    /// <summary>Notices for the people already here that someone else signed in or took control.</summary>
+    public RemoteNotices Notices { get; } = new();
+
+    // Usernames by device, for the notices ("Ash took control"); a paired phone (sign-in off) has none.
+    private readonly ConcurrentDictionary<string, string> _names = new(StringComparer.Ordinal);
+
+    // User ids by device, for the profile each signed-in user operates as.
+    private readonly ConcurrentDictionary<string, string> _userIds = new(StringComparer.Ordinal);
+
+    /// <summary>The signed-in user behind <paramref name="deviceId"/>, or null for a paired phone or one not seen yet.</summary>
+    public string? UserIdOf(string deviceId) => _userIds.TryGetValue(deviceId, out var id) ? id : null;
+    private readonly Func<string, (string? Refusal, string? NowAs)>? _switchProfile;
+
+    private string NameOf(string deviceId) => _names.TryGetValue(deviceId, out var n) ? n : "A phone";
+
+    /// <summary>A user signed in with their password on a device: everyone else using the station is told.</summary>
+    public void SignedIn(string token, string username)
+    {
+        var device = RemoteIdentity.DeviceIdFor(token);
+        _names[device] = username;
+        Notices.Add($"{username} signed in on another device.", device, _clock.UtcNow);
+        Changed?.Invoke();
     }
 
     /// <summary>
@@ -105,6 +140,8 @@ public sealed class RemoteControl
             // The phone is paired until Costas restarts; it will have to pair again after that.
             Serilog.Log.Warning(ex, "Could not save the paired phones");
         }
+        // With sign-in off a first visit is the sign-in, so the people already here hear of it the same way.
+        Notices.Add("A new phone opened the remote page.", RemoteIdentity.DeviceIdFor(token), _clock.UtcNow);
         Changed?.Invoke();
         return token;
     }
@@ -122,14 +159,15 @@ public sealed class RemoteControl
     /// <summary>Operator input at the desk: the desk is the control point again.</summary>
     public void DeskActivity()
     {
-        bool released;
+        string? holder;
         lock (_gate)
         {
-            released = Lease.IsHeld;
+            holder = Lease.Holder;
             Lease.Release();
         }
-        if (!released) return;
+        if (holder is null) return;
         _target.SetWatchdogCap(null);
+        Notices.Add("The desk took control.", null, _clock.UtcNow);
         Changed?.Invoke();
     }
 
@@ -161,14 +199,35 @@ public sealed class RemoteControl
         var call = cmd.Call?.Trim().ToUpperInvariant() ?? string.Empty;
         // A message the station cannot act on changes nothing: it must not take control or reset the Tx watchdog.
         if (!Understood(cmd, call)) return "The station did not understand that.";
+        // A user linked to a station profile operates as it (D25): switched in now if the station is idle, otherwise the
+        // command is refused so nothing goes out under another operator's callsign. Stop and Abandon always work and
+        // never switch.
+        string? nowAs = null;
+        if (cmd.Type is not ("halt" or "abandon") && _switchProfile is not null && _userIds.TryGetValue(deviceId, out var userId))
+        {
+            (var refusal, nowAs) = _switchProfile(userId);
+            if (refusal is not null) return refusal;
+        }
         bool changed;
+        string? previous;
         lock (_gate)
         {
-            changed = !string.Equals(Lease.Holder, deviceId, StringComparison.Ordinal);
+            previous = Lease.Holder;
+            changed = !string.Equals(previous, deviceId, StringComparison.Ordinal);
             Lease.Take(deviceId, now);
         }
         _target.SetWatchdogCap(ControlLease.WatchdogCapMinutes);
-        if (changed) Changed?.Invoke();
+        if (changed)
+        {
+            var from = previous is null ? "the desk" : _names.TryGetValue(previous, out var p) ? p : "another phone";
+            Notices.Add($"{NameOf(deviceId)} took control from {from}.", deviceId, now);
+            Changed?.Invoke();
+        }
+        if (nowAs is not null)
+        {
+            Notices.Add($"Now operating as {nowAs} for {NameOf(deviceId)}.", deviceId, now);
+            Changed?.Invoke();
+        }
         switch (cmd.Type)
         {
             case "halt":

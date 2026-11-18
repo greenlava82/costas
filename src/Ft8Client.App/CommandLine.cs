@@ -20,6 +20,12 @@ public sealed record CommandLine
     /// <summary>True when --simulate-partner was given.</summary>
     public bool SimulatePartner { get; init; }
 
+    /// <summary>
+    /// The credential store to use instead of the platform's (tests: an in-memory store, so they never read or overwrite
+    /// the operator's saved passwords). Not settable from the command line.
+    /// </summary>
+    public Data.Secrets.ISecretStore? Secrets { get; init; }
+
     /// <summary>Use a different data folder (portable, testing).</summary>
     public string? Home { get; init; }
 

@@ -38,9 +38,6 @@ public sealed class OperatingSettings
     /// <summary>The contest being run (a <c>ContestId</c> name such as <c>RttyRoundup</c>); empty for ordinary operating.</summary>
     public string Contest { get; set; } = string.Empty;
 
-    /// <summary>My exchange for each contest (by <c>ContestId</c> name), as typed: <c>UT</c>, <c>DX</c>, <c>1D UT</c>.</summary>
-    public Dictionary<string, string> ContestExchanges { get; set; } = [];
-
     /// <summary>
     /// When the contest log in use started: its contacts are the ones made in that contest since then. Picking a
     /// contest again within four days carries on the same log.

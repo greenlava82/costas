@@ -90,7 +90,7 @@ public sealed class AppHost : IAsyncDisposable
         CorrectedClock = new CorrectedClock(SystemClock.Instance);
         Clock = CorrectedClock;
         Guard = new ChildProcessGuard();
-        Secrets = SecretStoreFactory.Create();
+        Secrets = args.Secrets ?? SecretStoreFactory.Create();
         Database = new SqliteDatabase(paths.Database);
         Qsos = new QsoRepository(Database);
         Uploads = new UploadQueueRepository(Database);
@@ -346,6 +346,8 @@ public sealed class AppHost : IAsyncDisposable
         {
             var moved = LegacyMigration.MigrateSecrets(Secrets, s.Profiles.Select(p => p.Id));
             if (moved > 0) Log.Information("Moved {Count} saved credentials to their new names", moved);
+            var split = LegacyMigration.SplitLotwPassword(Secrets, s.Profiles.Select(p => p.Id));
+            if (split > 0) Log.Information("Gave {Count} station profiles their own copy of the LoTW password", split);
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
         {
@@ -539,7 +541,7 @@ public sealed class AppHost : IAsyncDisposable
             MostWantedRank = MostWanted.Current.RankOf,
             Bands = Frequencies.Bands,
             Hunt = () => this.Hunt.Recent().FirstOrDefault() is { } h ? Core.Hunting.HuntText.Alert(h, Countries, SettingsMapper.Units(Settings.Current)) : null,
-        }, RadioPower, RadioControls);
+        }, RadioPower, RadioControls, SwitchProfileForRemoteUser);
         Remote.Start();
 
         if (!Simulating)
@@ -790,6 +792,28 @@ public sealed class AppHost : IAsyncDisposable
             Session.SetService(ServiceNames.Radio, new ServiceStatus(ServiceHealth.Down, ex.Message, Clock.UtcNow));
             return $"The radio did not take the frequency: {ex.Message}";
         }
+    }
+
+    /// <summary>
+    /// Switches to the station profile a remote user is linked to, as their command takes control (owner decision D25).
+    /// Refused, with the reason, while the station is busy, so nothing goes out under another operator's callsign and
+    /// the contact in progress is left alone. A user with no profile linked, or one since deleted, operates as the active
+    /// profile. Returns the refusal, or the callsign now in use when the profile changed.
+    /// </summary>
+    public (string? Refusal, string? NowAs) SwitchProfileForRemoteUser(string userId)
+    {
+        var s = Settings.Current;
+        var linked = s.Remote.Users.FirstOrDefault(u => u.Id == userId)?.ProfileId;
+        if (linked is null || linked == s.ActiveProfile || s.Profiles.FirstOrDefault(p => p.Id == linked) is not { } profile)
+            return (null, null);
+        if (ProfileSwitch.RemoteRefusal(Session.Snapshot, profile.Name) is { } busy) return (busy, null);
+        Settings.Update(x => x.ActiveProfile = profile.Id);
+        // As Settings does after a switch: the profile's own Tx level, log index and (if it differs) radio and audio.
+        TxLevel.Apply();
+        RebuildLogIndex();
+        _ = ReopenDevicesAsync();
+        Log.Information("Remote user switched to the {Profile} profile ({Call})", profile.Name, profile.Callsign);
+        return (null, $"{profile.Callsign} ({profile.Name} profile)");
     }
 
     /// <summary>

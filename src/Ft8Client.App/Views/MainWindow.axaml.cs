@@ -412,7 +412,7 @@ public partial class MainWindow : Window
         var s = vm.Host.Settings.Current;
         var w = new ContestExchangeWindow
         {
-            DataContext = new ContestExchangeViewModel(info, s.Profile.Callsign, s.Profile.Grid, s.Operating.ContestExchanges.GetValueOrDefault(id.ToString())),
+            DataContext = new ContestExchangeViewModel(info, s.Profile.Callsign, s.Profile.Grid, s.Profile.ContestExchanges.GetValueOrDefault(id.ToString())),
         };
         var exchange = await w.ShowDialog<string?>(this);
         if (exchange is not null) vm.StartContest(id, exchange);

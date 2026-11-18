@@ -99,7 +99,7 @@ public sealed class LotwService : IDisposable
     /// <summary>Called when a contact is stored: signs and uploads it when the operator asked for that.</summary>
     public void OnLogged(QsoRecord q)
     {
-        var o = _settings.Current.Lotw;
+        var o = _settings.Current.Profile.Lotw;
         if (!_allowed || !o.UploadOnComplete || q.Source != QsoSource.Local) return;
         Interlocked.Exchange(ref _uploadWanted, 1);
         if (Interlocked.CompareExchange(ref _autoUploading, 1, 0) == 0) _ = Task.Run(() => AutoUploadAsync(_cts.Token));
@@ -121,7 +121,7 @@ public sealed class LotwService : IDisposable
                     if (Volatile.Read(ref _uploadWanted) == 0 || Interlocked.CompareExchange(ref _autoUploading, 1, 0) != 0) return;
                     continue;
                 }
-                if (!_settings.Current.Lotw.UploadOnComplete) continue;
+                if (!_settings.Current.Profile.Lotw.UploadOnComplete) continue;
                 var (_, retry) = await UploadAsync(ct).ConfigureAwait(false);
                 if (!retry)
                 {
@@ -145,8 +145,8 @@ public sealed class LotwService : IDisposable
     /// <summary>Downloads new confirmations now. Returns a message for the status line.</summary>
     public async Task<string> DownloadNowAsync(CancellationToken ct)
     {
-        var o = _settings.Current.Lotw;
-        var password = _secrets.Get(SecretNames.LotwPassword);
+        var o = _settings.Current.Profile.Lotw;
+        var password = _secrets.Get(SecretNames.LotwPassword(ProfileId));
         if (!_allowed) return "LoTW is not used in simulation.";
         if (!o.Enabled || string.IsNullOrWhiteSpace(o.Username) || string.IsNullOrEmpty(password))
         {
@@ -207,7 +207,7 @@ public sealed class LotwService : IDisposable
             Directory.CreateDirectory(_uploadFolder);
             file = Path.Combine(_uploadFolder, $"upload-{_clock.UtcNow:yyyyMMddHHmmss}.adi");
             await File.WriteAllTextAsync(file, AdifWriter.Document(pending.Select(AdifMapper.ToAdif), _clock.UtcNow), ct).ConfigureAwait(false);
-            var r = await _tqsl.UploadAsync(tqsl, file, _settings.Current.Lotw.StationLocation, ct).ConfigureAwait(false);
+            var r = await _tqsl.UploadAsync(tqsl, file, _settings.Current.Profile.Lotw.StationLocation, ct).ConfigureAwait(false);
             if (r.Uploaded) _qsos.SetLotwUploadState(pending.Select(q => q.Id), UploadState.Uploaded);
             Log.Information("TQSL upload of {Count} contacts: {Message}", pending.Count, r.Message);
             return (Remember(r.Uploaded ? $"{r.Message} ({pending.Count} contacts)." : r.Message + "."), !r.Uploaded);
@@ -240,7 +240,7 @@ public sealed class LotwService : IDisposable
 
     private void ShowStatus(string? text)
     {
-        var o = _settings.Current.Lotw;
+        var o = _settings.Current.Profile.Lotw;
         if (!_allowed || !o.Enabled) _session.SetService(ServiceNames.Lotw, ServiceStatus.Off("LoTW off"));
         else if (text is not null) _session.SetService(ServiceNames.Lotw, new ServiceStatus(ServiceHealth.Ok, text, _clock.UtcNow));
     }
@@ -251,7 +251,7 @@ public sealed class LotwService : IDisposable
         {
             try
             {
-                if (_allowed && _settings.Current.Lotw.Enabled) await DownloadNowAsync(ct).ConfigureAwait(false);
+                if (_allowed && _settings.Current.Profile.Lotw.Enabled) await DownloadNowAsync(ct).ConfigureAwait(false);
                 else ShowStatus(null);
                 await Task.Delay(TimeSpan.FromHours(Math.Max(1, _settings.Current.Lotw.DownloadHours)), ct).ConfigureAwait(false);
             }

@@ -19,8 +19,10 @@ public sealed partial class RemoteUserEditViewModel : ObservableObject
     /// <param name="username">The name typed to sign in.</param>
     /// <param name="enabled">May sign in.</param>
     /// <param name="hasPassword">A password is already set.</param>
-    public RemoteUserEditViewModel(string id, string username, bool enabled, bool hasPassword)
+    /// <param name="profileId">The station profile they operate as, or null for whichever is in use.</param>
+    public RemoteUserEditViewModel(string id, string username, bool enabled, bool hasPassword, string? profileId = null)
     {
+        ProfileId = profileId;
         Id = id;
         Username = username;
         Enabled = enabled;
@@ -31,7 +33,20 @@ public sealed partial class RemoteUserEditViewModel : ObservableObject
     public string Id { get; }
 
     /// <summary>A password is already set.</summary>
-    public bool HasPassword { get; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PasswordPlaceholder), nameof(Summary))]
+    public partial bool HasPassword { get; private set; }
+
+    /// <summary>
+    /// The new password was stored (Settings applied without closing): the box empties so a second Apply does not set it
+    /// again, which would sign this user out everywhere once more.
+    /// </summary>
+    public void PasswordSaved()
+    {
+        if (NewPassword.Length == 0) return;
+        NewPassword = string.Empty;
+        HasPassword = true;
+    }
 
     /// <summary>The name typed to sign in.</summary>
     [ObservableProperty]
@@ -53,13 +68,39 @@ public sealed partial class RemoteUserEditViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(EditLabel))]
     public partial bool IsEditing { get; set; }
 
+    /// <summary>The station profile they operate as (D25), or null for whichever is in use.</summary>
+    public string? ProfileId { get; private set; }
+
+    /// <summary>The profiles to choose from, set by Settings (they can be added and renamed while it is open).</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<ProfileChoice> ProfileChoices { get; private set; } = [];
+
+    /// <summary>The choice shown for <see cref="ProfileId"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Summary))]
+    public partial ProfileChoice? SelectedProfileChoice { get; set; }
+
+    partial void OnSelectedProfileChoiceChanged(ProfileChoice? value)
+    {
+        if (value is not null) ProfileId = value.Id;
+    }
+
+    /// <summary>Refreshes the list, keeping the profile chosen; one no longer in the list becomes none.</summary>
+    public void SetProfileChoices(IReadOnlyList<ProfileChoice> choices)
+    {
+        var id = ProfileId;
+        ProfileChoices = choices;
+        SelectedProfileChoice = choices.FirstOrDefault(c => c.Id == id) ?? choices.FirstOrDefault();
+    }
+
     /// <summary>The name on the collapsed line.</summary>
     public string DisplayName => string.IsNullOrWhiteSpace(Username) ? "New user" : Username.Trim();
 
     /// <summary>The state on the collapsed line: may they sign in, and is there a password.</summary>
     public string Summary =>
         (Enabled ? "Allowed" : "Not allowed") + " · "
-        + (NewPassword.Length > 0 ? "new password when you save" : HasPassword ? "password set" : "no password yet");
+        + (NewPassword.Length > 0 ? "new password when you save" : HasPassword ? "password set" : "no password yet")
+        + (SelectedProfileChoice is { Id: not null } p ? " · operates as " + p.Label : string.Empty);
 
     /// <summary>The edit button's text.</summary>
     public string EditLabel => IsEditing ? "Done" : "Edit";
