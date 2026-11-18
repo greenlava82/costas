@@ -260,6 +260,9 @@ public sealed class AppHost : IAsyncDisposable
     /// <summary>The radio's receive and tuner settings, for the phone's Radio tab.</summary>
     public RadioControlsService RadioControls { get; private set; } = null!;
 
+    /// <summary>The amplifier and tuner paired with a FlexRadio, through the radio's own API.</summary>
+    public FlexAccessoryService Accessories { get; private set; } = null!;
+
     /// <summary>Remote control from a phone on the home network.</summary>
     public RemoteControlService Remote { get; private set; } = null!;
 
@@ -538,6 +541,8 @@ public sealed class AppHost : IAsyncDisposable
         RadioControls = new RadioControlsService(() => _rig, () => Transmitter.Transmitting || Session.Snapshot.Transmitting,
             () => Remote?.Control.RadioWanted == true);
         RadioControls.Start();
+        Accessories = new FlexAccessoryService(Session, Settings, () => Transmitter.Transmitting || Session.Snapshot.Transmitting, Simulating);
+        Accessories.Start();
         Remote = new RemoteControlService(Session, Settings, Secrets, Clock, new HostTuning(this), () => new RemoteContext
         {
             Units = SettingsMapper.Units(Settings.Current),
@@ -1525,6 +1530,7 @@ public sealed class AppHost : IAsyncDisposable
         if (Remote is not null) await Remote.DisposeAsync().ConfigureAwait(false);
         if (RadioPower is not null) await RadioPower.DisposeAsync().ConfigureAwait(false);
         if (RadioControls is not null) await RadioControls.DisposeAsync().ConfigureAwait(false);
+        if (Accessories is not null) await Accessories.DisposeAsync().ConfigureAwait(false);
         _loop?.Dispose();
         // After the slot thread has stopped posting: a contact still waiting to be written reaches the log.
         _work?.Dispose();

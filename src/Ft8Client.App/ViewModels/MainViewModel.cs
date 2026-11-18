@@ -114,8 +114,10 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         _host.Settings.Changed += _ => Dispatch(ApplySettings);
         _host.Remote.Changed += () => Dispatch(UpdateRemote);
         _host.RadioPower.Changed += () => Dispatch(UpdatePower);
+        _host.Accessories.Changed += () => Dispatch(UpdateAccessories);
         // The first reading can arrive before this subscribes, and Changed only fires when the value changes.
         UpdatePower();
+        UpdateAccessories();
         UpdateRemote();
         _host.Udp.Inbound += m => Dispatch(() => OnUdp(m));
     }
@@ -440,6 +442,17 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     [ObservableProperty]
     public partial string PowerMessage { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The FlexRadio's paired amplifier and tuner for the bottom bar's button and flyout; <see cref="AccessoryPanel.None"/>
+    /// hides it.
+    /// </summary>
+    [ObservableProperty]
+    public partial AccessoryPanel Accessory { get; set; } = AccessoryPanel.None;
+
+    /// <summary>Why the last amp or tuner change was not made; empty when it was.</summary>
+    [ObservableProperty]
+    public partial string AccessoryMessage { get; set; } = string.Empty;
+
     /// <summary>"Call CQ" or "Stop CQ".</summary>
     [ObservableProperty]
     public partial string CqText { get; set; } = "Call CQ";
@@ -569,6 +582,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         RefreshQuiet();
         CqText = s.CallingCq ? "Stop CQ" : "Call CQ";
         UpdateTune(s);
+        UpdateAccessories();
         TxOffsetText = (s.TxOffsetAuto ? string.Empty : "Manual · ") + TxOffsetPicker.Describe(new TxOffsetChoice(s.TxOffsetHz, s.TxOffsetClear));
         // A line set by an operator action ("Added to your Hunt list", "not in the station list") stays for a few seconds;
         // the snapshot that the action itself publishes used to replace it before it could be read. A fault still shows.
@@ -1218,6 +1232,43 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         SwrText = m.Swr ?? string.Empty;
         SwrBar = m.SwrBar;
         SwrKind = m.SwrKind;
+    }
+
+    private void UpdateAccessories()
+    {
+        var next = AccessoryPanel.From(_host.Accessories.Current, _host.Accessories.CanChange);
+        if (next != Accessory) Accessory = next;
+    }
+
+    /// <summary>Puts the FlexRadio's amplifier in operate.</summary>
+    [RelayCommand]
+    private Task AmpOperate() => ChangeAccessoryAsync(() => _host.Accessories.SetAmpOperateAsync(true));
+
+    /// <summary>Puts the FlexRadio's amplifier in standby.</summary>
+    [RelayCommand]
+    private Task AmpStandby() => ChangeAccessoryAsync(() => _host.Accessories.SetAmpOperateAsync(false));
+
+    /// <summary>Puts the FlexRadio's tuner in operate.</summary>
+    [RelayCommand]
+    private Task TunerOperate() => ChangeAccessoryAsync(() => _host.Accessories.SetTunerOperateAsync(true));
+
+    /// <summary>Puts the FlexRadio's tuner in standby.</summary>
+    [RelayCommand]
+    private Task TunerStandby() => ChangeAccessoryAsync(() => _host.Accessories.SetTunerOperateAsync(false));
+
+    /// <summary>Bypasses the FlexRadio's tuner.</summary>
+    [RelayCommand]
+    private Task TunerBypass() => ChangeAccessoryAsync(() => _host.Accessories.SetTunerBypassAsync(true));
+
+    /// <summary>Puts the FlexRadio's tuner back in line.</summary>
+    [RelayCommand]
+    private Task TunerInLine() => ChangeAccessoryAsync(() => _host.Accessories.SetTunerBypassAsync(false));
+
+    private async Task ChangeAccessoryAsync(Func<Task<string?>> change)
+    {
+        Activity();
+        AccessoryMessage = await change() ?? string.Empty;
+        UpdateAccessories();
     }
 
     private void UpdatePower()
