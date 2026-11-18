@@ -634,6 +634,9 @@
                           <!-- Announced DXpedition (NG3K), display only: it never changes the order. -->
                           <TextBlock Text="{Binding Dxpedition}" IsVisible="{Binding HasDxpedition}" FontSize="12" TextTrimming="CharacterEllipsis"
                                      ToolTip.Tip="{Binding DxpeditionTip}" Foreground="{Binding DxpeditionKind, Converter={x:Static v:Converters.KindBrush}}" />
+                          <!-- DX cluster spot, display only: it never changes the order. -->
+                          <TextBlock Text="{Binding Spotted}" IsVisible="{Binding HasSpotted}" FontSize="12" TextTrimming="CharacterEllipsis" Classes="secondary"
+                                     ToolTip.Tip="{Binding SpottedTip}" />
                           </StackPanel>
                           <TextBlock Grid.Column="4" Text="{Binding DoingNow}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                           <TextBlock Grid.Column="5" Text="{Binding LastHeard}" Classes="secondary" VerticalAlignment="Center" />

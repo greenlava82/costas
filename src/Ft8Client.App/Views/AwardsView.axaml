@@ -86,6 +86,32 @@
           </StackPanel>
         </Border>
 
+        <!-- DX cluster spots of needed stations, display only: they never change who is called. Go to only changes band. -->
+        <Border Classes="card" Padding="14,10">
+          <StackPanel Spacing="6">
+            <TextBlock Text="Spotted on the DX cluster" Classes="title" />
+            <TextBlock Text="{Binding ClusterText}" Classes="secondary" TextWrapping="Wrap" />
+            <ItemsControl ItemsSource="{Binding ClusterSpots}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ClusterSpotRowViewModel">
+                  <Grid ColumnDefinitions="96,*,Auto,Auto" Margin="0,3" Background="Transparent">
+                    <TextBlock Text="{Binding Call}" FontWeight="SemiBold" VerticalAlignment="Top" TextTrimming="CharacterEllipsis" />
+                    <StackPanel Grid.Column="1">
+                      <TextBlock Text="{Binding Entity}" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding Spotted}" Classes="secondary" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Text="{Binding Need}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Top" Margin="8,0,0,0"
+                               Foreground="{Binding NeedKind, Converter={x:Static v:Converters.KindBrush}}" />
+                    <Button Grid.Column="3" Content="{Binding GoText}" IsVisible="{Binding CanGo}" VerticalAlignment="Top" Margin="8,0,0,0"
+                            Command="{Binding $parent[UserControl].((vm:AwardsViewModel)DataContext).GoToClusterCommand}" CommandParameter="{Binding}"
+                            ToolTip.Tip="Changes band only. Nothing is sent and nobody is called." />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
         <Border Classes="card" Padding="14,10">
           <StackPanel Spacing="6">
             <TextBlock Text="DXCC by band" Classes="title" />

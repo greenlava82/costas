@@ -481,6 +481,9 @@ public sealed partial class OperateViewModel : ObservableObject
     /// <summary>Announced DXpeditions (NG3K), for the line under Why. Display only.</summary>
     public Core.Dxpeditions.DxpeditionCalendar Dxpeditions { get; set; } = Core.Dxpeditions.DxpeditionCalendar.Empty;
 
+    /// <summary>DX cluster spots, for the Spotted line under Why and in station details. Display only.</summary>
+    public Core.Cluster.ClusterSpots ClusterSpots { get; set; } = Core.Cluster.ClusterSpots.Empty;
+
     /// <summary>ARRL's list of LoTW users; <see cref="LotwUsers.None"/> until loaded.</summary>
     public LotwUsers Lotw { get; set; } = LotwUsers.None;
 
@@ -810,7 +813,7 @@ public sealed partial class OperateViewModel : ObservableObject
         return _snap is null
             ? StationDetailsViewModel.From(call, station, QrzLookup?.Invoke(call), Log?.Invoke(), Units, _now(),
                 mostWantedRank: MostWanted.RankOf(station.EntityKey), lotwUpload: Lotw.LastUpload(call), park: ParkOf(station),
-                dxpedition: DxpeditionOf(call))
+                dxpedition: DxpeditionOf(call), spot: ClusterSpots.Latest(call, _now()))
             : DetailsFor(call, _snap, _now(), station);
     }
 
@@ -819,7 +822,8 @@ public sealed partial class OperateViewModel : ObservableObject
         var station = s.Stations.FirstOrDefault(x => Callsign.EqualsCall(x.Call, call)) ?? fallback;
         return StationDetailsViewModel.From(call, station, QrzLookup?.Invoke(call), Log?.Invoke(), Units, now, QrzName?.Invoke(call),
             s.Pileups.GetValueOrDefault(Callsign.Normalize(call)), s.TxOffsetHz, s.Mode,
-            MostWanted.RankOf(station?.EntityKey), Lotw.LastUpload(call), station is null ? null : ParkOf(station), DxpeditionOf(call));
+            MostWanted.RankOf(station?.EntityKey), Lotw.LastUpload(call), station is null ? null : ParkOf(station), DxpeditionOf(call),
+            ClusterSpots.Latest(call, now));
     }
 
     /// <summary>Adds the station's call to the Hunt list.</summary>
@@ -991,7 +995,8 @@ public sealed partial class OperateViewModel : ObservableObject
         var i = 1;
         foreach (var r in list.Take(MaxLine))
             Line.Add(new StationRowViewModel(r, i++, Units, now, log?.LastContactWith(r.Station.Call), log?.ContactsWith(r.Station.Call).Count ?? 0,
-                MostWanted.RankOf(r.Station.EntityKey), WhyTip(r, log), ParkOf(r.Station), DxpeditionOf(r.Station.Call), _snap?.Band));
+                MostWanted.RankOf(r.Station.EntityKey), WhyTip(r, log), ParkOf(r.Station), DxpeditionOf(r.Station.Call), _snap?.Band,
+                _snap is null ? null : ClusterSpots.SpotFor(r.Station.Call, _snap.Band, now)));
         MoreText = list.Count > MaxLine ? $"and {list.Count - MaxLine} more" : string.Empty;
         LineEmpty = Line.Count == 0;
         // Only a row the operator picked stays selected; nothing is selected for them, so the highlight never

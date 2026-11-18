@@ -131,6 +131,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         BandActivity = s.PskReporter.BandActivity;
         UploadSpots = s.PskReporter.UploadSpots;
         RbnEnabled = s.ReverseBeacon.Enabled;
+        ClusterEnabled = s.DxCluster.Enabled;
+        ClusterHost = s.DxCluster.Host;
+        ClusterPort = s.DxCluster.Port.ToString(CultureInfo.InvariantCulture);
         UdpEnabled = s.Udp.Enabled;
         UdpAddress = s.Udp.Address;
         UdpPort = s.Udp.Port.ToString(CultureInfo.InvariantCulture);
@@ -959,6 +962,35 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool DxpeditionList { get; set; }
 
+    /// <summary>Connect to a DX cluster node and show its spots.</summary>
+    [ObservableProperty]
+    public partial bool ClusterEnabled { get; set; }
+
+    /// <summary>The DX cluster node's host name.</summary>
+    [ObservableProperty]
+    public partial string ClusterHost { get; set; } = string.Empty;
+
+    /// <summary>The DX cluster node's telnet port.</summary>
+    [ObservableProperty]
+    public partial string ClusterPort { get; set; } = "7300";
+
+    /// <summary>
+    /// Well-known public nodes offered as suggestions, none endorsed or preferred (from the CC User manual's list, checked
+    /// September 2026). Picking one fills the host and port.
+    /// </summary>
+    public IReadOnlyList<string> ClusterSuggestions { get; } = ["dxspots.com:7300", "dxc.n4zkf.com:7373", "ea4ure.com:7300"];
+
+    /// <summary>The suggestion picked (it fills <see cref="ClusterHost"/> and <see cref="ClusterPort"/>).</summary>
+    [ObservableProperty]
+    public partial string? ClusterSuggestion { get; set; }
+
+    partial void OnClusterSuggestionChanged(string? value)
+    {
+        if (value is null || value.LastIndexOf(':') is var colon && colon <= 0) return;
+        ClusterHost = value[..colon];
+        ClusterPort = value[(colon + 1)..];
+    }
+
     /// <summary>Check SuperFox signatures online.</summary>
     [ObservableProperty]
     public partial bool VerifySuperFox { get; set; }
@@ -1480,6 +1512,9 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.PskReporter.BandActivity = BandActivity;
             s.PskReporter.UploadSpots = UploadSpots;
             s.ReverseBeacon.Enabled = RbnEnabled;
+            s.DxCluster.Enabled = ClusterEnabled;
+            s.DxCluster.Host = ClusterHost.Trim();
+            s.DxCluster.Port = Int(ClusterPort, 1, 65535, 7300);
             s.Udp.Enabled = UdpEnabled;
             s.Udp.Address = UdpAddress.Trim();
             s.Udp.Port = Int(UdpPort, 1, 65535, 2237);
