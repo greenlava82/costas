@@ -243,7 +243,7 @@ Plain text, one line per event, monthly files. Compatible in spirit with WSJT-X 
 
 The rig model number shown is an example; always take it from the Hamlib model list.
 
-`licenceClass` is the US licence class whose data segments the transmit guard keeps to: `extra`, `advanced`, `general`, `technician` or `none` (not US: band limits only). It is missing (null) until the operator chooses one; then `operating.usDataSegmentsOnly` (older builds' switch, true by default) decides: true reads as `extra`, false as `none`. Settings writes the class on every Save, so the old switch is only read for profiles never saved since. An unknown value reads as `extra`.
+`licenceClass` is the US licence class whose data segments the transmit guard keeps to: `extra`, `advanced`, `general`, `technician` or `none` (not US: band limits only). It is missing (null) until the operator chooses one; then `operating.usDataSegmentsOnly` decides: true reads as `extra`, false as `none`. It is false on a new install (the check is off by default, owner decision 2026-11-18); earlier builds wrote it as true unless the operator turned it off, so their stations keep the Extra check. Settings writes the class on every Save, so the old switch is only read for profiles never saved since. An unknown value reads as `extra`.
 
 ## Frequency table
 

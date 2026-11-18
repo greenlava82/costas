@@ -48,8 +48,9 @@ public class FrequencyTableTests
         // shift does not.
         const long dial = 14_148_000;
         const int offset = 1_700;
-        Table.TransmitAllowed("20m", Mode.Rtty, dial, offset, out _).Should().BeTrue();
-        Table.TransmitAllowed("20m", Mode.Rtty, dial, offset, ModeInfo.RttyBandwidthHz(850, 45.45), out _).Should().BeFalse();
+        var table = new FrequencyTable(Table.Entries) { Licence = UsLicenceClass.AmateurExtra };
+        table.TransmitAllowed("20m", Mode.Rtty, dial, offset, out _).Should().BeTrue();
+        table.TransmitAllowed("20m", Mode.Rtty, dial, offset, ModeInfo.RttyBandwidthHz(850, 45.45), out _).Should().BeFalse();
     }
 
     [Fact]

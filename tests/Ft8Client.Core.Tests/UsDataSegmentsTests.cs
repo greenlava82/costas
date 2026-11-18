@@ -17,7 +17,8 @@ public class UsDataSegmentsTests
         new FrequencyEntry("20m", Mode.Ft8, 14_074_000, 14_000_000, 14_350_000),
         new FrequencyEntry("40m", Mode.Ft8, 7_074_000, 7_000_000, 7_300_000),
         new FrequencyEntry("60m", Mode.Ft8, 5_357_000, 5_351_500, 5_366_500),
-    ]);
+    ])
+    { Licence = UsLicenceClass.AmateurExtra };
 
     [Theory]
     [InlineData("20m", 14_074_000, 1500, true)]
@@ -27,7 +28,7 @@ public class UsDataSegmentsTests
     [InlineData("40m", 7_074_000, 2900, true)]
     [InlineData("40m", 7_200_000, 1500, false)]
     [InlineData("60m", 5_357_000, 2900, true)]
-    public void TransmitAllowed_DefaultExtra_RefusesPhoneSegments(string band, long dial, int offset, bool allowed)
+    public void TransmitAllowed_Extra_RefusesPhoneSegments(string band, long dial, int offset, bool allowed)
     {
         var t = Table();
         t.TransmitAllowed(band, Mode.Ft8, dial, offset, out var why).Should().Be(allowed);

@@ -30,9 +30,10 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
   preview under **Contacts** shows exactly what will go out.
 - **US licence class**: Amateur Extra, Advanced, General, Technician, or Not US / don't check. Costas refuses to
   transmit, tune or call CQ anywhere your class may not send data such as FT8, and says where you can. Each profile
-  keeps its own, so a club or a second operator's profile can have another class. Until you choose one, a profile
-  uses the Amateur Extra segments (or none, if you had turned off *US data segments only* in an earlier version).
-  Choose **Not US** if you are licensed in another country: then only the band limits apply.
+  keeps its own, so a club or a second operator's profile can have another class. The check is off until you choose a
+  class: a new install starts on **Not US / don't check**, so only the band limits apply. If you used an earlier
+  version, your profile keeps what *US data segments only* gave you there (the Amateur Extra segments, unless you had
+  turned it off). US operators should pick their class. Licensed in another country? Leave it on **Not US**.
 
   ![Settings: Station, US licence class](images/settings-licence-class.png)
 

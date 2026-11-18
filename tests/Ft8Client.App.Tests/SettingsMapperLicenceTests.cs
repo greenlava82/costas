@@ -16,16 +16,27 @@ namespace Ft8Client.App.Tests;
 public class SettingsMapperLicenceTests
 {
     [Fact]
-    public void Licence_DefaultSettings_AmateurExtraAsBefore() =>
-        SettingsMapper.Licence(new AppSettings()).Should().Be(UsLicenceClass.AmateurExtra);
+    public void Licence_NewInstall_NotUsSoOnlyBandLimits() =>
+        SettingsMapper.Licence(new AppSettings()).Should().Be(UsLicenceClass.NotUs);
 
     [Fact]
-    public void Licence_NotChosenAndOldSwitchOff_NotUs()
+    public void Licence_NotChosenAndOldSwitchOn_AmateurExtraAsBefore()
     {
         var s = new AppSettings();
-        s.Operating.UsDataSegmentsOnly = false;
-        SettingsMapper.Licence(s).Should().Be(UsLicenceClass.NotUs);
+        s.Operating.UsDataSegmentsOnly = true;
+        SettingsMapper.Licence(s).Should().Be(UsLicenceClass.AmateurExtra);
     }
+
+    [Fact]
+    public void Licence_EarlierBuildsSettingsFile_KeepsTheExtraCheck()
+    {
+        // Earlier builds wrote every setting, so their files carry the old switch's default.
+        var s = SettingsStoreRead("""{ "schema": 2, "profiles": [{ "id": "home" }], "operating": { "usDataSegmentsOnly": true } }""");
+        SettingsMapper.Licence(s).Should().Be(UsLicenceClass.AmateurExtra);
+    }
+
+    private static AppSettings SettingsStoreRead(string json) =>
+        System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json, SettingsStore.Json)!;
 
     [Theory]
     [InlineData("extra", UsLicenceClass.AmateurExtra)]
@@ -37,7 +48,7 @@ public class SettingsMapperLicenceTests
     public void Licence_Stored_ReadBack(string stored, UsLicenceClass expected)
     {
         var s = new AppSettings();
-        s.Operating.UsDataSegmentsOnly = false; // a chosen class wins over the old switch
+        s.Operating.UsDataSegmentsOnly = true; // a chosen class wins over the old switch
         s.Profile.LicenceClass = stored;
         SettingsMapper.Licence(s).Should().Be(expected);
     }

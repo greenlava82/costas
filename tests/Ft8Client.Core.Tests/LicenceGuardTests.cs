@@ -81,6 +81,9 @@ public class LicenceGuardTests
     }
 
     [Fact]
+    public void Licence_NewTable_NotUs() => new FrequencyTable([]).Licence.Should().Be(UsLicenceClass.NotUs);
+
+    [Fact]
     public void TransmitAllowed_NotUsOutsideBand_StillRefused() =>
         Table(UsLicenceClass.NotUs).TransmitAllowed("20m", Mode.Ft8, 14_349_000, 1_500, out _).Should().BeFalse();
 

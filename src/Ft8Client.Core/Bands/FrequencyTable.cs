@@ -13,9 +13,9 @@ public sealed class FrequencyTable(IReadOnlyList<FrequencyEntry> entries)
 {
     /// <summary>
     /// Also keep transmissions inside this US licence class's data segments (<see cref="UsDataSegments"/>), not only the
-    /// band limits in the table. Amateur Extra by default; <see cref="UsLicenceClass.NotUs"/> checks the band limits only.
+    /// band limits in the table. <see cref="UsLicenceClass.NotUs"/> (the default) checks the band limits only.
     /// </summary>
-    public UsLicenceClass Licence { get; set; } = UsLicenceClass.AmateurExtra;
+    public UsLicenceClass Licence { get; set; } = UsLicenceClass.NotUs;
 
     /// <summary>All entries.</summary>
     public IReadOnlyList<FrequencyEntry> Entries { get; } = entries;

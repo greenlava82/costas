@@ -40,8 +40,8 @@ public static class SettingsMapper
     ];
 
     /// <summary>
-    /// A profile's licence class. One not chosen yet follows the older "US data segments only" switch: Extra when on (the
-    /// default), not US when off. An unknown stored name is read as Extra, the narrowest guess that keeps today's check.
+    /// A profile's licence class. One not chosen yet follows the older "US data segments only" switch: Extra when on (an
+    /// earlier build's settings, unless turned off), not US when off (a new install). An unknown stored name is read as Extra, the narrowest guess that keeps today's check.
     /// </summary>
     public static UsLicenceClass Licence(StationProfile p, OperatingSettings o)
     {
