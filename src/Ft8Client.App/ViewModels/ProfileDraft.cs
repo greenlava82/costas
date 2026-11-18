@@ -37,8 +37,11 @@ public sealed partial class ProfileDraft : ObservableObject
     /// <summary>Grid as typed.</summary>
     public string Grid { get; set; } = string.Empty;
 
-    /// <summary>The US licence class the transmit guard keeps to, or not US.</summary>
-    public UsLicenceClass Licence { get; set; } = UsLicenceClass.AmateurExtra;
+    /// <summary>
+    /// The US licence class the transmit guard keeps to, or not US. A new draft starts with the check off: the licence
+    /// lockout is turned on only by choosing a class.
+    /// </summary>
+    public UsLicenceClass Licence { get; set; } = UsLicenceClass.NotUs;
 
     /// <summary>Power in watts as typed.</summary>
     public string Power { get; set; } = string.Empty;
