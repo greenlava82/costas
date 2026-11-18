@@ -13,13 +13,13 @@ namespace Ft8Client.App.Engine;
 /// <summary>
 /// When the active station profile may change (owner decision D25, 2026-11-17): only when the station is idle. A switch
 /// changes the callsign that goes out, so it is refused while transmitting, in a contact, or with CQ, Auto-call or a
-/// keyboard-mode transmission going, and the operator is told why. Editing the callsign of the profile in use is held
+/// keyboard-mode transmission going, and the operator is told why. Editing the callsign or grid of the profile in use is held
 /// to the same rule (owner decision 2026-11-17). The same rule applies at the desk and from a phone.
 /// </summary>
 public static class ProfileSwitch
 {
     /// <summary>
-    /// Why <paramref name="what"/> (the station profile, or the callsign of the one in use: both change what goes out)
+    /// Why <paramref name="what"/> (the station profile, or the callsign or grid of the one in use: all change what goes out)
     /// cannot change now, or null when it can.
     /// </summary>
     public static string? Refusal(SessionSnapshot s, string what = "the station profile")

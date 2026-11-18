@@ -54,4 +54,9 @@ public class ProfileSwitchTests
     public void Refusal_CallsignEdit_SaysYourCallsign() =>
         ProfileSwitch.Refusal(Idle with { CallingCq = true }, "your callsign")
             .Should().Be("Nothing was saved: your callsign cannot change while calling CQ as K1ABC. Try again when the station is idle.");
+
+    [Fact]
+    public void Refusal_GridEdit_SaysYourGridSquare() =>
+        ProfileSwitch.Refusal(Idle with { Transmitting = true }, "your grid square")
+            .Should().StartWith("Nothing was saved: your grid square cannot change while transmitting");
 }

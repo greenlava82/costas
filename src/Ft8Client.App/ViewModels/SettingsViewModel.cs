@@ -1449,11 +1449,13 @@ public sealed partial class SettingsViewModel : ObservableObject
             SelectedPage = MobilePage;
             return false;
         }
-        // A different profile, or a new callsign for the one in use, changes what goes out: only when idle (D25).
-        // Checked before anything is stored.
+        // A different profile, or a new callsign or grid for the one in use, changes what goes out: only when idle (D25,
+        // owner decisions 2026-11-17). Checked before anything is stored.
         var chosen = SelectedProfile ?? Profiles[0];
+        var current = _host.Settings.Current.Profile;
         var what = chosen.Id != _loadedProfile ? "the station profile"
-            : !string.Equals(chosen.Callsign.Trim().ToUpperInvariant(), _host.Settings.Current.Profile.Callsign, StringComparison.Ordinal) ? "your callsign"
+            : !string.Equals(chosen.Callsign.Trim().ToUpperInvariant(), current.Callsign, StringComparison.Ordinal) ? "your callsign"
+            : !string.Equals(chosen.Grid.Trim().ToUpperInvariant(), current.Grid.Trim().ToUpperInvariant(), StringComparison.Ordinal) ? "your grid square"
             : null;
         if (what is not null && ProfileSwitch.Refusal(_host.Session.Snapshot, what) is { } busy)
         {
