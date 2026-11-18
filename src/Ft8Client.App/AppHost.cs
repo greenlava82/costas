@@ -807,13 +807,37 @@ public sealed class AppHost : IAsyncDisposable
         if (linked is null || linked == s.ActiveProfile || s.Profiles.FirstOrDefault(p => p.Id == linked) is not { } profile)
             return (null, null);
         if (ProfileSwitch.RemoteRefusal(Session.Snapshot, profile.Name) is { } busy) return (busy, null);
+        // Before the switch, so the desk's chip turns amber as it shows the new callsign.
+        RemoteProfileSwitchUtc = Clock.UtcNow;
+        Activate(profile);
+        Log.Information("Remote user switched to the {Profile} profile ({Call})", profile.Name, profile.Callsign);
+        return (null, RemoteProfileOffers.Label(profile));
+    }
+
+    /// <summary>When a remote user last switched the station profile, for the desk's callsign chip; null if never.</summary>
+    public DateTime? RemoteProfileSwitchUtc { get; private set; }
+
+    /// <summary>
+    /// Switches to another station profile from the desk's callsign chip: only when the station is idle, as everywhere
+    /// (D25). Returns the refusal, or null when it switched or <paramref name="profileId"/> is already in use or unknown.
+    /// </summary>
+    public string? SwitchProfileAtDesk(string profileId)
+    {
+        var s = Settings.Current;
+        if (profileId == s.Profile.Id || s.Profiles.FirstOrDefault(p => p.Id == profileId) is not { } profile) return null;
+        if (ProfileSwitch.DeskRefusal(Session.Snapshot) is { } busy) return busy;
+        Activate(profile);
+        Log.Information("Switched to the {Profile} profile ({Call}) at the desk", profile.Name, profile.Callsign);
+        return null;
+    }
+
+    // As Settings does after a switch: the profile's own Tx level, log index and (if it differs) radio and audio.
+    private void Activate(StationProfile profile)
+    {
         Settings.Update(x => x.ActiveProfile = profile.Id);
-        // As Settings does after a switch: the profile's own Tx level, log index and (if it differs) radio and audio.
         TxLevel.Apply();
         RebuildLogIndex();
         _ = ReopenDevicesAsync();
-        Log.Information("Remote user switched to the {Profile} profile ({Call})", profile.Name, profile.Callsign);
-        return (null, $"{profile.Callsign} ({profile.Name} profile)");
     }
 
     /// <summary>

@@ -128,6 +128,53 @@
         <Button Content="Pop out" Padding="8,3" Margin="2,0,0,0" VerticalAlignment="Center" Command="{Binding PopOutCommand}" IsVisible="{Binding CanPopOut}"
                 ToolTip.Tip="{Binding CurrentTabName, StringFormat='Open {0} in its own window, for example on a second monitor'}"
                 AutomationProperties.Name="Pop this view out into its own window" />
+        <!-- Whose callsign is on the air, when the station has more than one profile (D25): amber for a minute after a phone
+             switched it, and a menu to switch at the desk (only while idle). -->
+        <Button x:Name="ProfileButton" Classes="profile" Classes.flagged="{Binding ProfileFlagged}" IsVisible="{Binding HasProfiles}"
+                Margin="12,0,0,0" Padding="10,3" VerticalAlignment="Center" ToolTip.Tip="{Binding ProfileTip}"
+                AutomationProperties.Name="{Binding ProfileText, StringFormat='Station profile in use: {0}'}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="{Binding ProfileText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBlock Text="▾" VerticalAlignment="Center" />
+          </StackPanel>
+          <Button.Styles>
+            <Style Selector="Button.profile">
+              <Setter Property="Background" Value="Transparent" />
+              <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+              <Setter Property="BorderThickness" Value="1" />
+              <Setter Property="CornerRadius" Value="12" />
+            </Style>
+            <Style Selector="Button.profile.flagged">
+              <Setter Property="Background" Value="{DynamicResource CautionBackgroundBrush}" />
+              <Setter Property="BorderBrush" Value="{DynamicResource CautionBorderBrush}" />
+              <Setter Property="Foreground" Value="{DynamicResource CautionBrush}" />
+            </Style>
+          </Button.Styles>
+          <Button.Flyout>
+            <Flyout Placement="BottomEdgeAlignedRight">
+              <StackPanel Spacing="4" MinWidth="220">
+                <TextBlock Text="Station profile" Classes="title" />
+                <ItemsControl ItemsSource="{Binding ProfileItems}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ProfileMenuItem">
+                      <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,1" Click="OnProfileChosen"
+                              Command="{Binding Switch}" CommandParameter="{Binding Id}"
+                              AutomationProperties.Name="{Binding Label, StringFormat='Operate as {0}'}">
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Left" Text="{Binding Tick}" Width="18" />
+                          <TextBlock Text="{Binding Label}" />
+                        </DockPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Classes="secondary" TextWrapping="Wrap" MaxWidth="260"
+                           Text="The profile changes only while the station is idle: not transmitting, no contact in progress, CQ and Auto-call off." />
+                <Button Content="Edit profiles…" Classes="link" Click="OnProfileChosen" Command="{Binding OpenCommand}" CommandParameter="settings" />
+              </StackPanel>
+            </Flyout>
+          </Button.Flyout>
+        </Button>
         <TextBlock Text="{Binding ClockText}" FontSize="16" FontWeight="SemiBold" Classes="num" Margin="12,0,4,0" VerticalAlignment="Center"
                    Foreground="{Binding ClockKind, Converter={x:Static v:Converters.KindBrush}}" ToolTip.Tip="{Binding ClockTip}"
                    AutomationProperties.Name="UTC clock" />

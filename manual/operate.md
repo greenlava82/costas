@@ -13,6 +13,7 @@ should not need Settings while operating.
 | **Mode** | FT8, FT4, PSK31, PSK63 or RTTY. Changes the slot length and dial frequency. Locked while transmitting. For PSK31, PSK63 and RTTY see [PSK31, PSK63 and RTTY](keyboard-modes.md) |
 | Frequency | The dial frequency read from the radio, in MHz. Click it to type another frequency or use one you saved ([below](#typing-a-frequency)). Locked while transmitting |
 | **Operate**, **Raw decodes**, **Reach**, **Log**, **Awards** | The five views. ++ctrl+1++ to ++ctrl+5++, or ++ctrl+tab++ for the next one |
+| Callsign | Only when you have more than one [station profile](settings.md): the callsign and profile in use, such as **K1UTA · Ash**, so everyone at the desk can see whose callsign is on the air. It is also in the window title. It turns amber for a minute after someone [switched to their own profile from the phone](phone.md). Click it to switch profiles; that works only while the station is idle (not transmitting, no contact in progress, CQ and Auto-call off). **Edit profiles…** opens Settings |
 | Clock | UTC, corrected from internet time when your PC clock is off (the tooltip says by how much). Turns amber with a tooltip when the clock is still off by more than 0.5 s, red above 2 s |
 | **☰** | Mini mode, Settings, Station setup, Diagnostics, Keyboard shortcuts, About |
 
