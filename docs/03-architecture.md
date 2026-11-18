@@ -177,6 +177,18 @@ server {
 }
 ```
 
+## Desktop notifications
+
+`App/Services/Notifications`. `MainViewModel` turns a Hunt sighting (`HuntService.Alert`) and each new caller (`CallerAlert.Fresh`) into an `AttentionEvent` (`NotificationText`, Core) and hands it to `DesktopNotifications` on the UI thread. That asks `NotificationGate` (Core, unit tested: settings, foreground rule, 10-minute repeat quiet time, one popup per kind per minute with merging) and passes a `DesktopNotification` to the backend, an `IDesktopNotifier`. `Show` returns at once and does its work on the thread pool, so neither the UI thread nor the slot thread waits on it. `MainWindow` supplies the foreground test (main window active, not minimized, not in mini mode) and handles `Activated(call)`: out of mini mode, restore, activate, Operate tab, select the station. Nothing else happens on a click.
+
+| Backend | Where | How |
+| --- | --- | --- |
+| `WindowsToastNotifier` | Windows 10 and later | `Windows.UI.Notifications` called directly through WinRT with .NET's source-generated COM interop (`[GeneratedComInterface]` declarations of the few interfaces used, in `Notifications/WinRt`), so the app keeps its `net10.0` target with no Windows SDK projection or Windows App SDK. The AppUserModelID is the one Velopack sets on the process (`velopack.<id>`, matching its shortcut); without one (classic Inno Setup install, development run) Costas sets `Costas.Costas`, which the Inno shortcuts carry, and registers its name and icon under `HKCU\Software\Classes\AppUserModelId\Costas.Costas`. Clicks arrive through the toast's Activated event; no COM activator is registered, so a toast clicked after Costas has closed does nothing |
+| `FreedesktopNotifier` | Linux | `org.freedesktop.Notifications.Notify` on the session bus with Tmds.DBus.Protocol (already used by Avalonia; pinned to Avalonia's version), one notification per kind replaced through `replaces_id`, the `default` action only, `suppress-sound`; `ActionInvoked` maps the id back to the call. No bus or no server: logged once, then nothing |
+| `NullDesktopNotifier` | elsewhere, tests, and until the app picks a backend | Nothing |
+
+`App` picks the backend (`DesktopNotifications.PlatformBackend`) before the first window opens, because on Windows the process AppUserModelID must be set before then.
+
 ## Configuration and storage
 
 Per-user data lives in `%LOCALAPPDATA%\Costas\` (on other platforms, the equivalent app-data folder): `costas.db`, `settings.json`, `logs\`, `wav\`, `cache\`. See `06-data-model.md`.
@@ -194,6 +206,6 @@ Serilog, rolling daily files, 14 days kept. Levels: Information for slot summari
 
 ## Portability rules
 
-Windows-only code is confined to: `WasapiAudioBackend`, the credential store implementation, the job-object helper and the installer. Everything else must compile and run on macOS and Linux.
+Windows-only code is confined to: `WasapiAudioBackend`, the credential store implementation, the job-object helper, `WindowsToastNotifier` with its WinRT declarations, and the installer. Everything else must compile and run on macOS and Linux.
 
 Linux (D17) uses `PortAudioBackend` over the distribution's `libportaudio2` (ALSA, which also reaches PulseAudio and PipeWire through their `pulse` and `pipewire` devices). Device ids are `host API:device name`; a stored id whose ALSA card number has changed (`(hw:N,M)`) still finds its device. PortAudio lists devices as they were when it started, so the list is refreshed by restarting PortAudio when no stream is open. `jt9` and `rigctld` come from the distribution's `wsjtx` and `libhamlib-utils` packages, found on the PATH. The Linux build transmits like the Windows one (turned on 2026-10-31, D17). CI checks the Linux audio path end to end: a PulseAudio null sink is the loopback, and `PortAudioLoopbackTests` plays rendered FT8 and FT4 through it, captures it back and decodes it with `jt9` (measured 2026-10-13 on a VM: exact text, DT +0.10 s for output and input latency together).
