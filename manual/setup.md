@@ -49,8 +49,11 @@ baud rate does not matter. If you also made a PTT port in SmartSDR CAT, choose *
 **Transmit (PTT)** and pick it as **PTT port**; otherwise leave **CAT command**. Hamlib's own **FlexRadio › 6xxx**
 model connects only over the network, to a TCP port set up in SmartSDR CAT, so Costas shows an address box for it
 instead of a COM port. The **SmartSDR Slice A** to **H** models talk to the radio itself: enter the radio's IP address
-with port `4992`. Choose one of these if you have a PowerGenius XL amplifier or TunerGenius XL tuner paired with the
-radio and want to switch them from Costas's bottom bar.
+with port `4992`.
+
+A PowerGenius XL amplifier or TunerGenius XL tuner paired with the radio works with any of these: after setup, type the
+radio's IP address in **Settings › Station › FlexRadio amp and tuner**
+([how](settings.md#flexradio-amp-and-tuner)).
 
 PTT choices:
 
