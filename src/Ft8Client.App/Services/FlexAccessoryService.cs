@@ -38,6 +38,7 @@ public sealed class FlexAccessoryService : IAsyncDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly SemaphoreSlim _busy = new(1, 1);
     private FlexAccessoryClient? _client;
+    private volatile FlexAccessories? _shown;
     private (string Host, int Port)? _following;
     private bool _applied;
     private bool _disposed;
@@ -63,11 +64,18 @@ public sealed class FlexAccessoryService : IAsyncDisposable
     public event Action? Changed;
 
     /// <summary>What the radio reports now; empty when not connected or not a FlexRadio.</summary>
-    public FlexAccessories Current => _client?.Current ?? FlexAccessories.Empty;
+    public FlexAccessories Current => _shown ?? _client?.Current ?? FlexAccessories.Empty;
 
     /// <summary>False while anything is on the air, the amplifier says it is transmitting, or the tuner is tuning.</summary>
     public bool CanChange =>
         !_transmitting() && Current is var c && c.Amplifier?.Transmitting != true && c.Tuner?.Tuning != true;
+
+    /// <summary>Shows <paramref name="accessories"/> as if the radio had reported them (layout tests, no radio).</summary>
+    internal void ShowForTests(FlexAccessories accessories)
+    {
+        _shown = accessories;
+        Changed?.Invoke();
+    }
 
     /// <summary>Waits until the latest setting change has been applied (tests).</summary>
     internal Task Settled => _identity;

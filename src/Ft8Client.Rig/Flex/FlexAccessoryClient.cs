@@ -43,6 +43,7 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
     private volatile NetworkStream? _stream;
     private volatile bool _connected;
     private int _sequence;
+    private int _subscription = -1;
 
     /// <summary>
     /// Creates a client for the radio at <paramref name="host"/>. <paramref name="pingEvery"/> and
@@ -102,10 +103,12 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
         }
     }
 
-    private async Task<FlexReply> RequestAsync(string command, CancellationToken ct)
+    private Task<FlexReply> RequestAsync(string command, CancellationToken ct) =>
+        RequestAsync(Interlocked.Increment(ref _sequence), command, ct);
+
+    private async Task<FlexReply> RequestAsync(int seq, string command, CancellationToken ct)
     {
         var stream = _stream ?? throw new InvalidOperationException("Not connected");
-        var seq = Interlocked.Increment(ref _sequence);
         var tcs = new TaskCompletionSource<FlexReply>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pending[seq] = tcs;
         try
@@ -150,9 +153,11 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
                 _stream = stream;
                 using var session = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 var reading = ReadAsync(stream, session.Token);
-                var sub = await RequestAsync(FlexCommands.SubscribeAmplifiers, session.Token).ConfigureAwait(false);
+                var seq = Interlocked.Increment(ref _sequence);
+                Volatile.Write(ref _subscription, seq);
+                var sub = await RequestAsync(seq, FlexCommands.SubscribeAmplifiers, session.Token).ConfigureAwait(false);
                 if (!sub.Ok) throw new IOException($"The radio refused the subscription (code {sub.Code:X8})");
-                _connected = wasUp = true;
+                wasUp = true;
                 StatusChanged?.Invoke(new ServiceStatus(ServiceHealth.Ok, $"Connected to the radio at {_host}", _now()));
                 var pinging = PingAsync(session.Token);
                 await Task.WhenAny(reading, pinging).ConfigureAwait(false);
@@ -175,6 +180,7 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
             finally
             {
                 _connected = false;
+                Volatile.Write(ref _subscription, -1);
                 _stream = null;
                 foreach (var p in _pending.Values) p.TrySetCanceled(CancellationToken.None);
                 Use(FlexAccessories.Empty);
@@ -242,6 +248,9 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
     {
         if (FlexReply.Parse(line) is { } reply)
         {
+            // Connected is set here, on the reading thread, before any status line after the reply is read, so a device is
+            // never shown while commands to it would still be refused as "not connected".
+            if (reply.Ok && reply.Sequence == Volatile.Read(ref _subscription)) _connected = true;
             if (_pending.TryGetValue(reply.Sequence, out var tcs)) tcs.TrySetResult(reply);
             return;
         }

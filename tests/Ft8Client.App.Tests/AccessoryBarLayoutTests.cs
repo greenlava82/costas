@@ -62,8 +62,11 @@ public class AccessoryBarLayoutTests
                     var button = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "AccessoryButton");
                     button.IsEffectivelyVisible.Should().BeFalse("nothing is paired in simulation");
 
-                    vm.Accessory = AccessoryPanel.From(Both, canChange: true);
+                    // Through the service, as the radio's status would arrive: a snapshot update meanwhile rebuilds the
+                    // panel from the service, so setting the view model's panel directly would be undone at random.
+                    host.Accessories.ShowForTests(Both);
                     Settle(window);
+                    vm.Accessory.BarText.Should().Be("Amp Transmitting · Tuner Tuning");
 
                     button.IsEffectivelyVisible.Should().BeTrue();
                     var halt = window.GetVisualDescendants().OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Halt transmit");
