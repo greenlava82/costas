@@ -61,15 +61,20 @@ public static class AdifMapper
             LotwUploadState = r["lotw_qsl_sent"]?.ToUpperInvariant() is "Y" ? UploadState.Uploaded : UploadState.None,
             Source = source,
             EqslConfirmed = r["eqsl_qsl_rcvd"]?.ToUpperInvariant() is "Y" or "V",
+            EqslUploadState = r["eqsl_qsl_sent"]?.ToUpperInvariant() is "Y" ? UploadState.Uploaded : UploadState.None,
             QrzLogid = long.TryParse(r["app_qrzlog_logid"], NumberStyles.None, CultureInfo.InvariantCulture, out var logid) ? logid : null,
-            UploadState = source == QsoSource.Qrz ? UploadState.Uploaded : UploadState.None,
+            UploadState = source == QsoSource.Qrz || r["qrzcom_qso_upload_status"]?.ToUpperInvariant() is "Y" ? UploadState.Uploaded : UploadState.None,
             RawAdif = AdifWriter.Record(r),
         };
     }
 
-    /// <summary>True when any confirmation field says so (<c>app_qrzlog_status</c> C, <c>qsl_rcvd</c>, <c>lotw_qsl_rcvd</c> or <c>eqsl_qsl_rcvd</c> Y or V).</summary>
+    /// <summary>
+    /// True when any confirmation field says so (<c>app_qrzlog_status</c> C, <c>qsl_rcvd</c>, <c>lotw_qsl_rcvd</c>,
+    /// <c>eqsl_qsl_rcvd</c> Y or V, or Costas's own <c>app_costas_confirmed</c> Y).
+    /// </summary>
     public static bool IsConfirmed(AdifRecord r) =>
         string.Equals(r["app_qrzlog_status"], "C", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(r[CostasConfirmed], "Y", StringComparison.OrdinalIgnoreCase) ||
         r["qsl_rcvd"]?.ToUpperInvariant() is "Y" or "V" ||
         r["lotw_qsl_rcvd"]?.ToUpperInvariant() is "Y" or "V" ||
         r["eqsl_qsl_rcvd"]?.ToUpperInvariant() is "Y" or "V";
@@ -115,6 +120,52 @@ public static class AdifMapper
         }
         if (q.LotwUploadState == UploadState.Uploaded) r["lotw_qsl_sent"] = "Y";
         if (q.LotwConfirmed) r["lotw_qsl_rcvd"] = "Y";
+        return r;
+    }
+
+    /// <summary>
+    /// Costas's own field for a contact the log marks confirmed when no other field in the record says by whom (for
+    /// example a confirmation merged in from a record whose fields were not kept).
+    /// </summary>
+    public const string CostasConfirmed = "app_costas_confirmed";
+
+    /// <summary>
+    /// QSL fields copied from a contact's original record when present: paper QSL, dates, and the Club Log and QRZ
+    /// upload fields that have no column of their own.
+    /// </summary>
+    public static readonly IReadOnlyList<string> RawQslFields =
+    [
+        "qsl_sent", "qsl_rcvd", "qslsdate", "qslrdate", "qsl_sent_via", "qsl_rcvd_via", "qsl_via", "qslmsg",
+        "lotw_qslsdate", "lotw_qslrdate", "eqsl_qslsdate", "eqsl_qslrdate",
+        "clublog_qso_upload_status", "clublog_qso_upload_date", "qrzcom_qso_upload_date", "app_qrzlog_status",
+    ];
+
+    /// <summary>
+    /// The record for an ADIF file (Log view export and the log copy in the backups folder): the upload record plus the
+    /// QSL state the log holds. LoTW, eQSL and QRZ sent and received come from the columns; paper QSL, dates and Club
+    /// Log come from the original record when it has them. Costas's own <see cref="AdifImporter"/> reads every one
+    /// back.
+    /// </summary>
+    public static AdifRecord ToFileAdif(QsoRecord q)
+    {
+        var r = ToAdif(q);
+        if (q.EqslUploadState == UploadState.Uploaded) r["eqsl_qsl_sent"] = "Y";
+        if (q.UploadState == UploadState.Uploaded) r["qrzcom_qso_upload_status"] = "Y";
+        var raw = string.IsNullOrEmpty(q.RawAdif) ? null : AdifReader.Read(q.RawAdif).FirstOrDefault();
+        if (raw is not null)
+        {
+            foreach (var f in RawQslFields)
+            {
+                if (r[f] is null && raw[f] is { } v) r[f] = v;
+            }
+            // The original record's received field is kept only while the log still says confirmed (a QRZ confirmation can be withdrawn).
+            if (!q.Confirmed)
+            {
+                r["app_qrzlog_status"] = null;
+                if (r["qsl_rcvd"]?.ToUpperInvariant() is "Y" or "V") r["qsl_rcvd"] = null;
+            }
+        }
+        if (q.Confirmed && !IsConfirmed(r)) r[CostasConfirmed] = "Y";
         return r;
     }
 

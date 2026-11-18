@@ -21,4 +21,7 @@ public sealed record PreparedTx(TxPlan Plan, Mode Mode, int OffsetHz, float[] Sa
 {
     /// <summary>Audio duration.</summary>
     public TimeSpan Duration => TimeSpan.FromSeconds((double)Samples.Length / SampleRate);
+
+    /// <summary>The transmitter's Halt count when this was prepared: a Halt since then means it must not be keyed.</summary>
+    public long HaltEpoch { get; init; }
 }

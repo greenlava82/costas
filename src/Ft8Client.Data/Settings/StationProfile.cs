@@ -40,6 +40,13 @@ public sealed class StationProfile
     /// <summary>Audio devices.</summary>
     public AudioSettings Audio { get; set; } = new();
 
+    /// <summary>
+    /// The US licence class whose data segments the transmit guard keeps to: <c>extra</c>, <c>advanced</c>,
+    /// <c>general</c>, <c>technician</c>, or <c>none</c> (not US, band limits only). Null until chosen: then the older
+    /// <see cref="OperatingSettings.UsDataSegmentsOnly"/> switch decides (on, as in earlier builds' files: Extra segments; off, as on a new install: none).
+    /// </summary>
+    public string? LicenceClass { get; set; }
+
     /// <summary>Transmit power in watts, for the log.</summary>
     public int PowerWatts { get; set; } = 25;
 

@@ -377,23 +377,41 @@ public sealed partial class LogViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Exports the log to an ADIF file, on a worker thread. A file or database error is reported in
-    /// <see cref="Message"/> rather than thrown.
+    /// Exports the log to ADIF with QSL state, one file per station callsign (<see cref="AdifLogExport"/>): a log with one
+    /// callsign goes to <paramref name="path"/>; with several, each goes beside it with the callsign added to the name
+    /// (<c>log-W7LIT.adi</c>), so no file mixes callsigns. The work runs on a worker thread; a file or database error is
+    /// reported in <see cref="Message"/> rather than thrown.
     /// </summary>
     public async Task ExportAsync(string path)
     {
         if (Syncing) return;
         Syncing = true;
         Message = $"Exporting to {Path.GetFileName(path)}…";
+        var callsign = _profile().Callsign;
         try
         {
-            var count = await Task.Run(() =>
+            Message = await Task.Run(() =>
             {
-                var rows = _qsos.List();
-                File.WriteAllText(path, AdifImporter.Export(rows, DateTime.UtcNow));
-                return rows.Count;
+                var now = DateTime.UtcNow;
+                var groups = AdifLogExport.ByStation(_qsos.List());
+                if (groups.Count <= 1)
+                {
+                    var only = groups.Count == 1 ? groups[0] : new AdifLogExport.Group(callsign, []);
+                    Ft8Client.Data.Files.AtomicFile.WriteAllText(path, AdifLogExport.Document(only, now, "ADIF export"));
+                    return $"Exported {only.Contacts.Count} contacts.";
+                }
+                var folder = Path.GetDirectoryName(path) ?? ".";
+                var stem = Path.GetFileNameWithoutExtension(path);
+                var ext = Path.GetExtension(path) is { Length: > 0 } e ? e : ".adi";
+                var names = new List<string>();
+                foreach (var g in groups)
+                {
+                    var name = AdifLogExport.FileName(stem, g.StationCallsign, ext);
+                    Ft8Client.Data.Files.AtomicFile.WriteAllText(Path.Combine(folder, name), AdifLogExport.Document(g, now, "ADIF export"));
+                    names.Add(name);
+                }
+                return $"Exported {groups.Sum(g => g.Contacts.Count)} contacts to {names.Count} files, one per callsign: {string.Join(", ", names)}.";
             });
-            Message = $"Exported {count} contacts.";
         }
         catch (Exception e) when (IsFileError(e))
         {

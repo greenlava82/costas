@@ -15,4 +15,7 @@ namespace Ft8Client.App.Remote;
 /// <param name="CallingCq">Calling CQ.</param>
 /// <param name="YouNeed">You need.</param>
 /// <param name="Caption">The line under the figures.</param>
-public sealed record RemoteSummary(string Title, string StationsHeard, string Countries, string CallingCq, string YouNeed, string Caption);
+/// <param name="Advice">The band advice line, as on the desk ("15 m is open to Europe from your area: …"), or null.</param>
+/// <param name="Closing">The line about this band closing, or null.</param>
+public sealed record RemoteSummary(string Title, string StationsHeard, string Countries, string CallingCq, string YouNeed, string Caption,
+                                   string? Advice = null, string? Closing = null);

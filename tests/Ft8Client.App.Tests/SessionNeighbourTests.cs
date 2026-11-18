@@ -144,6 +144,52 @@ public class SessionNeighbourTests
         o["15m"].SpotsByContinent.Should().Contain("SA", 2);
     }
 
+    private static void HeardInEurope(Driver d, string band, int receivers)
+    {
+        var t = d.Clock.UtcNow.AddMinutes(-5);
+        for (var i = 0; i < receivers; i++)
+            d.Session.AddNeighbourReport(new NeighbourReport(i % 2 == 0 ? "K7AAA" : "K7BBB", "DN41", $"DL1A{(char)('A' + i)}", band, "FT8", -12, t));
+    }
+
+    [Fact]
+    public void Publish_BandActivityOff_GivesNoBandAdvice()
+    {
+        var d = new Driver();
+        HeardInEurope(d, "15m", 8);
+        d.Session.Publish();
+
+        d.Session.Snapshot.BandAdvice.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Publish_EveryBandFollowedAndAnotherBandOpen_AdvisesThatBand()
+    {
+        var d = new Driver();
+        d.Session.SetBandActivityFeed(BandActivityFeed.AllBands);
+        HeardInEurope(d, "15m", 8);
+        d.Clock.Advance(TimeSpan.FromSeconds(15));
+        d.Session.Publish();
+
+        var a = d.Session.Snapshot.BandAdvice.Should().ContainSingle().Subject;
+        a.Kind.Should().Be(BandAdviceKind.OpenFromArea);
+        a.Band.Should().Be("15m");
+        a.Continents.Single().Should().Match<BandAdviceContinent>(c => c.Continent == "EU" && c.Receivers == 8 && c.Senders == 2);
+    }
+
+    [Fact]
+    public void Publish_FiveEuropeansHeardMeOnThisBand_AdvisesThisBandForMe()
+    {
+        var d = new Driver();
+        var t = d.Clock.UtcNow.AddMinutes(-3);
+        for (var i = 0; i < 5; i++) d.Session.AddReport(new ReceptionReport($"DL1B{(char)('A' + i)}", null, null, null, "20m", "FT8", -10, t));
+        d.Clock.Advance(TimeSpan.FromSeconds(15));
+        d.Session.Publish();
+
+        var a = d.Session.Snapshot.BandAdvice.Should().ContainSingle().Subject;
+        a.Kind.Should().Be(BandAdviceKind.OpenForYou);
+        a.Band.Should().Be("20m");
+    }
+
     [Fact]
     public void SetBand_SameMode_KeepsReportsForTheBandMenu()
     {

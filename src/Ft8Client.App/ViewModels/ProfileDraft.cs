@@ -8,6 +8,7 @@
 
 
 using CommunityToolkit.Mvvm.ComponentModel;
+using Ft8Client.Core.Bands;
 
 namespace Ft8Client.App.ViewModels;
 
@@ -29,6 +30,9 @@ public sealed partial class ProfileDraft : ObservableObject
 
     /// <summary>Grid as typed.</summary>
     public string Grid { get; set; } = string.Empty;
+
+    /// <summary>The US licence class the transmit guard keeps to, or not US.</summary>
+    public UsLicenceClass Licence { get; set; } = UsLicenceClass.AmateurExtra;
 
     /// <summary>Power in watts as typed.</summary>
     public string Power { get; set; } = string.Empty;

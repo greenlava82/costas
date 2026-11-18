@@ -36,7 +36,7 @@ The search text is kept. The list shows the newest 5,000 matching contacts; the 
 | **Edit** | Opens the selected contact to correct it (call, grid, reports, name, power, comment). Your corrections stay: a later QRZ sync adds confirmations but does not change what you edited. The change is not sent to QRZ; correct it there too if you want both to match |
 | **Delete** | Removes the selected contact from the local log. Press it twice to confirm. It is **not** deleted from QRZ, but QRZ syncs and LoTW downloads will not bring it back. Importing an ADIF file that holds it does |
 | **Import ADIF** | Reads an `.adi` file (from WSJT-X, another logger, or a QRZ export). Duplicates are merged, not added twice; Costas reports how many were imported, merged and skipped |
-| **Export ADIF** | Writes the whole log to an `.adi` file |
+| **Export ADIF** | Writes the whole log to an `.adi` file, with each contact's LoTW, eQSL and QRZ sent and received state (and the paper QSL and Club Log fields of contacts you imported). A log with more than one station callsign is written as one file per callsign, named after the one you chose (`log-W7LIT.adi`, `log-VE3_W7LIT.adi`), so each can be uploaded to that callsign's logbook |
 | **Sync with QRZ now** | Reads your QRZ logbook and uploads anything waiting |
 
 ## What Costas logs
@@ -123,6 +123,26 @@ last 14 days. The copy is taken while Costas runs, so there is nothing to do.
 To go back to a copy: close Costas, rename `costas.db` in the data folder to keep it, copy the backup you want in as
 `costas.db`, and start Costas again. Contacts made after that backup are in your QRZ logbook, LoTW or your other
 logger if uploads were on, and an ADIF import brings them back.
+
+### ADIF copy of the log {#adif-copy}
+
+The same folder also holds a plain ADIF copy of your whole log, `costas-log-W7LIT.adi` (one file per station
+callsign; a `/` in the call becomes `_`). It holds every contact, oldest first, with its LoTW, eQSL and QRZ sent and
+received state, and any logger, Costas included, can import it. Costas rewrites it a few seconds after you log, edit
+or delete a contact and after an import or a sync, in the background, so it never holds up logging or transmitting.
+Each file is written whole and then swapped in, so even a crash or a power cut never leaves half a file. The copy is
+kept in simulation too.
+
+To restore from it, open the Log view and press **Import ADIF**. Contacts come back with their callsign, reports,
+confirmations and upload state; ones already in the log are merged, not added twice. They are filed under the
+station profile you are using when you import.
+
+[Settings › Logbooks › Backups](settings.md#backups) shows where the folder is, when the copy was last written, and
+has an **Open folder** button. If the copy cannot be written (the disk is full, or the folder was removed), that page
+says why, a **Log copy** light shows in the bottom bar, and Costas tries again after a minute, then less often.
+
+The file is plain UTF-8. Names with accented letters are counted in bytes, which most loggers expect; ADIF itself
+only allows plain ASCII in `.adi` files, so a few strict programs may still complain about them.
 
 Settings are protected too: each save keeps the previous file as `settings.json.bak`, and if the settings file is
 ever damaged Costas starts from that copy and says so on the status bar.
