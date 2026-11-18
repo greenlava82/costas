@@ -41,7 +41,7 @@ Ordered by value to an FT8 operator against effort. Anything that changes what g
 | C2 | Club Log real-time upload | Club Log already feeds the Rarity meter; uploading closes the loop for DXCC tracking and OQRS | S |
 | C3 | Compound and portable calls (type 4 messages) | VE3/W7LIT as your own call, or answering PJ4/K1ABC, fails today | M |
 | C4 | DX cluster and RBN spots, display only, beside POTA spots | Shows rare stations on other bands before they show up on the waterfall | M |
-| C5 | Band advice line: "15 m is open to Europe for you" | Already in the spec; builds on Other bands right now and the neighbour data | S |
+| C5 | ~~Band advice line: "15 m is open to Europe for you"~~ built 2026-11-18 (`04-domain-logic.md` section 14a); next: tune the thresholds on the air (V27) | Already in the spec; builds on Other bands right now and the neighbour data | S |
 | C6 | ~~Contest exchanges (ARRL RTTY Roundup, Field Day, WW Digi)~~ FT8/FT4 contests built 2026-11-07 (Roundup, Field Day, WW Digi, ARRL Digi); next: the Roundup in real RTTY | Contest CQs are only parked in Watching today; weekends are when FT8 is busiest | L |
 | C7 | More rigs: OmniRig and TCI (SunSDR, ANAN) | In the spec's v1.x list; TCI also carries audio, so no sound-card setup | M each |
 | C8 | Automatic log backup and per-profile ADIF export with QSL state | Protects the log; today's export mixes profiles and drops QSL status | S |

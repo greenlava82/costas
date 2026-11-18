@@ -62,6 +62,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     private readonly List<BandSample> _samples = [];
     private IReadOnlyDictionary<string, BandOpening> _sampledOpenings = new Dictionary<string, BandOpening>(StringComparer.Ordinal);
     private bool _samplesDirty;
+    private IReadOnlyList<BandAdvice> _advice = [];
+    private DateTime _adviceUtc;
+    private DateTime? _bandFollowedSince; // since when the current band's nearby reports have been followed without a break
     private StationTracker _tracker;
     private PileupTracker _pileups;
     private readonly List<NeighbourReport> _neighbours = [];
@@ -1241,6 +1244,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             // A refusal or fault from the old band or mode no longer applies.
             _fault = null;
             _hearsMe = new HearsMe(band, _hearsMe.Available, ModeInfo.Name(mode));
+            // The new band's closing line needs 30 minutes followed from now; the advice is rebuilt at the next publish.
+            _bandFollowedSince = BandOpenings.IsFollowed(_bandFeed, string.Empty, string.Empty) ? _clock.UtcNow : null;
+            _adviceUtc = default;
             // Reports of nearby stations cover every band (for the band menu); only a mode change makes them irrelevant.
             if (mode != oldMode)
             {
@@ -1248,6 +1254,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 _samples.Clear();
                 _samplesDirty = true;
                 _openingsUtc = default;
+                _adviceUtc = default;
             }
             _recentOffsets.Clear();
             _slotCounts.Clear();
@@ -1315,6 +1322,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 _samples.Clear();
                 _samplesDirty = true;
                 _openingsUtc = default;
+                _adviceUtc = default;
                 _tracker.SetMyStation(config.MyCall, config.MyGrid);
                 _myEntity = _countries.Lookup(config.MyCall);
             }
@@ -1438,7 +1446,13 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         lock (_gate)
         {
             if (_bandFeed == feed) return;
+            // The band I am on is followed all the time on every band, or alone after a fall-back.
+            var wasFollowed = BandOpenings.IsFollowed(_bandFeed, string.Empty, string.Empty);
+            var followed = BandOpenings.IsFollowed(feed, string.Empty, string.Empty);
+            if (!followed) _bandFollowedSince = null;
+            else if (!wasFollowed) _bandFollowedSince = _clock.UtcNow;
             _bandFeed = feed;
+            _adviceUtc = default;
         }
         Publish();
     }
@@ -1487,6 +1501,19 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         _samplesDirty = false;
         _sampledOpenings = BandOpenings.BuildSampled(_samples, _config.MyCall, _config.MyGrid, ModeInfo.Name(_config.Mode), _countries, _logIndex, now);
         return _sampledOpenings;
+    }
+
+    // The band advice line (docs/04-domain-logic.md, section 14a), from the band menu's numbers, my own reports and the last
+    // 30 minutes of nearby reports. Rebuilt at most once a slot, or at once after a band, mode, grid or feed change. Under _gate.
+    private IReadOnlyList<BandAdvice> Advice(IReadOnlyDictionary<string, BandOpening> followed, IReadOnlyDictionary<string, BandOpening> sampled,
+                                             DateTime now)
+    {
+        if (now - _adviceUtc < (ModeInfo.IsSlotted(_config.Mode) ? ModeInfo.SlotLength(_config.Mode) : TimeSpan.FromSeconds(15))) return _advice;
+        _adviceUtc = now;
+        var shown = BandOpenings.Shown(followed, sampled, _bandFeed, _config.Band);
+        _advice = BandAdvisor.Advise(new BandAdviceInput(shown, _neighbours, _hearsMe.Reports, _config.Band, ModeInfo.Name(_config.Mode), _config.MyCall,
+            _config.MyGrid, _myEntity?.Continent, _bandFollowedSince, now), _countries);
+        return _advice;
     }
 
     // The band menu's activity. It looks up the country of every receiver, so while reports stream in it is rebuilt at
@@ -1570,6 +1597,8 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             var stations = _tracker.Stations.ToList();
             var contestScore = ScoreNow();
             var rank = Ranker.Rank(RankInputAt(stations, now, contestScore));
+            var openings = Openings(now);
+            var sampledOpenings = SampledOpenings(now);
             var summary = BandSummaryCalculator.Compute(stations, _logIndex, _config.Band, LogModeKey.Of(_config.Mode), now, _slotCounts, _tonight,
                 _config.Ranking);
             snap = new SessionSnapshot
@@ -1595,8 +1624,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 ReceptionHistory = _receptionHistory.Buckets(_config.Band, ModeInfo.Name(_config.Mode), now),
                 Neighbours = NeighbourComparison.Compare(_hearsMe.Reports, _neighbours, _config.MyCall, _config.MyGrid, _config.Band,
                     ModeInfo.Name(_config.Mode), _countries, now),
-                SampledBandOpenings = SampledOpenings(now),
-                BandOpenings = Openings(now),
+                SampledBandOpenings = sampledOpenings,
+                BandOpenings = openings,
+                BandAdvice = Advice(openings, sampledOpenings, now),
                 BandActivityFeed = _bandFeed,
                 Services = new Dictionary<string, ServiceStatus>(_services),
                 Contact = keyboard ? KeyboardContactView() : _engine.View,
