@@ -100,14 +100,17 @@
                       <DataTemplate x:DataType="vm:ProfileDraft"><TextBlock Text="{Binding Name}" /></DataTemplate>
                     </ComboBox.ItemTemplate>
                   </ComboBox>
-                  <Button Content="New profile" Command="{Binding NewProfileCommand}" />
+                  <Button Content="New profile" Command="{Binding NewProfileCommand}"
+                          ToolTip.Tip="A copy of the profile shown, for a portable or park setup with a /P call or another grid" />
+                  <Button Content="New operator" Command="{Binding NewOperatorProfileCommand}"
+                          ToolTip.Tip="A profile for another licensed operator at this station: the same radio and audio, with no callsign, name or logbook accounts" />
                   <Button Content="Delete" Command="{Binding DeleteProfileCommand}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8" DataContext="{Binding SelectedProfile}" x:DataType="vm:ProfileDraft">
                   <TextBlock Text="Name" VerticalAlignment="Center" />
                   <TextBox Text="{Binding Name}" Width="160" AutomationProperties.Name="Profile name" />
                 </StackPanel>
-                <TextBlock Classes="help" Text="Each profile keeps its own callsign, grid, power, radio, audio devices, QRZ logbook key and LoTW, eQSL, Club Log and Wavelog accounts, for example a portable or park setup with a /P call or another grid. A new profile starts as a copy of the one shown. The profile shown when you press Save is the one Costas uses; set its radio and audio in Station setup." />
+                <TextBlock Classes="help" Text="Each profile keeps its own callsign, grid, power, radio, audio devices, QRZ logbook key and LoTW, eQSL, Club Log and Wavelog accounts, for example a portable or park setup with a /P call or another grid. New profile starts as a copy of the one shown. New operator is for another licensed operator using this station: it keeps the radio, audio, power, grid and QTH, and starts with no callsign, name or logbook accounts, so they enter their own. The profile shown when you press Save or Apply is the one Costas uses; set its radio and audio in Station setup." />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
@@ -315,7 +318,7 @@
         <ScrollViewer>
           <StackPanel>
             <TextBlock Classes="page" Text="PSK and RTTY" />
-            <TextBlock Classes="intro" Text="Your details for the macros, the macros themselves, and how RTTY is sent and read." />
+            <TextBlock Classes="intro" Text="Your details for the macros, the macros themselves, and how RTTY is sent and read. Your name, QTH, radio and antenna belong to the station profile shown on the Station page." />
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Your name" />
               <StackPanel Grid.Column="1">

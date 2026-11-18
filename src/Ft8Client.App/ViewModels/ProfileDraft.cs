@@ -36,6 +36,18 @@ public sealed partial class ProfileDraft : ObservableObject
     /// <summary>The radio's top power in watts as typed; empty to use what Hamlib reports.</summary>
     public string MaxPower { get; set; } = string.Empty;
 
+    /// <summary>The operator's first name as typed, for <c>{MYNAME}</c>.</summary>
+    public string OperatorName { get; set; } = string.Empty;
+
+    /// <summary>Where the station is, in words, for <c>{MYQTH}</c>.</summary>
+    public string Qth { get; set; } = string.Empty;
+
+    /// <summary>The radio, for <c>{MYRIG}</c>.</summary>
+    public string RigDescription { get; set; } = string.Empty;
+
+    /// <summary>The antenna, for <c>{MYANT}</c>.</summary>
+    public string Antenna { get; set; } = string.Empty;
+
     /// <summary>QRZ logbook API key as typed (kept in the credential store per profile).</summary>
     public string LogbookKey { get; set; } = string.Empty;
 

@@ -71,6 +71,72 @@ public class SettingsApplyTests
         host.Remote.Control.Users!.SignIn(login.Token!).Should().NotBeNull();
     });
 
+    [Fact]
+    public Task NewOperatorProfile_FromHome_KeepsTheStationButNothingOfTheOperator() => WithSettings((host, vm, _) =>
+    {
+        vm.OperatorName = "Dan";
+        vm.Qth = "Boise ID";
+        vm.LotwEnabled = true;
+        vm.LotwUser = "N0CALL";
+        vm.EqslUser = "n0call";
+        vm.ApplyCommand.Execute(null);
+        var home = vm.SelectedProfile!;
+
+        vm.NewOperatorProfileCommand.Execute(null);
+
+        var guest = vm.SelectedProfile!;
+        guest.Should().NotBeSameAs(home);
+        guest.Name.Should().Be("Operator");
+        vm.Callsign.Should().BeEmpty();
+        vm.OperatorName.Should().BeEmpty();
+        vm.Grid.Should().Be("DN40", "the station has not moved");
+        vm.Qth.Should().Be("Boise ID");
+        vm.LotwEnabled.Should().BeFalse();
+        vm.LotwUser.Should().BeEmpty();
+        vm.EqslUser.Should().BeEmpty();
+
+        // Save asks for the new operator's callsign first.
+        vm.ApplyCommand.Execute(null);
+        vm.Message.Should().Contain("Operator profile");
+        vm.Callsign = "K0GST";
+        vm.OperatorName = "Ash";
+        vm.ApplyCommand.Execute(null);
+        vm.Message.Should().BeEmpty();
+
+        var s = host.Settings.Current;
+        s.Profile.Name.Should().Be("Operator");
+        s.Profile.Callsign.Should().Be("K0GST");
+        s.Profile.OperatorName.Should().Be("Ash");
+        s.Profile.Rig.Should().BeEquivalentTo(s.Profiles.Single(p => p.Id == home.Id).Rig, "the same radio");
+        s.Profile.Lotw.Username.Should().BeNull();
+        s.Profiles.Single(p => p.Id == home.Id).OperatorName.Should().Be("Dan", "the first operator's name stays theirs");
+
+        // Each profile shows its own name again.
+        vm.SelectedProfile = home;
+        vm.OperatorName.Should().Be("Dan");
+        vm.LotwUser.Should().Be("N0CALL");
+        vm.SelectedProfile = guest;
+        vm.OperatorName.Should().Be("Ash");
+    });
+
+    [Fact]
+    public Task Save_AnotherProfileShown_DoesNotTakeTheFirstOnesName() => WithSettings((host, vm, closed) =>
+    {
+        // Settings used to load the name, QTH, radio and antenna once, from the profile active when it opened, and write
+        // them into whichever profile was shown at Save.
+        vm.OperatorName = "Dan";
+        vm.RigDescription = "FT-710";
+        vm.NewProfileCommand.Execute(null);
+        vm.OperatorName.Should().Be("Dan", "a copy starts with the same details");
+        vm.OperatorName = "Dan portable";
+        vm.SaveCommand.Execute(null);
+
+        closed().Should().Be(1);
+        host.Settings.Current.Profile.OperatorName.Should().Be("Dan portable");
+        host.Settings.Current.Profiles[0].OperatorName.Should().Be("Dan");
+        host.Settings.Current.Profiles[0].RigDescription.Should().Be("FT-710");
+    });
+
     // A simulated host in a temporary folder, with an in-memory credential store so nothing here touches the
     // operator's saved passwords.
     private static async Task WithSettings(Action<AppHost, SettingsViewModel, Func<int>> test)

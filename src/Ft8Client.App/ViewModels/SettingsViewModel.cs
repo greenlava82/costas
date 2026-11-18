@@ -41,6 +41,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Profiles.Add(new ProfileDraft
             {
                 Id = p.Id, Name = p.Name, Callsign = p.Callsign, Grid = p.Grid, Power = p.PowerWatts.ToString(CultureInfo.InvariantCulture),
+                OperatorName = p.OperatorName, Qth = p.Qth, RigDescription = p.RigDescription, Antenna = p.Antenna,
                 MaxPower = p.Rig.MaxPowerWatts?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 LogbookKey = host.Secrets.Get(SecretNames.QrzLogbookKey(p.Id)) ?? string.Empty,
                 EqslUser = host.Secrets.Get(SecretNames.EqslUsername(p.Id)) ?? string.Empty,
@@ -81,10 +82,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         RttyReverse = rtty.Reverse;
         RttyUnshiftOnSpace = s.Operating.RttyUnshiftOnSpace;
         RttyPowerPercent = s.Operating.RttyPowerPercent.ToString(CultureInfo.InvariantCulture);
-        OperatorName = s.Profile.OperatorName;
-        Qth = s.Profile.Qth;
-        RigDescription = s.Profile.RigDescription;
-        Antenna = s.Profile.Antenna;
         LoadMacros(SettingsMapper.Macros(s.Operating));
         CqParity = s.Operating.CqParity;
         ClockBlock = s.Operating.ClockBlockSeconds.ToString("0.0", CultureInfo.InvariantCulture);
@@ -256,6 +253,28 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, Name = NewProfileName(Profiles.Select(p => p.Name)),
             Callsign = from.Callsign, Grid = from.Grid, Power = from.Power, MaxPower = from.MaxPower,
+            OperatorName = from.OperatorName, Qth = from.Qth, RigDescription = from.RigDescription, Antenna = from.Antenna,
+        };
+        Profiles.Add(draft);
+        SelectedProfile = draft;
+        DeleteProfileCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Adds a profile for another operator at this station and shows it: the same radio, audio, power, grid, QTH, rig and
+    /// antenna as the one shown, but no callsign, name or logbook accounts, so nothing of the first operator's goes with
+    /// it. Save asks for the callsign.
+    /// </summary>
+    [RelayCommand]
+    private void NewOperatorProfile()
+    {
+        StoreFields();
+        var from = SelectedProfile ?? Profiles[0];
+        var draft = new ProfileDraft
+        {
+            Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, Name = NewProfileName(Profiles.Select(p => p.Name), "Operator"),
+            Grid = from.Grid, Power = from.Power, MaxPower = from.MaxPower,
+            Qth = from.Qth, RigDescription = from.RigDescription, Antenna = from.Antenna,
         };
         Profiles.Add(draft);
         SelectedProfile = draft;
@@ -275,14 +294,14 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private bool CanDeleteProfile() => Profiles.Count > 1;
 
-    /// <summary>"Portable", then "Portable 2", "Portable 3"… avoiding names in use.</summary>
-    public static string NewProfileName(IEnumerable<string> taken)
+    /// <summary>"Portable", then "Portable 2", "Portable 3"… (or another base name) avoiding names in use.</summary>
+    public static string NewProfileName(IEnumerable<string> taken, string baseName = "Portable")
     {
         var names = new HashSet<string>(taken, StringComparer.OrdinalIgnoreCase);
-        if (!names.Contains("Portable")) return "Portable";
+        if (!names.Contains(baseName)) return baseName;
         for (var i = 2; ; i++)
         {
-            var n = $"Portable {i}";
+            var n = $"{baseName} {i}";
             if (!names.Contains(n)) return n;
         }
     }
@@ -294,6 +313,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         _shownProfile.Grid = Grid;
         _shownProfile.Power = Power;
         _shownProfile.MaxPower = MaxPower;
+        _shownProfile.OperatorName = OperatorName;
+        _shownProfile.Qth = Qth;
+        _shownProfile.RigDescription = RigDescription;
+        _shownProfile.Antenna = Antenna;
         _shownProfile.LogbookKey = LogbookKey;
         _shownProfile.EqslUser = EqslUser;
         _shownProfile.EqslPassword = EqslPassword;
@@ -322,6 +345,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         CloudlogStatus = string.Empty;
         (ClubLogEmail, ClubLogPassword, ClubLogUploadOnComplete) = (d.ClubLogEmail, d.ClubLogPassword, d.ClubLogUpload);
         (LotwEnabled, LotwUser, LotwPassword, StationLocation, LotwUploadOnComplete) = (d.LotwEnabled, d.LotwUser, d.LotwPassword, d.LotwStationLocation, d.LotwUpload);
+        (OperatorName, Qth, RigDescription, Antenna) = (d.OperatorName, d.Qth, d.RigDescription, d.Antenna);
     }
 
     /// <summary>
@@ -346,6 +370,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             p.Name = string.IsNullOrWhiteSpace(d.Name) ? p.Name : d.Name.Trim();
             p.Callsign = d.Callsign.Trim().ToUpperInvariant();
             p.Grid = d.Grid.Trim().ToUpperInvariant();
+            p.OperatorName = d.OperatorName.Trim();
+            p.Qth = d.Qth.Trim();
+            p.RigDescription = d.RigDescription.Trim();
+            p.Antenna = d.Antenna.Trim();
             p.PowerWatts = Watts(d.Power, p.PowerWatts);
             p.Rig.MaxPowerWatts = string.IsNullOrWhiteSpace(d.MaxPower) ? null : Watts(d.MaxPower, p.Rig.MaxPowerWatts ?? 100);
             p.Eqsl.SyncEnabled = d.EqslSync;
@@ -521,19 +549,19 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     /// <summary>My first name, for {MYNAME}.</summary>
     [ObservableProperty]
-    public partial string OperatorName { get; set; }
+    public partial string OperatorName { get; set; } = string.Empty;
 
     /// <summary>Where I am, for {MYQTH}.</summary>
     [ObservableProperty]
-    public partial string Qth { get; set; }
+    public partial string Qth { get; set; } = string.Empty;
 
     /// <summary>My radio, for {MYRIG}.</summary>
     [ObservableProperty]
-    public partial string RigDescription { get; set; }
+    public partial string RigDescription { get; set; } = string.Empty;
 
     /// <summary>My antenna, for {MYANT}.</summary>
     [ObservableProperty]
-    public partial string Antenna { get; set; }
+    public partial string Antenna { get; set; } = string.Empty;
 
     /// <summary>The PSK and RTTY macros, F1 up.</summary>
     public ObservableCollection<MacroEditViewModel> Macros { get; } = [];
@@ -1480,10 +1508,6 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Operating.RttyReverse = RttyReverse;
             s.Operating.RttyUnshiftOnSpace = RttyUnshiftOnSpace;
             s.Operating.RttyPowerPercent = Int(RttyPowerPercent, 10, 100, 50);
-            s.Profile.OperatorName = OperatorName.Trim();
-            s.Profile.Qth = Qth.Trim();
-            s.Profile.RigDescription = RigDescription.Trim();
-            s.Profile.Antenna = Antenna.Trim();
             s.Operating.Macros = [.. Macros.Where(m => !string.IsNullOrWhiteSpace(m.Text))
                 .Select(m => new MacroOptions { Key = m.Key, Label = m.Label.Trim(), Text = m.Text.Trim() })];
             s.Operating.CqParity = CqParity;

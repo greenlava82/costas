@@ -76,6 +76,13 @@ public class ProfileSettingsTests
     }
 
     [Fact]
+    public void NewProfileName_OperatorBase_NumbersFromTwo()
+    {
+        SettingsViewModel.NewProfileName(["Home"], "Operator").Should().Be("Operator");
+        SettingsViewModel.NewProfileName(["Home", "operator"], "Operator").Should().Be("Operator 2");
+    }
+
+    [Fact]
     public void ApplyProfiles_DraftRemoved_DropsProfile()
     {
         var s = Home();

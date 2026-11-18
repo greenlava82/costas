@@ -18,6 +18,10 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
 - **Station profile**: which setup you are operating from. Each profile keeps its own callsign, grid, power, radio,
   audio devices and QRZ logbook key, so a portable or park setup with a `/P` call or another grid is one choice away.
   **New profile** adds a copy of the profile shown (same radio and audio) called *Portable*; rename it in **Name**.
+  **New operator** adds a profile called *Operator* for another licensed operator using this station: it keeps the
+  radio, audio, power, grid, QTH, rig and antenna, and starts with no callsign, name, QRZ key or LoTW, eQSL, Club Log
+  or Wavelog account, so they enter their own. Costas asks for the callsign before it saves. Your name, QTH, radio
+  and antenna on the PSK and RTTY page also belong to the profile shown.
   **Delete** removes the profile shown (the last one cannot be removed). The profile shown when you press **Save** is
   the one Costas uses from then on; if it uses another radio or sound card, Costas reconnects to it. Set a profile's
   radio and audio in **Station setup** while it is the active one. Worked-before and log totals count the contacts
