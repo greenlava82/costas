@@ -143,6 +143,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         RefreshRemote();
         host.Remote.Changed += OnRemoteChanged;
         _remoteLoaded = true;
+        if (host.LogCopy is { } copy) copy.StatusChanged += OnLogCopyChanged;
+        RefreshLogCopy();
         SaveWav = s.Files.SaveWav;
         Retention = s.Files.RetentionDays.ToString(CultureInfo.InvariantCulture);
         Theme = s.Appearance.Theme;
@@ -1164,8 +1166,58 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private void OnRemoteChanged() => MainViewModel.Dispatch(RefreshRemote);
 
-    /// <summary>Called when the window closes: this view model stops following the mobile connection.</summary>
-    public void Detach() => _host.Remote.Changed -= OnRemoteChanged;
+    /// <summary>Called when the window closes: this view model stops following the mobile connection and the log copy.</summary>
+    public void Detach()
+    {
+        _host.Remote.Changed -= OnRemoteChanged;
+        if (_host.LogCopy is { } copy) copy.StatusChanged -= OnLogCopyChanged;
+    }
+
+    /// <summary>The backups folder, which holds the daily copies and the ADIF log copy.</summary>
+    public string BackupsFolder => _host.Paths.Backups;
+
+    /// <summary>The ADIF log copy's file names.</summary>
+    [ObservableProperty]
+    public partial string LogCopyFiles { get; set; } = string.Empty;
+
+    /// <summary>When the ADIF log copy was last written, or why it could not be.</summary>
+    [ObservableProperty]
+    public partial string LogCopyWritten { get; set; } = string.Empty;
+
+    /// <summary>True when the last write of the ADIF log copy failed.</summary>
+    [ObservableProperty]
+    public partial bool LogCopyFailed { get; set; }
+
+    /// <summary>The newest daily database copy.</summary>
+    [ObservableProperty]
+    public partial string DailyBackup { get; set; } = string.Empty;
+
+    /// <summary>Opens the backups folder in the file manager.</summary>
+    [RelayCommand]
+    private void OpenBackupsFolder()
+    {
+        if (!FolderOpener.Open(BackupsFolder)) Message = $"Could not open {BackupsFolder}.";
+    }
+
+    private void OnLogCopyChanged(LogCopyStatus _) => MainViewModel.Dispatch(RefreshLogCopy);
+
+    private void RefreshLogCopy()
+    {
+        var st = _host.LogCopy?.Status ?? new LogCopyStatus(BackupsFolder, [], null, null, null);
+        LogCopyFiles = LogCopyText.Files(st);
+        LogCopyWritten = LogCopyText.Written(st);
+        LogCopyFailed = st.Error is not null;
+        (string, DateTime)? newest = null;
+        try
+        {
+            newest = _host.Backup?.Newest();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Shown as no copy yet.
+        }
+        DailyBackup = LogCopyText.Daily(newest, _host.Simulating);
+    }
 
     private void RefreshRemote()
     {
