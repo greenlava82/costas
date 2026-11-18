@@ -16,10 +16,17 @@ namespace Ft8Client.Data.Adif;
 public static class AdifWriter
 {
     /// <summary>The header block.</summary>
-    public static string Header(DateTime nowUtc)
+    public static string Header(DateTime nowUtc) => Header(nowUtc, $"{AppInfo.ProductName} ADIF export");
+
+    /// <summary>
+    /// The header block with <paramref name="text"/> as its opening lines. The text must not contain <c>&lt;</c>, which
+    /// would start a field.
+    /// </summary>
+    public static string Header(DateTime nowUtc, string text)
     {
+        if (text.Contains('<', StringComparison.Ordinal)) throw new ArgumentException("Header text must not contain '<'.", nameof(text));
         var sb = new StringBuilder();
-        sb.Append(CultureInfo.InvariantCulture, $"{AppInfo.ProductName} ADIF export\n");
+        sb.Append(text.TrimEnd()).Append('\n');
         Field(sb, "adif_ver", "3.1.4");
         Field(sb, "created_timestamp", nowUtc.ToString("yyyyMMdd HHmmss", CultureInfo.InvariantCulture));
         Field(sb, "programid", AppInfo.Id);
@@ -45,6 +52,20 @@ public static class AdifWriter
     {
         var sb = new StringBuilder(Header(nowUtc));
         foreach (var r in records) sb.Append(Record(r));
+        return sb.ToString();
+    }
+
+    /// <summary>A file: a header opening with <paramref name="headerText"/>, then the records separated by blank lines.</summary>
+    public static string FileText(IEnumerable<AdifRecord> records, DateTime nowUtc, string headerText)
+    {
+        var sb = new StringBuilder(Header(nowUtc, headerText));
+        var first = true;
+        foreach (var r in records)
+        {
+            if (!first) sb.Append('\n');
+            first = false;
+            sb.Append(Record(r));
+        }
         return sb.ToString();
     }
 

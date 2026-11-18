@@ -99,6 +99,7 @@ When transmitting in a slot, nothing is recorded or decoded for that slot.
 - **Slot thread**: one dedicated thread drives `SlotClock` with a high-resolution timer and schedules PTT and Tx start. It never waits on I/O.
 - **Session work queue** (`WorkQueue`): one thread that runs, in order, what follows the start of a transmission or a slot: the log write, the journal and the snapshot rebuild. The slot thread only posts to it (`Session.Defer`), so a locked database or a slow disk cannot delay PTT release or the next slot's marks.
 - **Worker tasks**: decoding, rig polling (1 s), QRZ, PSK Reporter, database writes. All async, all cancellable.
+- **Log copy** (`LogCopyService`, a supervised loop on the thread pool): keeps the ADIF copy of the log in `backups\` current. `QsoRepository.Changed` fires after every contact write, on whatever thread wrote (usually the session work queue); its handler only records the time under a short lock and releases a semaphore, so it never waits on the disk. The loop rewrites the files once the log has been quiet for 5 s, at most 60 s after the first change (`Core.Time.Debounce`), and on a failure shows the `logcopy` service as Down in the bottom bar and tries again after 1 minute, doubling to 30.
 - **UI thread**: rendering only. Snapshots are immutable, so no locks are shared with the core.
 
 ## Processes
@@ -191,7 +192,7 @@ server {
 
 ## Configuration and storage
 
-Per-user data lives in `%LOCALAPPDATA%\Costas\` (on other platforms, the equivalent app-data folder): `costas.db`, `settings.json`, `logs\`, `wav\`, `cache\`. See `06-data-model.md`.
+Per-user data lives in `%LOCALAPPDATA%\Costas\` (on other platforms, the equivalent app-data folder): `costas.db`, `settings.json`, `logs\`, `wav\`, `cache\`, `backups\` (daily copies and the ADIF log copy). See `06-data-model.md`.
 
 ## Error handling
 

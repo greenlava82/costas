@@ -23,6 +23,10 @@
       <Setter Property="FontSize" Value="12" />
       <Setter Property="Margin" Value="0,4,0,0" />
     </Style>
+    <Style Selector="TextBlock.help.problem">
+      <Setter Property="Opacity" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource CautionBrush}" />
+    </Style>
     <Style Selector="TextBlock.page">
       <Setter Property="FontSize" Value="20" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -550,7 +554,7 @@
         <ScrollViewer>
           <StackPanel>
             <TextBlock Classes="page" Text="Logbooks" />
-            <TextBlock Classes="intro" Text="Online logbooks Costas can read confirmations from or send contacts to. Every one is optional; open a section to set it up." />
+            <TextBlock Classes="intro" Text="Online logbooks Costas can read confirmations from or send contacts to. Every one is optional; open a section to set it up. Backups, at the end, shows where Costas keeps copies of your log." />
             <TextBlock Classes="help" Text="{Binding SecretsNote}" Margin="0,-10,0,14" />
             <Expander Classes="logbook" HorizontalAlignment="Stretch">
               <Expander.Header>
@@ -733,6 +737,40 @@
                 </Grid>
                 <CheckBox Content="Upload each new contact as soon as it is logged" IsChecked="{Binding CloudlogUploadOnComplete}" />
                 <TextBlock Classes="help" Text="Save to apply. A contact already in that logbook is left as it is. Simulation never contacts the site." />
+              </StackPanel>
+            </Expander>
+            <!-- Backups: the daily database copies and the ADIF log copy, both in the backups folder (C8). -->
+            <Expander Classes="logbook" HorizontalAlignment="Stretch">
+              <Expander.Header>
+                <StackPanel>
+                  <TextBlock Text="Backups" FontWeight="SemiBold" FontSize="15" />
+                  <TextBlock Text="Daily copies and a plain ADIF copy of the log" Classes="help" Margin="0" />
+                </StackPanel>
+              </Expander.Header>
+              <StackPanel>
+                <TextBlock Classes="intro service" Text="Costas keeps your log safe on this computer without any setting. Once a day it copies the log database and your settings, keeping 14 days. It also keeps an ADIF copy of the whole log, with confirmations and uploads, that any logger can import: one file per station callsign, rewritten a few seconds after a contact is logged, edited, deleted or imported." />
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Backups folder" />
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <SelectableTextBlock Text="{Binding BackupsFolder}" TextWrapping="Wrap" />
+                    <Button Content="Open folder" Command="{Binding OpenBackupsFolderCommand}" HorizontalAlignment="Left" />
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="ADIF log copy" />
+                  <StackPanel Grid.Column="1">
+                    <SelectableTextBlock Text="{Binding LogCopyFiles}" TextWrapping="Wrap" />
+                    <TextBlock Classes="help" Classes.problem="{Binding LogCopyFailed}" Text="{Binding LogCopyWritten}" />
+                    <TextBlock Classes="help" Text="Plain UTF-8 ADIF, oldest contact first. Each file is written whole and then swapped in, so it is never half written. To restore, import it in the Log view." />
+                  </StackPanel>
+                </Grid>
+                <Grid Classes="field" ColumnDefinitions="210,*">
+                  <TextBlock Classes="label" Text="Daily copies" />
+                  <StackPanel Grid.Column="1">
+                    <TextBlock Text="{Binding DailyBackup}" TextWrapping="Wrap" />
+                    <TextBlock Classes="help" Text="costas-YYYY-MM-DD.db and settings-YYYY-MM-DD.json. To go back to one, see Backups in the manual's Log chapter." />
+                  </StackPanel>
+                </Grid>
               </StackPanel>
             </Expander>
           </StackPanel>

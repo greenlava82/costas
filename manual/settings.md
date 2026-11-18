@@ -188,10 +188,11 @@ and nothing is shown.
 
 ## Logbooks
 
-![Settings: Logbooks](images/settings-logbooks.png)
+![Settings: Logbooks](images/settings-logbooks.png){ width="900" }
 
 QRZ, LoTW, eQSL, Club Log and Wavelog / Cloudlog are sections of one page; click a section's name to open it. All
-are optional, and passwords and keys are kept in Windows Credential Manager.
+are optional, and passwords and keys are kept in Windows Credential Manager. The last section, Backups, shows where
+Costas keeps copies of your log.
 
 ### QRZ
 
@@ -269,6 +270,17 @@ Club Log is down. A contact Club Log already has counts as sent; one it rejects 
 queue and the **Club Log** indicator says why. If Club Log refuses the login, uploads stop until you change the email
 or password, because Club Log blocks programs that keep trying. Each station profile has its own settings. Off by
 default. Simulation never contacts Club Log.
+### Backups {#backups}
+
+![Settings: Logbooks, Backups](images/settings-backups.png){ width="900" }
+
+Nothing to set: Costas keeps copies of your log on its own. This section shows:
+
+- **Backups folder**: where the copies are, with an **Open folder** button.
+- **ADIF log copy**: the file names (one per station callsign) and when they were last written. If a write failed it
+  says why and when Costas tries again. See [ADIF copy of the log](log.md#adif-copy).
+- **Daily copies**: the newest daily copy of the database. In simulation none are taken, as the picture above shows.
+
 ## PSK Reporter
 
 The page is called **PSK Reporter and RBN** in Settings.
