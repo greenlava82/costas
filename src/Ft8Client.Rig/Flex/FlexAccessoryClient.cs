@@ -41,6 +41,7 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
     private FlexAccessories _current = FlexAccessories.Empty;
     private Task _loop = Task.CompletedTask;
     private volatile NetworkStream? _stream;
+    private volatile bool _connected;
     private int _sequence;
 
     /// <summary>
@@ -65,7 +66,7 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
     public event Action<ServiceStatus>? StatusChanged;
 
     /// <summary>True while connected and subscribed.</summary>
-    public bool Connected { get; private set; }
+    public bool Connected => _connected;
 
     /// <summary>What is known now; empty while not connected.</summary>
     public FlexAccessories Current
@@ -90,8 +91,9 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
                 : reply.Code == FlexReply.UnknownAmplifier ? "The radio no longer knows that device."
                 : $"The radio refused it (code {reply.Code:X8}{(reply.Message.Length > 0 ? ", " + reply.Message : string.Empty)}).";
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
+            // No reply in time, or the caller gave up waiting (a write that stalled): either way it may have been done.
             return "The radio did not answer.";
         }
         catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException or InvalidOperationException)
@@ -150,7 +152,7 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
                 var reading = ReadAsync(stream, session.Token);
                 var sub = await RequestAsync(FlexCommands.SubscribeAmplifiers, session.Token).ConfigureAwait(false);
                 if (!sub.Ok) throw new IOException($"The radio refused the subscription (code {sub.Code:X8})");
-                Connected = wasUp = true;
+                _connected = wasUp = true;
                 StatusChanged?.Invoke(new ServiceStatus(ServiceHealth.Ok, $"Connected to the radio at {_host}", _now()));
                 var pinging = PingAsync(session.Token);
                 await Task.WhenAny(reading, pinging).ConfigureAwait(false);
@@ -172,7 +174,7 @@ public sealed class FlexAccessoryClient : IAsyncDisposable
             }
             finally
             {
-                Connected = false;
+                _connected = false;
                 _stream = null;
                 foreach (var p in _pending.Values) p.TrySetCanceled(CancellationToken.None);
                 Use(FlexAccessories.Empty);

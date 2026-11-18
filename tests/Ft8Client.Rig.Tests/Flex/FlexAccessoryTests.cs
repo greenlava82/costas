@@ -217,6 +217,21 @@ public class FlexAccessoryTests
     }
 
     [Fact]
+    public async Task Client_CallerGivesUp_SaysNoAnswerInsteadOfThrowing()
+    {
+        await using var radio = new FakeFlexRadio();
+        await using var client = new FlexAccessoryClient("127.0.0.1", radio.Port, pingEvery: TimeSpan.FromMinutes(1), replyTimeout: TimeSpan.FromMinutes(1));
+        client.Start();
+        await WaitUntil(() => client.Connected);
+        radio.Answers = false;
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+
+        var r = await client.SendAsync(FlexCommands.AmpOperate("0x18E5F0AA", true), cts.Token);
+
+        r.Should().Be("The radio did not answer.");
+    }
+
+    [Fact]
     public async Task Client_NotConnected_Refuses()
     {
         await using var client = new FlexAccessoryClient("127.0.0.1", 1);
