@@ -160,8 +160,9 @@ public sealed class Transmitter
     }
 
     /// <summary>
-    /// Checks what is on the air now against the band-edge limits at <paramref name="dialHz"/>. Returns null when
-    /// nothing is on the air or it still fits, otherwise why it must stop (the dial moved during a transmission).
+    /// Checks what is on the air now, or prepared to go out, against the band-edge limits at <paramref name="dialHz"/>.
+    /// Returns null when there is nothing or it still fits, otherwise why it must stop (the dial moved during a
+    /// transmission, or after it was prepared and checked at the old dial).
     /// </summary>
     public string? OnAirOutsideBand(string band, long dialHz)
     {
@@ -174,7 +175,7 @@ public sealed class Transmitter
             {
                 (mode, offset, width) = (_streamMode, _streamOffsetHz, _streamWidthHz);
             }
-            else if ((_current ?? (_ptt ? _next : null)) is { } tx)
+            else if ((_current ?? _next) is { } tx)
             {
                 // A Tune tone is checked as FT8 is when it starts.
                 (mode, offset, width) = (tx.Mode, tx.OffsetHz, null);
@@ -613,7 +614,12 @@ public sealed class Transmitter
         // The device's stream has stopped for good: every later transmission would key PTT and send silence.
         _outputFault = why;
         if (Transmitting) _ = AbortAsync($"Audio output fault during transmission: {why}");
-        else Fault?.Invoke(OutputDeadText(why));
+        else
+        {
+            // A transmission prepared before the fault would key PTT into the dead output at its slot.
+            CancelPending();
+            Fault?.Invoke(OutputDeadText(why));
+        }
     }
 
     // Keying the radio with the output muted puts nothing on the air and looks like a broken radio: refuse and say why.
