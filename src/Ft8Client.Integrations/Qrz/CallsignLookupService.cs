@@ -15,7 +15,11 @@ namespace Ft8Client.Integrations.Qrz;
 /// <summary>QRZ lookups through the 30-day cache. Strips portable suffixes when the full call is not found.</summary>
 public sealed class CallsignLookupService(QrzXmlClient client, CallsignCacheRepository cache, IClock clock)
 {
-    /// <summary>Looks up a call, from the cache when fresh. Returns null when not found or unavailable.</summary>
+    /// <summary>
+    /// Looks up a call, from the cache when fresh. Returns null when not found. Only QRZ's "not found" is cached as a
+    /// miss; when QRZ is unreachable or answers with any other error the <see cref="QrzException"/> passes up and
+    /// nothing is cached, so the call is asked about again later.
+    /// </summary>
     public async Task<CallsignCacheEntry?> LookupAsync(string call, CancellationToken ct)
     {
         var c = Callsign.Normalize(call);
