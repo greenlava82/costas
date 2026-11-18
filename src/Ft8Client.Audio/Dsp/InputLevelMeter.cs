@@ -6,6 +6,8 @@
 // License, or (at your option) any later version. This program is distributed WITHOUT ANY WARRANTY;
 // see the GNU General Public License in LICENSE for details.
 
+using Ft8Client.Core.Decoding;
+
 namespace Ft8Client.Audio.Dsp;
 
 /// <summary>
@@ -14,14 +16,14 @@ namespace Ft8Client.Audio.Dsp;
 /// </summary>
 public sealed class InputLevelMeter
 {
-    /// <summary>Bottom of the good band, RMS dBFS.</summary>
-    public const double GoodLowDbfs = -40;
+    /// <summary>Bottom of the good band, RMS dBFS (<see cref="InputLevelClassifier.GoodLowDbfs"/>).</summary>
+    public const double GoodLowDbfs = InputLevelClassifier.GoodLowDbfs;
 
-    /// <summary>Top of the good band, RMS dBFS.</summary>
-    public const double GoodHighDbfs = -10;
+    /// <summary>Top of the good band, RMS dBFS (<see cref="InputLevelClassifier.GoodHighDbfs"/>).</summary>
+    public const double GoodHighDbfs = InputLevelClassifier.GoodHighDbfs;
 
-    /// <summary>A sample peak at or above this counts as clipping, dBFS.</summary>
-    public const double ClipDbfs = -1;
+    /// <summary>A sample peak at or above this counts as clipping, dBFS (<see cref="InputLevelClassifier.ClipDbfs"/>).</summary>
+    public const double ClipDbfs = InputLevelClassifier.ClipDbfs;
 
     /// <summary>No samples for this long means no audio is arriving.</summary>
     public static readonly TimeSpan NoAudioAfter = TimeSpan.FromSeconds(1);
@@ -58,14 +60,9 @@ public sealed class InputLevelMeter
         _lastSamplesUtc = nowUtc;
         float peak = 0;
         foreach (var v in samples) peak = Math.Max(peak, Math.Abs(v));
-        var peakDb = peak <= 1e-6f ? -120 : 20 * Math.Log10(peak);
+        var peakDb = peak <= 1e-6f ? InputLevelClassifier.SilenceDbfs : 20 * Math.Log10(peak);
         var rms = AudioLevel.RmsDbfs(samples);
-        var state = peak == 0 ? InputLevelState.Silence
-            : peakDb >= ClipDbfs ? InputLevelState.Clipping
-            : rms < GoodLowDbfs ? InputLevelState.TooQuiet
-            : rms > GoodHighDbfs ? InputLevelState.TooLoud
-            : InputLevelState.Good;
-        Set(state, rms, peakDb, nowUtc);
+        Set(InputLevelClassifier.Classify(rms, peakDb), rms, peakDb, nowUtc);
     }
 
     private void Set(InputLevelState state, double rms, double peak, DateTime nowUtc)

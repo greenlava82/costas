@@ -8,6 +8,7 @@
 
 using Ft8Client.Core;
 using Ft8Client.Core.Contacts;
+using Ft8Client.Core.Decoding;
 using Ft8Client.Core.Keyboard;
 using Ft8Client.Core.Pileups;
 using Ft8Client.Core.Neighbours;
@@ -88,6 +89,12 @@ public sealed record SessionSnapshot
     /// </summary>
     public IReadOnlyDictionary<string, BandOpening> SampledBandOpenings { get; init; } = new Dictionary<string, BandOpening>(StringComparer.Ordinal);
 
+    /// <summary>
+    /// The band advice: at most one "open" line, then at most one "closing" line for this band (docs/04-domain-logic.md,
+    /// section 14a). Empty when the evidence does not support any. Display only.
+    /// </summary>
+    public IReadOnlyList<BandAdvice> BandAdvice { get; init; } = [];
+
     /// <summary>Which bands <see cref="BandOpenings"/> are being received for.</summary>
     public BandActivityFeed BandActivityFeed { get; init; }
 
@@ -144,6 +151,12 @@ public sealed record SessionSnapshot
 
     /// <summary>What is wrong with the receive audio (no audio, silence, clipping), or null.</summary>
     public string? ReceiveLevelWarning { get; init; }
+
+    /// <summary>
+    /// The "why is it quiet" line after two received slots with no decodes, or null when it is not shown
+    /// (<see cref="WhyQuiet"/>).
+    /// </summary>
+    public QuietReadout? Quiet { get; init; }
 
     /// <summary>Measured clock offset in seconds (SNTP or DT estimate), if known.</summary>
     public double? ClockOffsetSeconds { get; init; }

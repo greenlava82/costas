@@ -592,7 +592,8 @@ public sealed partial class OperateViewModel : ObservableObject
         RepeatsEmptyText = Repeats.Count > 0 ? string.Empty : $"Nobody you have worked on {band} is on the air right now.";
 
         UnnamedText = ModeInfo.IsSlotted(s.Mode) ? string.Empty : UnnamedSignalsText(s.UnnamedSignals);
-        Summary = s.Summary is null ? null : new SummaryViewModel(s.Summary, s.LogIsEmpty, ModeInfo.IsSlotted(s.Mode) ? null : s.Activity);
+        Summary = s.Summary is null ? null : new SummaryViewModel(s.Summary, s.LogIsEmpty, ModeInfo.IsSlotted(s.Mode) ? null : s.Activity,
+            s.BandAdvice, Units, now);
         Contact = s.Contact is null ? null : ContactPanelViewModel.For(s.Contact, s, now, Units, QrzName?.Invoke(s.Contact.DxCall));
         OnPropertyChanged(nameof(InContact));
         OnPropertyChanged(nameof(ShowStrip));

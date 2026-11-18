@@ -223,6 +223,21 @@
         </DockPanel>
       </DockPanel>
     </Border>
+    <!-- Why is it quiet: after two received slots with no decodes, the likeliest reason and its fix. It only advises; Go to
+         tunes the radio only when the operator clicks it. Operate view only. -->
+    <Border IsVisible="{Binding QuietVisible}" Margin="16,0,16,8" Padding="12,8" CornerRadius="6"
+            Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CautionBrush}" BorderThickness="1"
+            AutomationProperties.Name="Why it is quiet" AutomationProperties.LiveSetting="Polite">
+      <DockPanel LastChildFill="True">
+        <Button DockPanel.Dock="Right" Content="{Binding QuietGoText}" Classes="accent" Command="{Binding QuietGoCommand}" IsVisible="{Binding QuietCanGo}"
+                ToolTip.Tip="Tune the radio to this frequency in USB data. Nothing is sent." AutomationProperties.Name="{Binding QuietGoText}" />
+        <DockPanel VerticalAlignment="Center" Margin="0,0,12,0">
+          <TextBlock DockPanel.Dock="Left" Text="Why it's quiet" FontWeight="SemiBold" Foreground="{DynamicResource CautionBrush}" VerticalAlignment="Center"
+                     Margin="0,0,12,0" />
+          <TextBlock Text="{Binding QuietText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding QuietText}" />
+        </DockPanel>
+      </DockPanel>
+    </Border>
     <!-- On a small window it is one slim line (owner decision 2026-11-14): on a laptop a full-height bar cost a row of the
          call list. Big windows keep the full bar (owner request 2026-11-16). -->
     <Border x:Name="UpdateBar" IsVisible="{Binding Update.Visible}" Classes.slim="{Binding Operate.Compact}" CornerRadius="6"

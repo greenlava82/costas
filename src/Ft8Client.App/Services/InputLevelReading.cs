@@ -6,7 +6,7 @@
 // License, or (at your option) any later version. This program is distributed WITHOUT ANY WARRANTY;
 // see the GNU General Public License in LICENSE for details.
 
-using Ft8Client.Audio.Dsp;
+using Ft8Client.Core.Decoding;
 
 namespace Ft8Client.App.Services;
 

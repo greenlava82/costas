@@ -121,6 +121,23 @@ band again in Costas to put it back.
 
 ### No decodes
 
+If nothing has decoded for two slots, the [Why it's quiet](operate.md#why-its-quiet) line on the Operate screen
+already says what Costas thinks is wrong:
+
+| The line says | What to do |
+| --- | --- |
+| *no audio is arriving from the radio's sound device* | Check the USB cable and that the radio is on; close any program holding the device |
+| *the radio's sound device sends only silence* | Turn up the radio's USB audio output and check it is not muted, in the radio or in Windows |
+| *the receive audio is too quiet* | Turn up the radio's USB audio output or the computer's recording level until Setup's input meter sits in the shaded band |
+| *the receive audio is clipping* | Turn the same levels down |
+| *the dial is on 14.090, not the usual FT8 frequency* | Click **Go to 14.074**, or tune back yourself. Ignore it if you moved on purpose (a DXpedition off the usual frequency) and are waiting for it |
+| *the radio is in LSB, and FT8 needs USB data* | Set USB data (DATA-U, USB-D) on the radio, or click **Go to 14.074**, which sets it |
+| *the decoder (jt9) is not running* or *is not working* | Open Diagnostics for the decoder's state. *jt9 not found*: reinstall Costas, or set the WSJT-X folder in Settings |
+| *your clock is 3.1 s off* | Sync the computer's clock, or turn on **Clock correction** in Settings › Transmitting |
+| *Audio, dial, radio mode, decoder and clock look right* | The band may simply be quiet or closed. Try another band; the band menu shows where stations near you are heard |
+
+If there is no line, or it does not help:
+
 1. Check **Audio** is green and the input is the radio's USB audio device (Station setup › Audio). The input meter
    should sit in the shaded band.
 2. Check the radio is on an FT8 frequency (14.074 MHz on 20 m) in USB or USB-D, with a wide enough filter (about

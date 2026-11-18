@@ -41,6 +41,12 @@ public sealed record RemoteState
     /// <summary>A line when something is wrong or stopped, else null.</summary>
     public string? Fault { get; init; }
 
+    /// <summary>The Operate view's "why is it quiet" line, or null when it is not shown.</summary>
+    public string? Quiet { get; init; }
+
+    /// <summary>The readout's button, "Go to 14.074", or null when the fix is not a frequency or a transmission is on.</summary>
+    public string? QuietGo { get; init; }
+
     /// <summary>The latest Hunt list alert ("VK9XA is on 17 m, heard 300 mi from you at -14 dB."), or null.</summary>
     public string? Hunt { get; init; }
 
