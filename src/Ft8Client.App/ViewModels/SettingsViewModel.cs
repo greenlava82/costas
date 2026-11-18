@@ -50,6 +50,9 @@ public sealed partial class SettingsViewModel : ObservableObject
                 CloudlogKey = host.Secrets.Get(SecretNames.CloudlogKey(p.Id)) ?? string.Empty,
                 ClubLogEmail = p.ClubLog.Email, ClubLogUpload = p.ClubLog.UploadOnComplete,
                 ClubLogPassword = host.Secrets.Get(SecretNames.ClubLogPassword(p.Id)) ?? string.Empty,
+                LotwEnabled = p.Lotw.Enabled, LotwUser = p.Lotw.Username ?? string.Empty,
+                LotwPassword = host.Secrets.Get(SecretNames.LotwPassword(p.Id)) ?? string.Empty,
+                LotwStationLocation = p.Lotw.StationLocation ?? string.Empty, LotwUpload = p.Lotw.UploadOnComplete,
             });
         }
         _loadedProfile = s.Profile.Id;
@@ -97,13 +100,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         SkipLongShots = s.Ranking.SkipLongShots;
         ConfirmedOnly = s.Ranking.ConfirmedOnly;
         ConfirmedByLotw = !string.Equals(s.Ranking.ConfirmedBy, "any", StringComparison.OrdinalIgnoreCase);
-        LotwEnabled = s.Lotw.Enabled;
-        LotwUser = s.Lotw.Username ?? string.Empty;
-        LotwPassword = host.Secrets.Get(SecretNames.LotwPassword) ?? string.Empty;
-        LotwUploadOnComplete = s.Lotw.UploadOnComplete;
         LotwUserList = s.Lotw.UserList;
         TqslPath = s.Lotw.TqslPath ?? string.Empty;
-        StationLocation = s.Lotw.StationLocation ?? string.Empty;
         TqslFound = host.Lotw.TqslPath is { } tq ? $"TQSL found: {tq}" : "TQSL not found. Install it from ARRL, or type where tqsl.exe is.";
         foreach (var t in HuntService.ToTargets(s.Hunt.Targets)) HuntRows.Add(new HuntRowViewModel(t, t.Describe(host.Countries)));
         HuntEmpty = HuntRows.Count == 0;
@@ -305,6 +303,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         _shownProfile.ClubLogEmail = ClubLogEmail;
         _shownProfile.ClubLogPassword = ClubLogPassword;
         _shownProfile.ClubLogUpload = ClubLogUploadOnComplete;
+        _shownProfile.LotwEnabled = LotwEnabled;
+        _shownProfile.LotwUser = LotwUser;
+        _shownProfile.LotwPassword = LotwPassword;
+        _shownProfile.LotwStationLocation = StationLocation;
+        _shownProfile.LotwUpload = LotwUploadOnComplete;
     }
 
     private void ShowEqsl(ProfileDraft d)
@@ -314,6 +317,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         CloudlogStations.Clear();
         CloudlogStatus = string.Empty;
         (ClubLogEmail, ClubLogPassword, ClubLogUploadOnComplete) = (d.ClubLogEmail, d.ClubLogPassword, d.ClubLogUpload);
+        (LotwEnabled, LotwUser, LotwPassword, StationLocation, LotwUploadOnComplete) = (d.LotwEnabled, d.LotwUser, d.LotwPassword, d.LotwStationLocation, d.LotwUpload);
     }
 
     /// <summary>
@@ -348,6 +352,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             p.Cloudlog.UploadOnComplete = d.CloudlogUpload;
             p.ClubLog.Email = d.ClubLogEmail.Trim();
             p.ClubLog.UploadOnComplete = d.ClubLogUpload;
+            p.Lotw.Enabled = d.LotwEnabled;
+            p.Lotw.Username = string.IsNullOrWhiteSpace(d.LotwUser) ? null : d.LotwUser.Trim();
+            p.Lotw.StationLocation = string.IsNullOrWhiteSpace(d.LotwStationLocation) ? null : d.LotwStationLocation.Trim();
+            p.Lotw.UploadOnComplete = d.LotwUpload;
             result.Add(p);
         }
         s.Profiles = result;
@@ -1418,12 +1426,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Ranking.SkipLongShots = SkipLongShots;
             s.Ranking.ConfirmedOnly = ConfirmedOnly;
             s.Ranking.ConfirmedBy = ConfirmedByLotw ? "lotw" : "any";
-            s.Lotw.Enabled = LotwEnabled;
-            s.Lotw.Username = string.IsNullOrWhiteSpace(LotwUser) ? null : LotwUser.Trim();
-            s.Lotw.UploadOnComplete = LotwUploadOnComplete;
             s.Lotw.UserList = LotwUserList;
             s.Lotw.TqslPath = string.IsNullOrWhiteSpace(TqslPath) ? null : TqslPath.Trim();
-            s.Lotw.StationLocation = string.IsNullOrWhiteSpace(StationLocation) ? null : StationLocation.Trim();
             s.Hunt.Targets = HuntRows.Select(r => HuntService.ToEntry(r.Target)).ToList();
             s.Hunt.WatchAllBands = HuntAllBands;
             s.Hunt.Sound = HuntSound;
@@ -1513,6 +1517,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Set(SecretNames.EqslPassword(d.Id), d.EqslPassword);
             Set(SecretNames.CloudlogKey(d.Id), d.CloudlogKey.Trim());
             Set(SecretNames.ClubLogPassword(d.Id), d.ClubLogPassword.Trim());
+            Set(SecretNames.LotwPassword(d.Id), d.LotwPassword);
         }
         foreach (var id in removedRemote)
         {
@@ -1532,10 +1537,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             _host.Secrets.Delete(SecretNames.EqslPassword(id));
             _host.Secrets.Delete(SecretNames.CloudlogKey(id));
             _host.Secrets.Delete(SecretNames.ClubLogPassword(id));
+            _host.Secrets.Delete(SecretNames.LotwPassword(id));
         }
         Set(SecretNames.QrzUsername, QrzUser.Trim());
         Set(SecretNames.QrzPassword, QrzPassword);
-        Set(SecretNames.LotwPassword, LotwPassword);
         _host.TxLevel.Apply();
         _host.RebuildLogIndex();
         // Another profile may use another radio or audio device. A new Hamlib folder is where rigctld is found: Setup

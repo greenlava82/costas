@@ -340,6 +340,8 @@ public sealed class AppHost : IAsyncDisposable
         {
             var moved = LegacyMigration.MigrateSecrets(Secrets, s.Profiles.Select(p => p.Id));
             if (moved > 0) Log.Information("Moved {Count} saved credentials to their new names", moved);
+            var split = LegacyMigration.SplitLotwPassword(Secrets, s.Profiles.Select(p => p.Id));
+            if (split > 0) Log.Information("Gave {Count} station profiles their own copy of the LoTW password", split);
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
         {

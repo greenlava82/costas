@@ -162,7 +162,7 @@ public sealed class SettingsStore(string path)
     /// <summary>
     /// Brings older files up to <see cref="AppSettings.CurrentSchema"/>. Schema 0 (pre-release) had the profile's
     /// call and grid at the top level and no schema field. Schema 1 could hold band transmit levels walked down to
-    /// silence by a misread ALC.
+    /// silence by a misread ALC. Schema 2 had one LoTW account for every station profile.
     /// </summary>
     public static void Migrate(JsonObject node)
     {
@@ -192,6 +192,31 @@ public sealed class SettingsStore(string path)
             DropRunawayBandLevels(node);
             node["schema"] = 2;
         }
+        if (schema < 3)
+        {
+            MoveLotwAccountIntoProfiles(node);
+            node["schema"] = 3;
+        }
+    }
+
+    // Schema 3: the LoTW account (login, Station Location, upload on log) moved from the shared LoTW settings into each
+    // station profile, so another operator's profile can use their own. Every profile had been using the shared one, so
+    // each gets a copy and nothing changes until the operator edits a profile. The TQSL path, download interval and user
+    // list stay shared.
+    private static readonly string[] LotwAccountKeys = ["enabled", "username", "stationLocation", "uploadOnComplete"];
+
+    private static void MoveLotwAccountIntoProfiles(JsonObject node)
+    {
+        if (node["lotw"] is not JsonObject shared) return;
+        var account = new JsonObject();
+        foreach (var key in LotwAccountKeys)
+        {
+            if (shared[key] is { } v) account[key] = v.DeepClone();
+            shared.Remove(key);
+        }
+        if (account.Count == 0 || node["profiles"] is not JsonArray profiles) return;
+        foreach (var p in profiles.OfType<JsonObject>())
+            p["lotw"] ??= account.DeepClone();
     }
 
     // Schema 2: before 0.1.0.336 a stale rigctld reply could read SWR as ALC, and automatic level walked a band's level

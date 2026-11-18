@@ -110,6 +110,45 @@ public class DatabaseAndSettingsTests
     }
 
     [Fact]
+    public void SettingsStore_SchemaTwo_MovesLotwAccountIntoEveryProfile()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");
+        File.WriteAllText(path, """
+            { "schema": 2, "profiles": [ { "id": "home", "callsign": "W7LIT" }, { "id": "park", "callsign": "W7LIT/P" } ],
+              "lotw": { "enabled": true, "username": "w7lit", "downloadHours": 6, "tqslPath": "C:\\TQSL\\tqsl.exe",
+                        "stationLocation": "Home QTH", "uploadOnComplete": true, "userList": false } }
+            """);
+        var store = new SettingsStore(path);
+        var s = store.Load();
+
+        s.Schema.Should().Be(AppSettings.CurrentSchema);
+        foreach (var p in s.Profiles)
+        {
+            p.Lotw.Enabled.Should().BeTrue(p.Id);
+            p.Lotw.Username.Should().Be("w7lit", "every profile was using the shared account");
+            p.Lotw.StationLocation.Should().Be("Home QTH");
+            p.Lotw.UploadOnComplete.Should().BeTrue();
+        }
+        s.Lotw.DownloadHours.Should().Be(6, "the station's own LoTW settings stay shared");
+        s.Lotw.TqslPath.Should().Be(@"C:\TQSL\tqsl.exe");
+        s.Lotw.UserList.Should().BeFalse();
+
+        store.Save(s);
+        var back = store.Load();
+        back.Profiles[1].Lotw.Username.Should().Be("w7lit");
+    }
+
+    [Fact]
+    public void SettingsStore_SchemaTwoWithoutLotw_ProfilesStartWithLotwOff()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");
+        File.WriteAllText(path, """{ "schema": 2, "profiles": [ { "id": "home", "callsign": "W7LIT" } ] }""");
+        var s = new SettingsStore(path).Load();
+        s.Profile.Lotw.Enabled.Should().BeFalse();
+        s.Profile.Lotw.Username.Should().BeNull();
+    }
+
+    [Fact]
     public void SettingsStore_SchemaOne_DropsBandLevelsWalkedDownToSilence()
     {
         var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");

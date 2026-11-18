@@ -80,4 +80,34 @@ public class LegacyMigrationTests : IDisposable
         store.Get("Ft8Client:qrz-password").Should().BeNull();
         LegacyMigration.MigrateSecrets(store, ["home"]).Should().Be(0);
     }
+
+    [Fact]
+    public void SplitLotwPassword_SharedPassword_EachProfileGetsItsOwnOnce()
+    {
+        var store = new InMemorySecretStore();
+        store.Set(SecretNames.SharedLotwPassword, "lotw-shared");
+        store.Set(SecretNames.LotwPassword("park"), "lotw-park");
+
+        LegacyMigration.SplitLotwPassword(store, ["home", "park"]).Should().Be(1);
+
+        store.Get(SecretNames.LotwPassword("home")).Should().Be("lotw-shared");
+        store.Get(SecretNames.LotwPassword("park")).Should().Be("lotw-park", "a profile's own password wins");
+        store.Get(SecretNames.SharedLotwPassword).Should().BeNull();
+        LegacyMigration.SplitLotwPassword(store, ["home", "park"]).Should().Be(0);
+    }
+
+    [Fact]
+    public void SplitLotwPassword_LegacyShared_MovedThenSplit()
+    {
+        // A Ft8Client-era install: the old name is renamed first, then shared out.
+        var store = new InMemorySecretStore();
+        store.Set("Ft8Client:lotw-password", "lotw-old");
+
+        LegacyMigration.MigrateSecrets(store, ["home"]);
+        LegacyMigration.SplitLotwPassword(store, ["home"]).Should().Be(1);
+
+        store.Get(SecretNames.LotwPassword("home")).Should().Be("lotw-old");
+        store.Get("Ft8Client:lotw-password").Should().BeNull();
+        store.Get(SecretNames.SharedLotwPassword).Should().BeNull();
+    }
 }

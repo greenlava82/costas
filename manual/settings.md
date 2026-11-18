@@ -158,7 +158,9 @@ The key and password are kept in Windows Credential Manager.
 
 ### LoTW
 
-Logbook of the World confirmations, uploads through TQSL, and the list of LoTW users. See [LoTW](log.md#lotw).
+Logbook of the World confirmations, uploads through TQSL, and the list of LoTW users. See [LoTW](log.md#lotw). The
+login, Station Location and automatic upload belong to the current station profile, so each operator uses their own
+account; where TQSL is and the list of LoTW users are shared by all profiles.
 
 - **Confirmations**: **Download my LoTW confirmations**, your LoTW login (usually your call) and LoTW website
   password. This is the website password, not the TQSL certificate password.
@@ -166,7 +168,7 @@ Logbook of the World confirmations, uploads through TQSL, and the list of LoTW u
   to sign with (blank if TQSL has only one), and **Sign and upload each contact as soon as it is logged** (off).
 - **Who uses LoTW**: **Download ARRL's list of LoTW users once a week** (on, about 6 MB, no login).
 
-The password is kept in Windows Credential Manager.
+The password is kept in Windows Credential Manager, one for each station profile.
 
 ### eQSL
 

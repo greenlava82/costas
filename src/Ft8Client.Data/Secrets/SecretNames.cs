@@ -19,7 +19,8 @@ public static class SecretNames
 
     /// <summary>Every name the app uses for these station profiles.</summary>
     public static IEnumerable<string> All(IEnumerable<string> profileIds) =>
-        profileIds.SelectMany(id => new[] { QrzLogbookKey(id), EqslUsername(id), EqslPassword(id), CloudlogKey(id), ClubLogPassword(id) }).Append(QrzUsername).Append(QrzPassword).Append(LotwPassword);
+        profileIds.SelectMany(id => new[] { QrzLogbookKey(id), EqslUsername(id), EqslPassword(id), CloudlogKey(id), ClubLogPassword(id), LotwPassword(id) })
+            .Append(QrzUsername).Append(QrzPassword).Append(SharedLotwPassword);
 
     /// <summary>QRZ logbook API key for a station profile (a logbook serves one callsign).</summary>
     public static string QrzLogbookKey(string profileId) => $"{Prefix}qrz-logbook-key:{profileId}";
@@ -42,8 +43,11 @@ public static class SecretNames
     /// <summary>QRZ XML password.</summary>
     public const string QrzPassword = Prefix + "qrz-password";
 
-    /// <summary>LoTW website password (for downloading confirmations).</summary>
-    public const string LotwPassword = Prefix + "lotw-password";
+    /// <summary>LoTW website password for a station profile (for downloading its confirmations).</summary>
+    public static string LotwPassword(string profileId) => $"{Prefix}lotw-password:{profileId}";
+
+    /// <summary>The one LoTW password every profile shared before each had its own; moved by <c>LegacyMigration.SplitLotwPassword</c>.</summary>
+    public const string SharedLotwPassword = Prefix + "lotw-password";
 
     /// <summary>Hashes of the tokens of phones paired for remote control.</summary>
     public const string RemoteDevices = Prefix + "remote-devices";

@@ -75,6 +75,21 @@ public sealed partial class ProfileDraft : ObservableObject
     /// <summary>Upload each contact to Club Log when it is logged.</summary>
     public bool ClubLogUpload { get; set; }
 
+    /// <summary>Download this profile's LoTW confirmations.</summary>
+    public bool LotwEnabled { get; set; }
+
+    /// <summary>LoTW login as typed.</summary>
+    public string LotwUser { get; set; } = string.Empty;
+
+    /// <summary>LoTW website password as typed (credential store, per profile).</summary>
+    public string LotwPassword { get; set; } = string.Empty;
+
+    /// <summary>TQSL Station Location as typed.</summary>
+    public string LotwStationLocation { get; set; } = string.Empty;
+
+    /// <summary>Sign and upload each contact through TQSL when it is logged.</summary>
+    public bool LotwUpload { get; set; }
+
     /// <inheritdoc />
     public override string ToString() => Name;
 }
