@@ -127,6 +127,8 @@ Managing users, in the list under **Sign-in**:
   **New operator** on the Station page. Leave it on **The profile in use** and the user operates as whichever
   profile is active.
 
+Signing in does not switch the profile, so someone can sign in just to watch. While another profile is in use, the
+linked user's page says *You will operate as K1UTA (Ash profile) when you take control, if the station is idle.*
 When a linked user's command takes control, Costas switches to their profile first, but only when the station is
 idle. While it is transmitting, in a contact, or has CQ or Auto-call on, the command is refused with the reason
 (*Not done: the station is busy during the contact with JA1AAA as K1ABC…*), so nothing goes out under someone

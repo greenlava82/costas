@@ -108,6 +108,9 @@ public sealed class RemoteControl
 
     // User ids by device, for the profile each signed-in user operates as.
     private readonly ConcurrentDictionary<string, string> _userIds = new(StringComparer.Ordinal);
+
+    /// <summary>The signed-in user behind <paramref name="deviceId"/>, or null for a paired phone or one not seen yet.</summary>
+    public string? UserIdOf(string deviceId) => _userIds.TryGetValue(deviceId, out var id) ? id : null;
     private readonly Func<string, (string? Refusal, string? NowAs)>? _switchProfile;
 
     private string NameOf(string deviceId) => _names.TryGetValue(deviceId, out var n) ? n : "A phone";
