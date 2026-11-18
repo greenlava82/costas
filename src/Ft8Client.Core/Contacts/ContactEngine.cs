@@ -341,6 +341,7 @@ public sealed class ContactEngine
                 toMe.Add((h, m));
             }
         }
+        DropMovedOn(heard, toMe, slotStartUtc);
 
         if (_c is not null)
         {
@@ -931,6 +932,30 @@ public sealed class ContactEngine
     private string MyExchange(int snr) => Contest is { } c ? ContestExchange.Mine(c, _settings.ContestExchange, _myGrid, snr, NextSerial) : string.Empty;
 
     private void RemoveWaiting(string call) => _waiting.RemoveAll(x => Callsign.EqualsCall(x.Call, call));
+
+    // A waiting caller heard calling CQ, or starting or finishing a contact with another call, in a later slot has moved
+    // on: what it sent me is stale, so answering it would send an old report (or resume a stopped contact it has left).
+    // It leaves Waiting for you, and a stopped contact with it is forgotten; calling it again starts afresh. A Fox
+    // always works other Hounds while its report to me stands, so it is left alone.
+    private void DropMovedOn(IReadOnlyList<HeardMessage> heard, List<(HeardMessage H, ParsedMessage M)> toMe, DateTime slotUtc)
+    {
+        if (_waiting.Count == 0) return;
+        foreach (var h in heard)
+        {
+            if (h.Decode.LowConfidence) continue;
+            foreach (var m in h.Message.Expand())
+            {
+                if (m.SenderCall is not { } call) continue;
+                var w = _waiting.FirstOrDefault(x => Callsign.EqualsCall(x.Call, call));
+                if (w is null || slotUtc <= w.LastCalledUtc) continue;
+                if (toMe.Exists(x => Callsign.EqualsCall(x.M.SenderCall, call)) || IsFox?.Invoke(call) == true) continue;
+                var elsewhere = m.Kind == MessageKind.Cq || (m.To is { Unresolved: false } to && !Callsign.EqualsCall(to.Call, _myCall));
+                if (!elsewhere) continue;
+                _waiting.Remove(w);
+                if (_stopped is { } st && Callsign.EqualsCall(st.Contact.DxCall, call)) ForgetStopped();
+            }
+        }
+    }
 
     // True while a dismissed station keeps calling within DismissQuiet of its last call; each call restarts the wait.
     private bool StillDismissed(string call, DateTime slotUtc)

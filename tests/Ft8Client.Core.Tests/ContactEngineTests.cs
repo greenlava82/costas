@@ -456,6 +456,62 @@ public class ContactEngineTests
     }
 
     [Fact]
+    public void AnswerAllInTurn_CallerSinceHeardCallingCq_IsNotAnsweredWithOldReport()
+    {
+        var s = new Sim(new ContactSettings { AnswerAllInTurn = true });
+        s.E.CallCq(SlotParity.Even, Sim.T0);
+        s.Step();
+        s.Step("W7LIT K1ABC FN42", "W7LIT VE7HLB -05");
+        s.Step().Should().Be("K1ABC W7LIT -12");
+        s.Step("W7LIT K1ABC R-08", "CQ VE7HLB CN89");
+        s.E.Waiting.Should().BeEmpty("VE7HLB has moved on to calling CQ");
+        s.Step().Should().Be("K1ABC W7LIT RR73");
+        s.Step();
+        s.Step().Should().Be("CQ W7LIT DN40", "nobody is waiting, so CQ resumes");
+        s.Sent.Should().NotContain(x => x.Message.StartsWith("VE7HLB", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void OnDecodes_WaitingCallerHeardWorkingAnother_LeavesWaiting()
+    {
+        var s = new Sim();
+        s.Step();
+        s.Step("W7LIT VE7HLB CN89");
+        s.E.Waiting.Should().ContainSingle();
+        s.Step();
+        s.Step("K1ABC VE7HLB -07");
+        s.E.Waiting.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void OnDecodes_WaitingCallerHeardSigningOffWithAnotherInSameSlotAsCallingMe_StaysWaiting()
+    {
+        var s = new Sim();
+        s.Step();
+        s.Step("W7LIT VE7HLB CN89");
+        s.Step();
+        s.Step("W7LIT VE7HLB CN89", "CQ K1ABC FN42");
+        s.E.Waiting.Should().ContainSingle().Which.Call.Should().Be("VE7HLB");
+    }
+
+    [Fact]
+    public void AnswerCaller_StoppedContactSinceHeardCallingCq_IsNotResumed()
+    {
+        var s = new Sim(new ContactSettings { RetryLimit = 1 });
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        s.Step();
+        s.Step("W7LIT ZL2RPA -22");
+        s.Step().Should().Be("ZL2RPA W7LIT R-19");
+        s.E.Abandon(s.Now);
+        s.Step("W7LIT ZL2RPA -22");
+        s.E.Waiting.Should().ContainSingle().Which.AfterStop.Should().BeTrue();
+        s.Step();
+        s.Step("CQ ZL2RPA RF70");
+        s.E.Waiting.Should().BeEmpty();
+        s.E.AnswerCaller("ZL2RPA", s.Now).Should().BeFalse("there is no stale report left to answer");
+    }
+
+    [Fact]
     public void Waiting_AtMostFiveOldestFirst()
     {
         var s = new Sim();
