@@ -14,18 +14,23 @@ using System.Text;
 namespace Ft8Client.Rig.Tests.Flex;
 
 /// <summary>
-/// A stand-in for a FlexRadio's SmartSDR TCP API on a loopback port: greets with V and H lines, answers every command
-/// with <c>R&lt;seq&gt;|0|</c> (or the code set for it), records what was sent, and sends status lines on request.
+/// A stand-in for a FlexRadio's SmartSDR TCP API: greets with V and H lines, answers every command with
+/// <c>R&lt;seq&gt;|0|</c> (or the code set for it), records what was sent, and sends status lines on request. With
+/// <see cref="Acts"/> on it also does what a radio with a PowerGenius XL and TunerGenius XL is expected to do: after an
+/// operate, mode or bypass command it sends the status line that reports the change (docs/05-integrations.md 2a).
+/// Shared by the Rig and App tests and by tools/Ft8Client.FakeFlex.
 /// </summary>
 internal sealed class FakeFlexRadio : IAsyncDisposable
 {
-    private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+    private readonly TcpListener _listener;
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _accept;
     private volatile NetworkStream? _client;
 
-    public FakeFlexRadio()
+    /// <summary>Listens on loopback on a free port, or on <paramref name="endpoint"/>.</summary>
+    public FakeFlexRadio(IPEndPoint? endpoint = null)
     {
+        _listener = new TcpListener(endpoint ?? new IPEndPoint(IPAddress.Loopback, 0));
         _listener.Start();
         _accept = Task.Run(AcceptAsync);
     }
@@ -43,6 +48,12 @@ internal sealed class FakeFlexRadio : IAsyncDisposable
 
     /// <summary>When false, commands get no reply at all.</summary>
     public volatile bool Answers = true;
+
+    /// <summary>When true, operate, mode and bypass commands are carried out and reported in a status line.</summary>
+    public volatile bool Acts = true;
+
+    /// <summary>Raised for each command received (the tool prints them).</summary>
+    public event Action<string>? Received;
 
     public int Connections;
 
@@ -87,16 +98,37 @@ internal sealed class FakeFlexRadio : IAsyncDisposable
                 var seq = line[1..bar];
                 var cmd = line[(bar + 1)..];
                 Commands.Enqueue(cmd);
+                Received?.Invoke(cmd);
                 if (!Answers) continue;
                 var code = Codes.FirstOrDefault(k => cmd.StartsWith(k.Key, StringComparison.Ordinal)).Value ?? "0";
                 await stream.WriteAsync(Encoding.ASCII.GetBytes($"R{seq}|{code}|\n"), _cts.Token);
                 if (cmd == "sub amplifier all")
                     foreach (var s in OnSubscribe) await stream.WriteAsync(Encoding.ASCII.GetBytes(s + "\n"), _cts.Token);
+                else if (Acts && code == "0" && Effect(cmd) is { } status)
+                    await stream.WriteAsync(Encoding.ASCII.GetBytes(status + "\n"), _cts.Token);
             }
         }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or SocketException or ObjectDisposedException)
         {
         }
+    }
+
+    /// <summary>
+    /// The status line a radio would send after <paramref name="cmd"/>: <c>amplifier set h operate=1</c> takes the amp
+    /// to IDLE (0 to STANDBY); <c>tgxl set handle=h mode=</c> and <c>bypass=</c> report <c>operate=</c> and <c>bypass=</c>.
+    /// </summary>
+    internal static string? Effect(string cmd)
+    {
+        var w = cmd.Split(' ');
+        if (w is ["amplifier", "set", var h, var op] && op.StartsWith("operate=", StringComparison.Ordinal))
+            return $"S0|amplifier {h} state={(op == "operate=1" ? "IDLE" : "STANDBY")}";
+        if (w is ["tgxl", "set", var hh, var kv] && hh.StartsWith("handle=", StringComparison.Ordinal))
+        {
+            var handle = hh["handle=".Length..];
+            if (kv.StartsWith("mode=", StringComparison.Ordinal)) return $"S0|amplifier {handle} operate={kv["mode=".Length..]}";
+            if (kv.StartsWith("bypass=", StringComparison.Ordinal)) return $"S0|amplifier {handle} {kv}";
+        }
+        return null;
     }
 
     public async ValueTask DisposeAsync()

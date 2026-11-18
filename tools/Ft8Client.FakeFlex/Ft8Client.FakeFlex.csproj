@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Ft8Client.FakeFlex</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The same stand-in radio the tests use. -->
+    <Compile Include="..\..\tests\Ft8Client.Rig.Tests\Flex\FakeFlexRadio.cs" Link="FakeFlexRadio.cs" />
+  </ItemGroup>
+</Project>

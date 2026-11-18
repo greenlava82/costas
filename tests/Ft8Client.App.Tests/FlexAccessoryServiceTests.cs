@@ -62,7 +62,7 @@ public sealed class FlexAccessoryServiceTests : IAsyncDisposable
     }
 
     private (FlexAccessoryService Service, Session Session, AppSettingsAccessor Settings) Create(int? model = 23005, string? port = "192.168.1.20:4992",
-        bool simulating = false, string mode = RigModes.Hamlib)
+        bool simulating = false, string mode = RigModes.Hamlib, string? flexAddress = null)
     {
         var clock = new ManualClock(new DateTime(2026, 11, 18, 20, 0, 0, DateTimeKind.Utc));
         var freqs = ReferenceData.LoadFrequencies();
@@ -73,6 +73,7 @@ public sealed class FlexAccessoryServiceTests : IAsyncDisposable
         s.Profile.Rig.Mode = mode;
         s.Profile.Rig.Model = model;
         s.Profile.Rig.Port = port;
+        s.Profile.Rig.FlexAddress = flexAddress;
         var settings = new AppSettingsAccessor(new SettingsStore(Path.Combine(_dir, "settings.json")), s);
         var service = new FlexAccessoryService(session, settings, () => _transmitting, simulating,
             (_, _) => new FlexAccessoryClient("127.0.0.1", _radio.Port, pingEvery: TimeSpan.FromMinutes(1)));
@@ -87,6 +88,29 @@ public sealed class FlexAccessoryServiceTests : IAsyncDisposable
     public void RadioAddress_SmartSdrSlice_ReadsHostAndPort(int model, string port, string host, int p)
     {
         FlexAccessoryService.RadioAddress(new RigSettings { Mode = RigModes.Hamlib, Model = model, Port = port }).Should().Be((host, p));
+    }
+
+    [Theory]
+    [InlineData(RigModes.Hamlib, 2014, "COM5", "192.168.1.20", "192.168.1.20", 4992)] // TS-2000 through SmartSDR CAT COM ports
+    [InlineData(RigModes.Hamlib, 2036, "127.0.0.1:5002", "192.168.1.20:4992", "192.168.1.20", 4992)] // FlexRadio 6xxx through SmartSDR CAT TCP
+    [InlineData(RigModes.Vox, null, null, "flex-8600.local", "flex-8600.local", 4992)]
+    [InlineData(RigModes.None, null, null, "127.0.0.1:5000", "127.0.0.1", 5000)] // tools/Ft8Client.FakeFlex
+    [InlineData(RigModes.Hamlib, 23005, "192.168.1.20:4992", "192.168.1.30", "192.168.1.30", 4992)] // the typed address wins
+    public void RadioAddress_FlexAddressTyped_UsedWhateverTheRadioModel(string mode, int? model, string? port, string typed, string host, int p)
+    {
+        FlexAccessoryService.RadioAddress(new RigSettings { Mode = mode, Model = model, Port = port, FlexAddress = typed }).Should().Be((host, p));
+    }
+
+    [Theory]
+    [InlineData("COM5")]
+    [InlineData("http://192.168.1.20")]
+    [InlineData("192.168.1.20:99999")]
+    [InlineData("192.168.1.20:")]
+    [InlineData(":4992")]
+    [InlineData("192.168.1 .20")]
+    public void ParseAddress_NotAnAddress_Null(string typed)
+    {
+        FlexAccessoryService.ParseAddress(typed).Should().BeNull();
     }
 
     [Theory]
@@ -110,6 +134,104 @@ public sealed class FlexAccessoryServiceTests : IAsyncDisposable
         session.Snapshot.Services[ServiceNames.Accessories].Health.Should().Be(ServiceHealth.Off);
         _radio.Connections.Should().Be(0);
         AccessoryPanel.From(service.Current, service.CanChange).Any.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Start_TypedAddressNotValid_SaysWhy()
+    {
+        var (service, _, _) = Create(model: 2014, port: "COM5", flexAddress: "COM5");
+        await using var _ = service;
+        await service.Settled;
+
+        service.Status.Health.Should().Be(ServiceHealth.Off);
+        service.Status.Message.Should().Be("\"COM5\" is not an address; type the radio's IP address, such as 192.168.1.20");
+        FlexStatusText.For(service.Status, service.Current).Kind.Should().Be(TextKind.Caution);
+        _radio.Connections.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Start_Ts2000WithFlexAddress_Connects()
+    {
+        _radio.OnSubscribe.Add(PgxlStandby);
+        var (service, _, _) = Create(model: 2014, port: "COM5", flexAddress: "192.168.1.20");
+        await using var _ = service;
+
+        await WaitUntil(() => service.Current.Amplifier is not null);
+
+        FlexStatusText.For(service.Status, service.Current).Should().Be(("Connected. Found PowerGenius XL; switch them from the bottom bar.", TextKind.Success));
+    }
+
+    [Fact]
+    public async Task RoundTrip_OperateThenStandby_PanelFollowsWhatTheRadioReports()
+    {
+        _radio.OnSubscribe.AddRange([PgxlStandby, Tgxl]);
+        var (service, _, _) = Create();
+        await using var _ = service;
+        var changes = 0;
+        service.Changed += () => Interlocked.Increment(ref changes);
+        await WaitUntil(() => service.Current.Amplifier is not null && service.Current.Tuner is not null);
+        AccessoryPanel.From(service.Current, service.CanChange).BarText.Should().Be("Amp Standby · Tuner Operate");
+
+        (await service.SetAmpOperateAsync(true)).Should().BeNull();
+        await WaitUntil(() => service.Current.Amplifier!.Operate);
+        AccessoryPanel.From(service.Current, service.CanChange).Should().Match<AccessoryPanel>(p =>
+            p.BarText == "Amp Operate · Tuner Operate" && !p.CanAmpOperate && p.CanAmpStandby);
+
+        (await service.SetTunerBypassAsync(true)).Should().BeNull();
+        await WaitUntil(() => service.Current.Tuner!.Bypass);
+        AccessoryPanel.From(service.Current, service.CanChange).Should().Match<AccessoryPanel>(p =>
+            p.BarText == "Amp Operate · Tuner Bypass" && p.CanTunerInLine && !p.CanTunerBypass);
+
+        (await service.SetTunerOperateAsync(false)).Should().BeNull();
+        await WaitUntil(() => !service.Current.Tuner!.Operate);
+        AccessoryPanel.From(service.Current, service.CanChange).Should().Match<AccessoryPanel>(p =>
+            p.BarText == "Amp Operate · Tuner Standby" && !p.CanTunerBypass && !p.CanTunerInLine && p.CanTunerOperate);
+
+        (await service.SetAmpOperateAsync(false)).Should().BeNull();
+        await WaitUntil(() => !service.Current.Amplifier!.Operate);
+
+        _radio.Commands.Should().Equal("sub amplifier all", "amplifier set 0x18E5F0AA operate=1", "tgxl set handle=0x2C01D3B4 bypass=1",
+            "tgxl set handle=0x2C01D3B4 mode=0", "amplifier set 0x18E5F0AA operate=0");
+        changes.Should().BeGreaterThanOrEqualTo(5, "each change reported by the radio reaches the bottom bar");
+    }
+
+    [Fact]
+    public async Task RoundTrip_RadioRefuses_StateUnchangedAndSaysWhy()
+    {
+        _radio.OnSubscribe.Add(PgxlStandby);
+        _radio.Codes["amplifier set"] = "50000016";
+        var (service, _, _) = Create();
+        await using var _ = service;
+        await WaitUntil(() => service.Current.Amplifier is not null);
+
+        (await service.SetAmpOperateAsync(true)).Should().Be("The radio refused it (code 50000016).");
+
+        service.Current.Amplifier!.State.Should().Be(FlexAmpState.Standby);
+    }
+
+    [Fact]
+    public async Task RoundTrip_ConnectionDrops_ButtonHidesThenReturns()
+    {
+        _radio.OnSubscribe.AddRange([PgxlStandby, Tgxl]);
+        var (service, session, _) = Create();
+        await using var _ = service;
+        await WaitUntil(() => service.Current.Amplifier is not null);
+
+        _radio.Drop();
+        await WaitUntil(() => !AccessoryPanel.From(service.Current, service.CanChange).Any);
+        await WaitUntil(() => AccessoryPanel.From(service.Current, service.CanChange).Any);
+
+        session.Snapshot.Services[ServiceNames.Accessories].Health.Should().Be(ServiceHealth.Ok);
+    }
+
+    [Theory]
+    [InlineData(ServiceHealth.Down, "Could not reach the radio at 192.168.1.20: Connection refused", "Could not reach the radio at 192.168.1.20: Connection refused. Check the address, and that the radio is on.", TextKind.Critical)]
+    [InlineData(ServiceHealth.Degraded, "Connecting to the radio at 192.168.1.20", "Connecting to the radio at 192.168.1.20…", TextKind.Caution)]
+    [InlineData(ServiceHealth.Ok, "Connected to the radio at 192.168.1.20", "Connected to the radio, but it reports no amplifier or tuner. Check in SmartSDR that they are paired with it.", TextKind.Caution)]
+    [InlineData(ServiceHealth.Off, "No FlexRadio address set", "", TextKind.Secondary)]
+    public void StatusText_EachState_OneClearLine(ServiceHealth health, string message, string text, TextKind kind)
+    {
+        FlexStatusText.For(new ServiceStatus(health, message, DateTime.UtcNow), FlexAccessories.Empty).Should().Be((text, kind));
     }
 
     [Fact]
