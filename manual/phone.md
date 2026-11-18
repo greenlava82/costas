@@ -188,7 +188,7 @@ On the other tabs the slot countdown bar sits under the top bar instead (red whi
 | Tab | What it shows |
 |---|---|
 | **Operate** | The tiles above. In PSK and RTTY the macro keys take the place of Resend and Call CQ, and the last lines of the conversation show in the contact tile ([PSK and RTTY](keyboard-modes.md#away-from-the-desk)) |
-| **Stations** | The band summary (stations heard, countries, calling CQ, you need), **Repeats** (stations already in your log on this band and mode) and **Watching** (needed, but not callable right now, and why) |
+| **Stations** | The band summary (stations heard, countries, calling CQ, you need, and the desk's [band advice](operate.md#band-advice) line when there is one), **Repeats** (stations already in your log on this band and mode) and **Watching** (needed, but not callable right now, and why) |
 | **Decodes** | Band activity, newest first. Messages to you are highlighted, CQs are blue and your own transmissions are grey |
 | **Signal** | Who hears you, from PSK Reporter: how many stations and countries in the last 15 minutes, the farthest and best reports, the latest reports, and the last hour of distinct receivers in five-minute intervals (the final interval is incomplete) |
 | **Log** | The contacts you made this session |

@@ -84,6 +84,24 @@ until a contact starts). Under it is the **band summary**, the same numbers as t
 described [below](#side-column), laid out across the width. If the window is too short for both, the band summary
 moves to the top of the call list and scrolls with it, so the card is never cut off.
 
+### Band advice
+
+When the evidence supports it, a line under the band summary (on a small window, on the **Band** tab) says which band
+looks best for you right now, for example:
+
+- *15 m is open to Europe from your area: 23 stations there heard 6 stations near you in the last 15 min.* Stations
+  within 300 miles of you are being heard in Europe on 15 m, and the band you are on is not reaching Europe.
+- *20 m is open to Europe for you: 12 stations there heard you in the last 15 min.* Your own signal on this band, from
+  PSK Reporter and the Reverse Beacon Network.
+- *20 m is closing to Europe: 1 station there heard stations near you in the last 15 min, 14 in the 15 min before.*
+
+If countries you still need on that band are among the listeners, the line says so. Hover over it to see the
+numbers per continent, how recent the newest report is, and the rule that was met. A band is called open only when at
+least 5 stations on another continent heard at least 2 stations near you (or 5 heard you). Your own continent is never
+named. When Costas isn't sure, it says nothing. It needs the same settings as the band menu's activity (see
+[Maps](maps.md#band-activity-near-you)), and it shows nothing with no live reports. The line is advice only: Costas never
+changes band for you.
+
 ### Small window: idle card and band strip
 
 On a small window, the card at the top folds to two short lines when you are not in a contact, so the call list gets
@@ -276,7 +294,8 @@ the idle card.
 On a small window it is one card with four tabs, one showing at a time. Costas remembers the tab you left it on.
 
 - **Band**: the full band summary. **20 m right now** has stations heard in the last 5 minutes, countries, how many
-  are calling CQ and **You need**, with decodes in the last slot and the average per slot over the past hour.
+  are calling CQ and **You need**, with decodes in the last slot and the average per slot over the past hour, and the
+  [band advice](#band-advice) line when there is one.
   **Heard from** is a bar per continent (N. Am., Europe, Asia, Oceania, S. Am., Africa). **Your log on 20 m** has
   countries worked and confirmed on this band, US states worked (and the first few you still need), grid squares
   worked, and **This session**: contacts, new DXCC and new band DXCC this session. A session starts when you open

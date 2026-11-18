@@ -344,6 +344,27 @@ The band menu shows, for each band, whether stations near me are being heard rig
 
 This shows where the band is open from my area, not who I can hear: a receiver hearing my neighbour is a station listening on that band.
 
+## 14a. Band advice
+
+C5 (owner request 2026-11-18): one line that answers "which band should I be on?" from evidence Costas already holds about this station, not solar indices. `BandAdvisor` (Core, pure) judges; `BandAdviceText` words it. **Display only:** it never changes band, ranking or who is called, and has no Go link.
+
+Evidence, all from the last 15 minutes unless said otherwise:
+
+- **Stations near me on every band**: the band menu's openings (section 14, `BandOpenings.Shown`: bands followed all the time, plus sampled bands). Each opening carries, per receiver continent, the distinct receivers and distinct nearby senders (`ContinentReach`); these are real counts, never scaled up from a sample.
+- **My own signal on the band I am on**: PSK Reporter and RBN reports (`HearsMe`), in my mode, with the receiver's continent from the country file.
+- **Nearby reports on the band I am on for the last 30 minutes**, for the closing line.
+
+Rules (thresholds are constants on `BandAdvisor`):
+
+- My own continent (from the country file for my call) is never advised: "20 m is open to North America" says nothing to a US station. Distances are in kilometres internally (300 miles = 482.8 km, as in section 13) and shown in the operator's units.
+- **Open from my area**: at least 5 distinct stations on a continent heard at least 2 distinct stations near me on the band. Two senders stop one loud neighbour from reading as a band opening.
+- **Open for me**: at least 5 distinct stations on a continent heard my own signal on the band I am on.
+- **Which line**: another band is named only for continents the band I am on is not already open to (by either rule), so the line never suggests a move that gains nothing. Among other bands: most receivers on its best continent, then most needed countries, then band order. With no other band, the band I am on is named, "for me" before "from my area". At most two continents, most receivers first. "You need" is the band's needed countries from section 14.
+- **Closing** (the band I am on, second line): a continent had at least 8 distinct receivers of at least 2 nearby senders 15 to 30 minutes ago, and a third as many or fewer in the last 15 minutes. It needs the band followed without a break for 30 minutes (reset on a band change or when the feed falls back past it) and at least 10 nearby reports on the band in the last 15 minutes, so a feed that went quiet is not read as a closing band. A continent the band is closing to is not also called open.
+- Nothing is shown without a valid grid, with the feed or band activity off, or when no rule is met. Rebuilt at most once a slot, and at once after a band, mode, grid or feed change.
+
+The thresholds are first guesses from the band menu's shading (10 spots is "medium") and have not been tuned on the air; see V27 in `08-open-questions.md`.
+
 ## 15. Rarity (most wanted)
 
 Club Log publishes a most-wanted list of DXCC entities, ranked by how many of its users still need each one (owner request 2026-10-12). `MostWanted` (Core) maps it to country-file entity keys through the ADIF DXCC codes in the bundled `dxcc-adif.csv` (from AD1C's `cty.csv`, the same source and licence as `cty.dat`). `Rarity` turns a rank into a five-step meter:
