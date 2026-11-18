@@ -69,6 +69,8 @@ main{padding:12px 14px 120px;display:flex;flex-direction:column;gap:12px;flex:1}
 .hband b{display:block;color:var(--fox-tx)}.hband span{color:var(--mut)}
 .hero.tx .hband{background:rgba(0,0,0,.25);border-color:rgba(255,255,255,.4)}.hero.tx .hband b,.hero.tx .hband span{color:#fff}
 .banner{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-tx);border-radius:12px;padding:12px;font-size:14px}
+.banner.info{background:var(--card);border-color:var(--accent);color:var(--tx)}
+.notice{display:flex;align-items:center;gap:8px}.notice+.notice{margin-top:8px}.notice .t{flex:1}.notice .s{color:var(--mut);font-size:12px}
 .note{position:fixed;left:14px;right:14px;bottom:110px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;display:none;z-index:3}
 /* The "Logged" notice: one slim line above HALT TX with a countdown bar; it closes itself after 5 s. */
 .logged{position:fixed;left:14px;right:14px;bottom:110px;background:var(--card);border:1px solid var(--grn);border-radius:12px;padding:9px 10px 0;z-index:3;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.35)}
@@ -261,6 +263,7 @@ body.dashon #slot,body.dashon #onair{display:none!important}
   <main>
     <div id="fault" class="banner hidden"></div>
     <div id="hunt" class="banner hidden" aria-live="polite"></div>
+    <div id="notices" class="banner info hidden" role="status" aria-live="polite"></div>
     <div id="meter" class="banner warnline hidden"></div>
     <div id="services" class="mini hidden"></div>
     <div id="board" class="board"><div class="col">
@@ -514,6 +517,7 @@ function render() {
   renderTune(s);
   renderRadio(s);
   renderLogged(s);
+  renderNotices(s);
   if (!wide) renderDash(s);
 
   const busy = s.transmitting || s.callingCq || (s.contact && s.contact.active);
@@ -1217,6 +1221,28 @@ setInterval(renderSlot, 200);
 // The "Logged" notice. The station sends the contact only while its notice should show, with the time left; the
 // phone counts down between states and shows each contact once, so ✕ keeps it closed.
 let loggedId = 0, loggedUntil = 0;
+// Someone else signed in or took control: shown until dismissed (or ten minutes old), so the people already here know
+// to share. Dismissed notices are remembered in this browser.
+const NOTICES_KEY = "costas-remote-notices-seen";
+let noticesSeen = new Set();
+try { noticesSeen = new Set(JSON.parse(localStorage.getItem(NOTICES_KEY) || "[]")); } catch { }
+function renderNotices(s) {
+  const box = $("notices");
+  const list = (s.notices || []).filter(n => !noticesSeen.has(n.id));
+  box.replaceChildren();
+  for (const n of list) {
+    const row = el("div", "notice");
+    row.append(el("span", "t", n.text), el("span", "s", n.time), button("✕", "x", () => dismissNotice(n.id)));
+    box.append(row);
+  }
+  box.classList.toggle("hidden", list.length === 0);
+}
+function dismissNotice(id) {
+  noticesSeen.add(id);
+  try { localStorage.setItem(NOTICES_KEY, JSON.stringify([...noticesSeen].slice(-50))); } catch { }
+  if (state) renderNotices(state);
+}
+
 function renderLogged(s) {
   const l = s.logged;
   if (!l || l.id === loggedId) return;

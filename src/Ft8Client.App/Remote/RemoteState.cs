@@ -131,6 +131,9 @@ public sealed record RemoteState
     /// <summary>The contact just logged while its notice should still show, else null.</summary>
     public RemoteLogged? Logged { get; init; }
 
+    /// <summary>Recent notices that someone else signed in or took control, newest first (not about this phone).</summary>
+    public IReadOnlyList<RemoteNotice> Notices { get; init; } = [];
+
     /// <summary>Band activity, newest first.</summary>
     public IReadOnlyList<RemoteDecode> Decodes { get; init; } = [];
 

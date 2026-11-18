@@ -267,8 +267,18 @@ take control; calling, answering, Tune, and band, offset, power and radio settin
 ## Who is in control
 
 The phone takes control as soon as it sends a command, and the desk shows **Phone in control** in the bottom bar.
-A click or key press at the desk takes control back. The top of the phone page says **You control** or
-**Desk controls**.
+A click or key press at the desk takes control back. The top of the phone page says **You control**,
+**Another phone controls** or **Desk controls**.
+
+So that the station is shared knowingly, everyone already using it is told when someone else arrives:
+
+- **Signing in.** When a user signs in on a new device (or, with sign-in off, a new phone opens the page), every
+  other phone shows a notice such as *Ash signed in on another device.* under the top bar, and the desk's bottom bar
+  shows it for a minute.
+- **Taking control.** When someone takes control, the others see *Ash took control from Dan.* or *The desk took
+  control.*
+
+The notices only inform; nothing has to be approved. Tap **✕** to dismiss one; they also go after ten minutes.
 
 ## Safety
 

@@ -84,9 +84,31 @@ public sealed class RemoteControl
     /// </summary>
     public RemoteIdentity? SignIn(string? token)
     {
-        if (SignInRequired) return Users!.SignIn(token);
+        if (SignInRequired)
+        {
+            var who = Users!.SignIn(token);
+            if (who?.Username is { } name) _names[who.DeviceId] = name;
+            return who;
+        }
         if (!Tokens.Verify(token)) return null;
         return new RemoteIdentity(RemoteIdentity.DeviceIdFor(token!));
+    }
+
+    /// <summary>Notices for the people already here that someone else signed in or took control.</summary>
+    public RemoteNotices Notices { get; } = new();
+
+    // Usernames by device, for the notices ("Ash took control"); a paired phone (sign-in off) has none.
+    private readonly ConcurrentDictionary<string, string> _names = new(StringComparer.Ordinal);
+
+    private string NameOf(string deviceId) => _names.TryGetValue(deviceId, out var n) ? n : "A phone";
+
+    /// <summary>A user signed in with their password on a device: everyone else using the station is told.</summary>
+    public void SignedIn(string token, string username)
+    {
+        var device = RemoteIdentity.DeviceIdFor(token);
+        _names[device] = username;
+        Notices.Add($"{username} signed in on another device.", device, _clock.UtcNow);
+        Changed?.Invoke();
     }
 
     /// <summary>
@@ -105,6 +127,8 @@ public sealed class RemoteControl
             // The phone is paired until Costas restarts; it will have to pair again after that.
             Serilog.Log.Warning(ex, "Could not save the paired phones");
         }
+        // With sign-in off a first visit is the sign-in, so the people already here hear of it the same way.
+        Notices.Add("A new phone opened the remote page.", RemoteIdentity.DeviceIdFor(token), _clock.UtcNow);
         Changed?.Invoke();
         return token;
     }
@@ -122,14 +146,15 @@ public sealed class RemoteControl
     /// <summary>Operator input at the desk: the desk is the control point again.</summary>
     public void DeskActivity()
     {
-        bool released;
+        string? holder;
         lock (_gate)
         {
-            released = Lease.IsHeld;
+            holder = Lease.Holder;
             Lease.Release();
         }
-        if (!released) return;
+        if (holder is null) return;
         _target.SetWatchdogCap(null);
+        Notices.Add("The desk took control.", null, _clock.UtcNow);
         Changed?.Invoke();
     }
 
@@ -162,13 +187,20 @@ public sealed class RemoteControl
         // A message the station cannot act on changes nothing: it must not take control or reset the Tx watchdog.
         if (!Understood(cmd, call)) return "The station did not understand that.";
         bool changed;
+        string? previous;
         lock (_gate)
         {
-            changed = !string.Equals(Lease.Holder, deviceId, StringComparison.Ordinal);
+            previous = Lease.Holder;
+            changed = !string.Equals(previous, deviceId, StringComparison.Ordinal);
             Lease.Take(deviceId, now);
         }
         _target.SetWatchdogCap(ControlLease.WatchdogCapMinutes);
-        if (changed) Changed?.Invoke();
+        if (changed)
+        {
+            var from = previous is null ? "the desk" : _names.TryGetValue(previous, out var p) ? p : "another phone";
+            Notices.Add($"{NameOf(deviceId)} took control from {from}.", deviceId, now);
+            Changed?.Invoke();
+        }
         switch (cmd.Type)
         {
             case "halt":

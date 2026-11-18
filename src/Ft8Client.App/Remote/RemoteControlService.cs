@@ -184,7 +184,7 @@ public sealed class RemoteControlService : IAsyncDisposable
     {
         var s = _session.Snapshot;
         return RemoteStateBuilder.Build(s, _clock.UtcNow, _context(), Control.ControlFor(deviceId), Control.ViewingFor(deviceId))
-            with { Power = Control.PowerFor(), RadioTab = Control.RadioFor(s) };
+            with { Power = Control.PowerFor(), RadioTab = Control.RadioFor(s), Notices = Control.Notices.For(deviceId, _clock.UtcNow) };
     }
 
     private async Task LoopAsync()

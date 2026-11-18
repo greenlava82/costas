@@ -142,6 +142,12 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     private void UpdateRemote()
     {
         var r = _host.Remote;
+        // Someone signing in or taking control shows here for a minute, so the operator at the desk knows to share.
+        if (r.Running && r.Control.Notices.ForDesk(_host.Clock.UtcNow) is { } notice)
+        {
+            (RemoteText, RemoteTip) = (notice, notice + " Phones that are signed in are told too.");
+            return;
+        }
         (RemoteText, RemoteTip) = !r.Running ? (string.Empty, string.Empty)
             : r.Control.Lease.IsHeld ? ("Phone in control", "A phone is the control point. Transmit stops if it loses touch for 15 seconds. Click or press a key here to take control back.")
             : r.Connected > 0 ? ("Phone connected", "A phone has the remote page open. It takes control when it sends a command.")
@@ -513,6 +519,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
             if (s.LastLogged is not null && IsOut(4)) Awards.Refresh();
         }
         Frequency = FormatFrequency(s.DialHz);
+        UpdateRemote(); // a sign-in notice on the remote indicator clears after a minute
         FollowBand(s.Band);
         Transmitting = s.Transmitting;
         OnAirText = s.TransmittingMessage is { Length: > 0 } msg ? $"ON AIR · {msg}" : "ON AIR";

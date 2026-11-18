@@ -233,6 +233,24 @@ public sealed class RemoteServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Login_SecondUser_FirstUserToldNotTheNewcomer()
+    {
+        AddUser("Dan", "correct horse battery");
+        AddUser("Ash", "another long password");
+        var dan = await LoginAsync("dan", "correct horse battery");
+        var ash = await LoginAsync("ash", "another long password");
+
+        _control.Notices.For(RemoteIdentity.DeviceIdFor(dan), _clock.UtcNow).Select(n => n.Text)
+            .Should().Equal("Ash signed in on another device.");
+        _control.Notices.For(RemoteIdentity.DeviceIdFor(ash), _clock.UtcNow).Select(n => n.Text)
+            .Should().Equal("Dan signed in on another device.");
+        _control.Notices.ForDesk(_clock.UtcNow).Should().Be("Ash signed in on another device.");
+
+        await _control.HandleAsync(_control.SignIn(ash)!.DeviceId, new RemoteCommand("call", "ve7xyz"));
+        _control.Notices.For(RemoteIdentity.DeviceIdFor(dan), _clock.UtcNow)[0].Text.Should().Be("Ash took control from the desk.");
+    }
+
+    [Fact]
     public async Task Login_WrongPassword_RefusedThenTooManyTries()
     {
         AddUser("dan", "correct horse battery");
