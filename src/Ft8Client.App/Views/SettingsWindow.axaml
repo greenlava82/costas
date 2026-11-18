@@ -472,10 +472,10 @@
                 <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding ClusterEnabled}">
                   <TextBox Text="{Binding ClusterHost}" Width="240" PlaceholderText="Node, such as your club's" AutomationProperties.Name="DX cluster node" />
                   <TextBox Text="{Binding ClusterPort}" Width="80" PlaceholderText="Port" AutomationProperties.Name="DX cluster port" />
-                  <ComboBox ItemsSource="{Binding ClusterSuggestions}" SelectedItem="{Binding ClusterSuggestion}" PlaceholderText="Well-known nodes" MinWidth="200"
-                            AutomationProperties.Name="Well-known DX cluster nodes" />
                 </StackPanel>
-                <TextBlock Classes="help" Text="Logs in to the node with your callsign and reads its spots; Costas never sends spots, filters or commands. Needed stations spotted in your mode are listed on the Awards view, and a station you hear shows when it was last spotted under Why and in its details. Spots never change the order, who is called or the radio's frequency: Go to on the Awards view only changes band when you click it. Use your club's node if it has one; the well-known nodes are run by volunteers, and none is endorsed. Nodes that ask for a password are not supported." TextWrapping="Wrap" />
+                <ComboBox ItemsSource="{Binding ClusterSuggestions}" SelectedItem="{Binding ClusterSuggestion}" PlaceholderText="Or pick a well-known node" MinWidth="240"
+                          IsEnabled="{Binding ClusterEnabled}" AutomationProperties.Name="Well-known DX cluster nodes" />
+                <TextBlock Classes="help" Text="Logs in to the node with your callsign and only reads its spots. Needed stations spotted in your mode are listed on the Awards view, and a heard station shows when it was last spotted. Spots never change the order, who is called or the radio's frequency; Go to on the Awards view changes band only when you click it. Use your club's node if it has one: the well-known nodes are run by volunteers and none is endorsed. Nodes that ask for a password are not supported." TextWrapping="Wrap" />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
