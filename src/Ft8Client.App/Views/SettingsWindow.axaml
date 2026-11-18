@@ -119,6 +119,13 @@
               <StackPanel Grid.Column="1"><TextBox Text="{Binding Callsign}" Width="160" HorizontalAlignment="Left" /></StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="US licence class" />
+              <StackPanel Grid.Column="1">
+                <ComboBox ItemsSource="{Binding LicenceChoices}" SelectedItem="{Binding LicenceChoice}" MinWidth="200" AutomationProperties.Name="US licence class" />
+                <TextBlock Classes="help" TextWrapping="Wrap" Text="Costas refuses to transmit outside the parts of each band where your class may send data such as FT8. General and Advanced lose the bottom 25 kHz of 80, 40, 20 and 15 m; a Technician may send data only on 28.000 to 28.300 MHz, 6 m and 2 m, so the other bands are receive only. Licensed in another country? Choose Not US: only the band limits apply." />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Grid square" />
               <StackPanel Grid.Column="1">
                 <TextBox Text="{Binding Grid}" Width="120" HorizontalAlignment="Left" />
@@ -178,8 +185,7 @@
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Where to transmit" />
               <StackPanel Grid.Column="1">
-                <CheckBox Content="US data segments only" IsChecked="{Binding UsDataSegmentsOnly}" />
-                <TextBlock Classes="help" Text="Refuses to transmit outside the parts of each band where US rules allow data modes such as FT8 (for example above 14.150 MHz on 20 m or 7.125 MHz on 40 m), and on 60 m outside the channels and 5351.5 to 5366.5 kHz. Turn it off if you are licensed in another country; the band limits still apply." TextWrapping="Wrap" />
+                <TextBlock Classes="help" Text="Set by the US licence class on the Station page: Costas keeps to that class's data segments (for example 14.025 to 14.150 MHz on 20 m for a General), or only to the band limits for Not US." TextWrapping="Wrap" />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">

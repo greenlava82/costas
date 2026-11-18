@@ -171,9 +171,12 @@ Costas does not know your log yet. Add your QRZ logbook API key in [Settings ›
 | --- | --- |
 | *Your clock is off by 2.4 s. Transmitting is blocked above 2 s.* | Sync the Windows clock. With **Clock correction** on, Costas fixes this itself once a time server answers; if it cannot reach one, or the clock is off by more than a minute, it can't. The limit is in Settings › Transmitting › Clock limit |
 | *Stopped by watchdog* | You had not touched the app for 6 minutes (3 from the phone). Any contact being answered was finished first. Click Call or Call CQ again |
-| *… is outside the US data segments on 20 m* | US rules allow FT8 only in part of each band (below 14.150 MHz on 20 m, 7.125 MHz on 40 m, 3.600 MHz on 80 m, and so on). Tune back to an FT8 frequency. Licensed outside the US? Turn off **Settings › Transmitting › US data segments only** |
+| *Not sent: your General licence allows data on 20 m only on 14.025-14.150 MHz, and this signal would take …* | The signal (dial plus audio offset, plus its width) is outside the part of the band where your US licence class may send data. Tune or move the offset back inside the limits it gives; Costas never moves it for you. If the class is wrong, or you are licensed outside the US, change **Settings › Station › US licence class** (Not US checks only the band limits) |
+| *Not sent: your Technician licence doesn't allow data on 20 m, so the band is receive only for you* | A Technician may send FT8 and other data only on 10 m (28.000 to 28.300 MHz), 6 m and 2 m. You can listen on the band; to transmit, change band. If you hold a higher class, choose it in **Settings › Station › US licence class** |
 | *… cannot be sent …* | The message cannot be encoded exactly as shown, for example a callsign or free text FT8 cannot carry. Costas never changes a message silently; shorten or change it |
 | No radio set up | See *Radio not connected* above |
+
+![A transmission refused by the licence class](images/refused-licence-class.png)
 
 ## QRZ
 

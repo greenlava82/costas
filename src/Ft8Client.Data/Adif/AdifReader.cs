@@ -12,9 +12,9 @@ namespace Ft8Client.Data.Adif;
 
 /// <summary>
 /// Reads ADIF 3.1 text (<c>&lt;name:len[:type]&gt;value</c>, <c>&lt;eor&gt;</c>, header ending <c>&lt;eoh&gt;</c>).
-/// Tolerates unknown fields, junk between fields and records, and a missing header. A length may count characters or
-/// UTF-8 bytes: loggers differ for non-ASCII text, which ADIF 3.1 does not allow in ADI files (see
-/// <see cref="AdifLengthUnit"/>), so both are accepted.
+/// Tolerates unknown fields, junk between fields and records, and a missing header. Field lengths are taken as UTF-8
+/// bytes, as most loggers and services write them; a file that counts characters instead is read correctly too (see
+/// <c>ValueEnd</c>).
 /// </summary>
 public static class AdifReader
 {
@@ -56,36 +56,55 @@ public static class AdifReader
             var colon2 = lenPart.IndexOf(':');
             if (colon2 >= 0) lenPart = lenPart[..colon2];
             if (!int.TryParse(lenPart, NumberStyles.None, CultureInfo.InvariantCulture, out var len) || len < 0) continue;
-            len = Value(text, pos, len);
-            current[name] = text.Substring(pos, len);
-            pos += len;
+            var end = ValueEnd(text, pos, len);
+            current[name] = text[pos..end];
+            pos = end;
         }
         if (current.Fields.Count > 0) records.Add(current);
         return records;
     }
 
-    // How many characters of text from pos make up a value of the given length. For ASCII the two counts agree. Otherwise
-    // the length is taken as UTF-8 bytes when that ends the value where the next field or tag starts (only white space
-    // between), and as characters when it does not.
-    private static int Value(string text, int pos, int len)
+    // Where a value of length len starting at start ends. Plain ASCII reads the same either way. Otherwise len is taken
+    // as UTF-8 bytes, unless that cannot be right and a character count can: the byte count ends inside a character
+    // (a file that counts characters, or a non-UTF-8 file decoded with replacement characters), or only the character
+    // count is followed by the next tag (with nothing but white space between).
+    private static int ValueEnd(string text, int start, int len)
     {
-        var chars = Math.Min(len, text.Length - pos);
-        var bytes = 0;
-        var n = 0;
-        while (n < chars && bytes < len)
-        {
-            int size;
-            if (char.IsHighSurrogate(text[pos + n]) && pos + n + 1 < text.Length && char.IsLowSurrogate(text[pos + n + 1])) size = 2;
-            else size = 1;
-            bytes += System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(pos + n, size));
-            n += size;
-        }
-        if (n == chars) return chars;
-        if (bytes == len && EndsField(text, pos + n)) return n;
-        return chars;
+        var charEnd = start + Math.Min(len, text.Length - start);
+        var ascii = true;
+        for (var i = start; i < charEnd && ascii; i++) ascii = text[i] < 0x80;
+        if (ascii) return charEnd;
+
+        var byteEnd = ByteEnd(text, start, len);
+        if (byteEnd < 0) return charEnd;
+        if (!NextTagFollows(text, byteEnd) && NextTagFollows(text, charEnd)) return charEnd;
+        return byteEnd;
     }
 
-    private static bool EndsField(string text, int at)
+    // The index after len UTF-8 bytes of text from start, the end of text if it is shorter, or -1 when the count ends
+    // inside a character.
+    private static int ByteEnd(string text, int start, int len)
+    {
+        var bytes = 0;
+        var i = start;
+        while (bytes < len && i < text.Length)
+        {
+            var c = text[i];
+            if (c < 0x80) bytes += 1;
+            else if (c < 0x800) bytes += 2;
+            else if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+            {
+                bytes += 4;
+                i++;
+            }
+            else bytes += 3;
+            i++;
+        }
+        return bytes <= len ? i : -1;
+    }
+
+    // True when only white space lies between at and the next '<' (or the end of text).
+    private static bool NextTagFollows(string text, int at)
     {
         while (at < text.Length && char.IsWhiteSpace(text[at])) at++;
         return at == text.Length || text[at] == '<';

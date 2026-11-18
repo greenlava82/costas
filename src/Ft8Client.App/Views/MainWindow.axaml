@@ -30,7 +30,7 @@
           </ComboBox.SelectionBoxItemTemplate>
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="vm:BandChoiceViewModel">
-              <Grid ColumnDefinitions="48,Auto,Auto,Auto,Auto" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Name}">
+              <Grid ColumnDefinitions="48,Auto,Auto,Auto,Auto,Auto" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Name}">
                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Width="150" IsVisible="{Binding HasActivity}" VerticalAlignment="Center">
                   <Border Width="60" Height="6" CornerRadius="3" Background="{DynamicResource ControlBorderBrush}" VerticalAlignment="Center">
@@ -56,6 +56,8 @@
                            Foreground="{DynamicResource CautionBrush}" IsVisible="{Binding HasActivity}" ToolTip.Tip="{Binding NeedTip}" />
                 <TextBlock Grid.Column="4" Text="{Binding HuntText}" Margin="12,0,0,0" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
                            Foreground="{DynamicResource AccentBrush}" IsVisible="{Binding HasHunt}" ToolTip.Tip="{Binding HuntTip}" />
+                <TextBlock Grid.Column="5" Text="Receive only" Classes="secondary" Margin="12,0,0,0" FontSize="12" VerticalAlignment="Center"
+                           IsVisible="{Binding ReceiveOnly}" ToolTip.Tip="Your US licence class has no data privileges on this band (Settings › Station)." />
               </Grid>
             </DataTemplate>
           </ComboBox.ItemTemplate>

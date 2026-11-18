@@ -12,11 +12,33 @@ using Ft8Client.Audio.Timing;
 namespace Ft8Client.App.Services;
 
 /// <summary>The dedicated slot thread: polls the slot clock and the transmitter every millisecond. Never waits on I/O.</summary>
-public sealed class SlotLoop(SlotClock clock, Transmitter tx) : IDisposable
+public sealed class SlotLoop : IDisposable
 {
+    /// <summary>Errors on the slot thread are logged at most this often, as a fault can repeat every millisecond.</summary>
+    public static readonly TimeSpan ErrorLogInterval = TimeSpan.FromSeconds(10);
+
+    private readonly SlotClock _clock;
+    private readonly Transmitter _tx;
+    private readonly Func<long> _ticks;
+    private readonly Action<Exception> _logError;
     private Thread? _thread;
     private volatile bool _run;
-    private long _lastErrorTicks = long.MinValue;
+    private long? _lastErrorTicks; // slot thread only
+
+    /// <summary>Creates the loop.</summary>
+    public SlotLoop(SlotClock clock, Transmitter tx)
+        : this(clock, tx, () => Environment.TickCount64, ex => Serilog.Log.Error(ex, "Slot thread error; transmit halted"))
+    {
+    }
+
+    /// <summary>Test seam: a millisecond tick source and the error log.</summary>
+    internal SlotLoop(SlotClock clock, Transmitter tx, Func<long> ticks, Action<Exception> logError)
+    {
+        _clock = clock;
+        _tx = tx;
+        _ticks = ticks;
+        _logError = logError;
+    }
 
     /// <summary>Starts the thread.</summary>
     public void Start()
@@ -26,8 +48,8 @@ public sealed class SlotLoop(SlotClock clock, Transmitter tx) : IDisposable
         {
             while (_run)
             {
-                Guarded(clock.Poll);
-                Guarded(tx.Poll);
+                Guarded(_clock.Poll);
+                Guarded(_tx.Poll);
                 Thread.Sleep(1);
             }
         })
@@ -36,8 +58,9 @@ public sealed class SlotLoop(SlotClock clock, Transmitter tx) : IDisposable
     }
 
     // An exception on this thread would end the process, possibly with PTT keyed over CAT. Stop transmitting instead,
-    // say why in the log (at most every 10 s, as a fault can repeat every millisecond), and keep the slots running.
-    private void Guarded(Action poll)
+    // say why in the log (at most every ErrorLogInterval), and keep the slots running. A repeat inside the interval is
+    // not logged, but still halts if something went on the air since the last Halt.
+    internal void Guarded(Action poll)
     {
         try
         {
@@ -45,11 +68,15 @@ public sealed class SlotLoop(SlotClock clock, Transmitter tx) : IDisposable
         }
         catch (Exception ex)
         {
-            var now = Environment.TickCount64;
-            if (now - Interlocked.Read(ref _lastErrorTicks) < 10_000) return;
-            Interlocked.Exchange(ref _lastErrorTicks, now);
-            Serilog.Log.Error(ex, "Slot thread error; transmit halted");
-            _ = tx.HaltAsync();
+            var now = _ticks();
+            if (_lastErrorTicks is { } last && now - last < (long)ErrorLogInterval.TotalMilliseconds)
+            {
+                if (_tx.Transmitting) _ = _tx.HaltAsync();
+                return;
+            }
+            _lastErrorTicks = now;
+            _logError(ex);
+            _ = _tx.HaltAsync();
         }
     }
 

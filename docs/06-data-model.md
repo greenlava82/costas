@@ -87,7 +87,7 @@ CREATE INDEX ix_qso_date        ON qso(qso_date_on);
 CREATE TABLE upload_queue (
   id            INTEGER PRIMARY KEY,
   qso_id        INTEGER NOT NULL REFERENCES qso(id) ON DELETE CASCADE,
-  target        TEXT    NOT NULL,             -- 'qrz'
+  target        TEXT    NOT NULL,             -- 'qrz', 'eqsl', 'clublog', 'cloudlog'; only qrz and eqsl have a qso state column
   attempts      INTEGER NOT NULL DEFAULT 0,
   next_try_utc  TEXT    NOT NULL,
   last_error    TEXT
@@ -213,7 +213,7 @@ Import must tolerate unknown fields, junk between records and records with no ca
 
 ### ADIF files
 
-The Log view's export and the log copy use one writer (`AdifLogExport`): one file per station callsign (upper case), contacts oldest first, a header line naming the callsign, the count and the time written, records separated by a blank line. Profiles with the same callsign share a file. Export with more than one callsign in the log writes `<name>-<CALL>.adi` beside the chosen file. Plain UTF-8 without a byte order mark; lengths count UTF-8 bytes, and the reader accepts characters too (`08-open-questions.md` V29). Every file is written to `<name>.tmp`, flushed and renamed over the old one (`AtomicFile`).
+The Log view's export and the log copy use one writer (`AdifLogExport`): one file per station callsign (upper case), contacts oldest first, a header line naming the callsign, the count and the time written, records separated by a blank line. Profiles with the same callsign share a file. Export with more than one callsign in the log writes `<name>-<CALL>.adi` beside the chosen file. Plain UTF-8 without a byte order mark; lengths count UTF-8 bytes, as every ADIF record Costas writes does, and the reader accepts characters too (`08-open-questions.md` V-ADIF1). Every file is written to `<name>.tmp`, flushed and renamed over the old one (`AtomicFile`).
 
 The log copy (`AdifLogMirror`, driven by `LogCopyService` in App) lives in `backups\`: `costas-log-W7LIT.adi`, a `/` in the call becoming `_`. A file for a callsign no longer in the log is removed; nothing else in the folder is touched. An empty log writes no file.
 
@@ -233,7 +233,7 @@ Plain text, one line per event, monthly files. Compatible in spirit with WSJT-X 
   "schema": 1,
   "activeProfile": "home",
   "profiles": [{
-    "id": "home", "name": "Home", "callsign": "W7LIT", "grid": "DN40",
+    "id": "home", "name": "Home", "callsign": "W7LIT", "grid": "DN40", "licenceClass": "general",
     "rig": { "mode": "hamlib", "model": 3073, "port": "COM4", "baud": 115200, "ptt": "cat", "pttPort": null },
     "audio": { "inputId": "...", "outputId": "...", "txGainDb": -6.0 },
     "powerWatts": 25
@@ -264,6 +264,8 @@ Plain text, one line per event, monthly files. Compatible in spirit with WSJT-X 
 ```
 
 The rig model number shown is an example; always take it from the Hamlib model list.
+
+`licenceClass` is the US licence class whose data segments the transmit guard keeps to: `extra`, `advanced`, `general`, `technician` or `none` (not US: band limits only). It is missing (null) until the operator chooses one; then `operating.usDataSegmentsOnly` decides: true reads as `extra`, false as `none`. It is false on a new install (the check is off by default, owner decision 2026-11-18); earlier builds wrote it as true unless the operator turned it off, so their stations keep the Extra check. Settings writes the class on every Save, so the old switch is only read for profiles never saved since. An unknown value reads as `extra`.
 
 ## Frequency table
 

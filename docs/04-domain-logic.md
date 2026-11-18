@@ -407,3 +407,16 @@ Owner request 2026-11-18. `WhyQuiet.Explain` (Core, pure) picks the Operate scre
     6. **Radio not connected**: nothing; the no-radio banner already says so.
     7. Otherwise **nothing found**: the band may just be quiet.
 - The readout never changes rig state. Only the operator's click on its Go to button tunes, through `AppHost.TuneDialAsync`.
+
+## 19. Band-edge and licence guard
+
+Every transmission, Tune tone and CQ passes `FrequencyTable.TransmitAllowed` (Core) before PTT, after the radio, audio and clock guards. The whole signal must fit: from dial + offset to dial + offset + width for FT8 and FT4 (tones sit above the offset), and centred on dial + offset for PSK and RTTY, with the RTTY width from its shift and speed. It is refused when the signal is outside the frequency table's limits for the band, when a PSK or RTTY signal has no row for its mode on the band, or when it is not wholly inside one data segment of the operator's US licence class.
+
+The licence class (owner request 2026-11-18) is set per station profile on Settings › Station: Amateur Extra, Advanced, General, Technician, or Not US / don't check (band limits only). Off by default (owner decision 2026-11-18): on a new install a profile with no class chosen is Not US, so only the band limits apply until the operator picks a class. A profile from an earlier build that has never had one chosen follows that build's "US data segments only" switch, which its settings file stores: Extra when it was on (that build's default), Not US when it was off, so an existing station keeps the check it had. Costas never guesses a class from the callsign or QRZ. `UsDataSegments` holds the segments per class, from 47 CFR 97.301, 97.303(h), 97.305(c) and 97.307(f)(9) (source, date and the full table in `08-open-questions.md`). In short: General and Advanced have the Extra segments less 3.500-3.525, 7.000-7.025, 14.000-14.025 and 21.000-21.025 MHz; a Technician has data only on 28.000-28.300 MHz, 6 m and 2 m; 60 m (channels and 5351.5-5366.5 kHz) is General and up.
+
+A refusal is never fixed by moving the signal (rule 4); the reason names the class and the limits on that band:
+
+- "Not sent: your General licence allows data on 20 m only on 14.025-14.150 MHz, and this signal would take 14.0215-14.02155 MHz. Wrong licence class, or licensed outside the US? Change it in Settings › Station."
+- "Not sent: your Technician licence doesn't allow data on 20 m, so the band is receive only for you. Technicians may send data on 10 m (28.000-28.300 MHz), 6 m and 2 m. Wrong licence class, or licensed outside the US? Change it in Settings › Station."
+
+`FrequencyTable.ReceiveOnly` is true for a band where the class has no data segment within the band's limits; the band menu marks it "Receive only". The band can still be picked to listen. Changing the class only restricts: no class allows more than the Extra segments did before.

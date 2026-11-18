@@ -66,6 +66,13 @@ public sealed partial class BandChoiceViewModel : ObservableObject
     [ObservableProperty]
     public partial bool NotFollowed { get; set; }
 
+    /// <summary>
+    /// True when the operator's US licence class has no data segment on this band, so Costas will refuse to transmit
+    /// here (<see cref="FrequencyTable.ReceiveOnly"/>). The band can still be picked to listen.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool ReceiveOnly { get; set; }
+
     /// <summary>True when this is the band the radio is on.</summary>
     [ObservableProperty]
     public partial bool IsCurrent { get; set; }

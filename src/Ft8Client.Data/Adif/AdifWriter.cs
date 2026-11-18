@@ -35,16 +35,13 @@ public static class AdifWriter
         return sb.ToString();
     }
 
-    /// <summary>One record ending in <c>&lt;eor&gt;</c>, lengths counted in UTF-16 code units.</summary>
-    public static string Record(AdifRecord r) => Record(r, AdifLengthUnit.Utf16);
-
-    /// <summary>One record ending in <c>&lt;eor&gt;</c>, lengths counted in <paramref name="unit"/>.</summary>
-    public static string Record(AdifRecord r, AdifLengthUnit unit)
+    /// <summary>One record ending in <c>&lt;eor&gt;</c>.</summary>
+    public static string Record(AdifRecord r)
     {
         var sb = new StringBuilder();
         foreach (var (k, v) in r.Fields)
         {
-            if (v.Length > 0) Field(sb, k, v, unit);
+            if (v.Length > 0) Field(sb, k, v);
         }
         sb.Append("<eor>\n");
         return sb.ToString();
@@ -58,10 +55,7 @@ public static class AdifWriter
         return sb.ToString();
     }
 
-    /// <summary>
-    /// A file: a header opening with <paramref name="headerText"/>, then the records separated by blank lines, lengths in
-    /// UTF-8 bytes (see <see cref="AdifLengthUnit"/>).
-    /// </summary>
+    /// <summary>A file: a header opening with <paramref name="headerText"/>, then the records separated by blank lines.</summary>
     public static string FileText(IEnumerable<AdifRecord> records, DateTime nowUtc, string headerText)
     {
         var sb = new StringBuilder(Header(nowUtc, headerText));
@@ -70,15 +64,12 @@ public static class AdifWriter
         {
             if (!first) sb.Append('\n');
             first = false;
-            sb.Append(Record(r, AdifLengthUnit.Utf8Bytes));
+            sb.Append(Record(r));
         }
         return sb.ToString();
     }
 
-    /// <summary>The length of <paramref name="value"/> in <paramref name="unit"/>.</summary>
-    public static int Length(string value, AdifLengthUnit unit) =>
-        unit == AdifLengthUnit.Utf8Bytes ? Encoding.UTF8.GetByteCount(value) : value.Length;
-
-    private static void Field(StringBuilder sb, string name, string value, AdifLengthUnit unit = AdifLengthUnit.Utf16) =>
-        sb.Append(CultureInfo.InvariantCulture, $"<{name}:{Length(value, unit)}>{value}\n");
+    // The length is in UTF-8 bytes, as QRZ, LoTW (TQSL), Club Log and Cloudlog read it, not in UTF-16 characters.
+    private static void Field(StringBuilder sb, string name, string value) =>
+        sb.Append(CultureInfo.InvariantCulture, $"<{name}:{Encoding.UTF8.GetByteCount(value)}>{value}\n");
 }
