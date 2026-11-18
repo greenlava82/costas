@@ -40,7 +40,7 @@ Ordered by value to an FT8 operator against effort. Anything that changes what g
 | C1 | SuperFox decoding, then SuperHound | Done 2026-11-14 (signature check and an on-air try still open) | M |
 | C2 | Club Log real-time upload | Club Log already feeds the Rarity meter; uploading closes the loop for DXCC tracking and OQRS | S |
 | C3 | Compound and portable calls (type 4 messages) | VE3/W7LIT as your own call, or answering PJ4/K1ABC, fails today | M |
-| C4 | DX cluster and RBN spots, display only, beside POTA spots | Shows rare stations on other bands before they show up on the waterfall | M |
+| C4 | ~~DX cluster and RBN spots, display only, beside POTA spots~~ Done 2026-11-18: DX cluster spots (one operator-chosen node, off by default) on station rows, details and the Awards view, with an explicit Go to; RBN was already in. Live node capture and the SET/FT8 question still open (V-DXC2, owner question 7) | Shows rare stations on other bands before they show up on the waterfall | M |
 | C5 | ~~Band advice line: "15 m is open to Europe for you"~~ built 2026-11-18 (`04-domain-logic.md` section 14a); next: tune the thresholds on the air (V27) | Already in the spec; builds on Other bands right now and the neighbour data | S |
 | C6 | ~~Contest exchanges (ARRL RTTY Roundup, Field Day, WW Digi)~~ FT8/FT4 contests built 2026-11-07 (Roundup, Field Day, WW Digi, ARRL Digi); next: the Roundup in real RTTY | Contest CQs are only parked in Watching today; weekends are when FT8 is busiest | L |
 | C7 | More rigs: OmniRig and TCI (SunSDR, ANAN) | In the spec's v1.x list; TCI also carries audio, so no sound-card setup | M each |

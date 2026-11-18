@@ -40,11 +40,11 @@
     <nav class="bar__nav" aria-label="Site">
       <a href="{{ home }}#tour">Tour</a>
       <a href="{{ 'introduction/' | url }}">Manual</a>
-      {%- if support %}
-      <a href="{{ support }}">Support</a>
-      {%- endif %}
       <a href="{{ config.repo_url }}">GitHub</a>
       <a href="{{ 'about/' | url }}">About</a>
+      {%- if support %}
+      <a class="bar__support" href="{{ support }}"><span aria-hidden="true">♥</span> Support</a>
+      {%- endif %}
       <a class="bar__cta" href="{{ home }}#download">Download</a>
     </nav>
   </div>

@@ -129,7 +129,7 @@ CREATE TABLE callsign_cache (
   itu_zone     INTEGER
 );
 
-CREATE TABLE spot (                           -- reports of my signal from PSK Reporter
+CREATE TABLE spot (                           -- reports of my signal (PSK Reporter, RBN), and DX cluster spots
   id            INTEGER PRIMARY KEY,
   my_call       TEXT    NOT NULL,
   rx_call       TEXT    NOT NULL,
@@ -141,7 +141,7 @@ CREATE TABLE spot (                           -- reports of my signal from PSK R
   freq_hz       INTEGER,
   snr           INTEGER,
   time_utc      TEXT    NOT NULL,
-  source        TEXT    NOT NULL              -- 'mqtt', 'query'
+  source        TEXT    NOT NULL              -- 'mqtt', 'query', 'rbn', 'cluster'
 );
 CREATE INDEX ix_spot_band_time ON spot(band, time_utc);
 CREATE INDEX ix_spot_rx        ON spot(rx_call, band);
@@ -154,6 +154,8 @@ CREATE TABLE band_stat (                      -- per-slot counts for "per slot o
   PRIMARY KEY (slot_start_utc, band, mode)
 );
 ```
+
+A `cluster` row in `spot` is a DX cluster spot of another station (`05-integrations.md` section 5b): `my_call` holds the station spotted, `rx_call` the spotter, `mode` the mode its comment named (or empty), `snr` is null, and `rx_grid`, `rx_dxcc` and `rx_entity_key` are empty. Code that reads reports of my signal skips source `cluster`. No migration was needed.
 
 Duplicate rule for the log (import, sync and local): same `call`, `band`, `mode` (and `submode`) and `qso_date_on` within 30 minutes is the same contact. Prefer the row with a `qrz_logid`; merge missing fields into it.
 
@@ -256,6 +258,7 @@ Plain text, one line per event, monthly files. Compatible in spirit with WSJT-X 
   "notifications": { "enabled": true, "hunt": true, "callers": true, "onlyInBackground": true },
   "qrz": { "logbookEnabled": true, "lookupEnabled": true, "syncMinutes": 15, "uploadOnComplete": true },
   "pskReporter": { "feedEnabled": true, "uploadSpots": false },
+  "dxCluster": { "enabled": false, "host": "", "port": 7300 },
   "udp": { "enabled": true, "address": "127.0.0.1", "port": 2237 },
   "files": { "saveWav": "none", "retentionDays": 30 },
   "appearance": { "theme": "system", "skin": "classic", "units": "miles" },

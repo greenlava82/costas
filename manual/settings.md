@@ -161,6 +161,17 @@ line*.
   one of them shows *DXpedition* and the country under **Why** and in its details, and the
   [Awards](awards.md#dxpeditions-on-the-air) view lists the ones on the air and starting soon. It never changes the
   order or who is called. Off makes no requests.
+- **DX cluster: Show DX cluster spots of stations I need**: off. Type the address and port of a DX cluster node
+  (port 7300 on most nodes), or pick one from *Or pick a well-known node*. Use your club's node if it has one: the
+  well-known nodes are run by volunteers, and Costas does not prefer any of them. Costas logs in with your callsign and
+  only reads the spots: it never sends spots, filters or commands. Needed stations spotted in the mode you are in are
+  listed on the [Awards](awards.md#spotted-on-the-dx-cluster) view, and a station you are hearing shows *Spotted 4 min
+  ago* under **Why** ([Operate](operate.md#next-in-line)). Spots never change the order, who is called or the radio's
+  frequency. While it is on, a **DX cluster** indicator in the bottom bar says whether Costas is connected; if the node
+  cannot be reached Costas tries again less often, and nothing else is affected. Nodes that ask for a password are not
+  supported. Which spots a node sends (FT8 skimmer spots in particular) depends on your settings stored on that node.
+
+  ![Settings: DX cluster](images/settings-dx-cluster.png)
 
 ## Hunt list
 

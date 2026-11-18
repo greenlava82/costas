@@ -85,11 +85,17 @@ public sealed class StationDetailsViewModel
     /// <summary>The DXpedition line is shown.</summary>
     public bool HasDxpedition => Dxpedition.Length > 0;
 
+    /// <summary>"Spotted 4 min ago on 15 m by DL1ABC · FT8 -12 dB" (DX cluster), blank when not spotted lately.</summary>
+    public string Spotted { get; private init; } = string.Empty;
+
+    /// <summary>The DX cluster line is shown.</summary>
+    public bool HasSpotted => Spotted.Length > 0;
+
     /// <summary>The details strip's QSL and awards column has something to show.</summary>
-    public bool HasFactsColumn => HasQsl || HasZones || HasRarity || HasPark || HasDxpedition || HasHeard;
+    public bool HasFactsColumn => HasQsl || HasZones || HasRarity || HasPark || HasDxpedition || HasSpotted || HasHeard;
 
     /// <summary>The confirmation and awards group has at least one known fact.</summary>
-    public bool HasConfirmationDetails => HasQsl || HasRarity || HasPark || HasDxpedition;
+    public bool HasConfirmationDetails => HasQsl || HasRarity || HasPark || HasDxpedition || HasSpotted;
 
     /// <summary>
     /// When the operator hears this station's country, from the decode journal: "Mongolia: heard 6 times, always on 20 m
@@ -179,7 +185,7 @@ public sealed class StationDetailsViewModel
     public static StationDetailsViewModel From(string call, Station? s, CallsignCacheEntry? q, LogIndex? log, DistanceUnit units, DateTime nowUtc,
                                                string? name = null, Pileup? pileup = null, int txOffsetHz = 0, Mode mode = Mode.Ft8, int? mostWantedRank = null,
                                                DateTime? lotwUpload = null, Core.Pota.ParkInfo? park = null,
-                                               Core.Dxpeditions.Dxpedition? dxpedition = null)
+                                               Core.Dxpeditions.Dxpedition? dxpedition = null, Core.Cluster.ClusterSpot? spot = null)
     {
         var entity = s?.Entity?.Entity;
         var offset = q is null ? null : StationClock.Offset(q.GmtOffset, q.ObservesDst, s?.EntityKey, s?.Continent, nowUtc);
@@ -200,6 +206,7 @@ public sealed class StationDetailsViewModel
             Rarity = mostWantedRank is { } mw ? Core.Geo.Rarity.Describe(mw) : string.Empty,
             Park = Core.Pota.PotaText.Details(park),
             Dxpedition = Core.Dxpeditions.DxpeditionText.Details(dxpedition, nowUtc),
+            Spotted = Core.Cluster.ClusterText.Details(spot, nowUtc),
             Zones = Join(" · ", q?.CqZone is { } cq ? $"CQ {cq}" : null, q?.ItuZone is { } itu ? $"ITU {itu}" : null),
             LookupNote = q is null && name is null ? "No QRZ details yet. They appear here when QRZ lookups are set up." : string.Empty,
             QrzUrl = "https://www.qrz.com/db/" + Uri.EscapeDataString(call),
