@@ -12,4 +12,5 @@ namespace Ft8Client.Integrations.Cloudlog;
 /// <param name="Accepted">The contact is in the log now (added, or already there).</param>
 /// <param name="Error">Why not, in words for the status line; never contains the API key.</param>
 /// <param name="Permanent">True when retrying soon cannot help (wrong key or station id): retry slowly.</param>
-public sealed record CloudlogUploadResult(bool Accepted, string? Error = null, bool Permanent = false);
+/// <param name="RetryAfter">How long the site asked Costas to wait (Wavelog v2 <c>rate_limited</c>), or null.</param>
+public sealed record CloudlogUploadResult(bool Accepted, string? Error = null, bool Permanent = false, TimeSpan? RetryAfter = null);

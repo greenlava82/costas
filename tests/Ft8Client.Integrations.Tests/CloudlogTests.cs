@@ -120,6 +120,166 @@ public class CloudlogTests
         queue.All().Should().Contain(i => i.QsoId == other && i.Target == CloudlogUploadService.Target);
     }
 
+    [Theory]
+    [InlineData("wl2_abc123", WavelogApi.V2)]
+    [InlineData("  wl2_abc123 ", WavelogApi.V2)]
+    [InlineData("cl5f2a9", WavelogApi.V1)]
+    [InlineData("WL2_abc", WavelogApi.V1)]
+    [InlineData("", WavelogApi.V1)]
+    [InlineData(null, WavelogApi.V1)]
+    public void ApiFor_Key_PicksTheApi(string? key, WavelogApi api) => CloudlogClient.ApiFor(key).Should().Be(api);
+
+    [Theory]
+    [InlineData("https://example.com/wavelog/index.php/api/v2/qso", "https://example.com/wavelog")]
+    [InlineData("https://log.example.com/api/v2/station", "https://log.example.com/")]
+    public void SiteUrl_PastedV2Address_BaseAddress(string typed, string expected) =>
+        CloudlogClient.SiteUrl(typed)!.AbsoluteUri.Should().Be(expected);
+
+    [Fact]
+    public async Task Upload_V2Token_PostsAdifImportWithBearer()
+    {
+        JsonElement? sent = null;
+        using var handler = new Handler(async (request, ct) =>
+        {
+            request.Method.Should().Be(HttpMethod.Post);
+            request.RequestUri.Should().Be(new Uri("https://log.example.com/index.php/api/v2/qso"));
+            request.Headers.Authorization!.Scheme.Should().Be("Bearer");
+            request.Headers.Authorization.Parameter.Should().Be("wl2_secret");
+            request.Headers.UserAgent.ToString().Should().StartWith("Costas/");
+            sent = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct)).RootElement.Clone();
+            return new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = new StringContent("""{"data":{"parsed":1,"imported":1,"skipped":0,"messages":[]},"meta":{}}"""),
+            };
+        });
+        using var http = HttpFactory.Create("W7LIT", handler);
+        var record = new Ft8Client.Data.Adif.AdifRecord { ["call"] = "K1ABC", ["band"] = "20m", ["mode"] = "FT8" };
+
+        (await new CloudlogClient(http).UploadAsync(Site, " wl2_secret", "3", record, TestContext.Current.CancellationToken)).Accepted.Should().BeTrue();
+
+        var body = sent!.Value;
+        body.GetProperty("import_type").GetString().Should().Be("adif");
+        body.GetProperty("station_profile_id").GetInt32().Should().Be(3);
+        body.GetProperty("adif").GetString().Should().Contain("<call:5>K1ABC").And.Contain("<eor>");
+        body.GetRawText().Should().NotContain("wl2_secret", "a v2 token travels only in the header");
+    }
+
+    [Fact]
+    public async Task Upload_V2TokenStationIdNotANumber_RefusedWithoutSending()
+    {
+        var calls = 0;
+        using var handler = new Handler((_, _) => { calls++; return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Created)); });
+        using var http = HttpFactory.Create("W7LIT", handler);
+        var r = await new CloudlogClient(http).UploadAsync(Site, "wl2_x", "home", new Ft8Client.Data.Adif.AdifRecord { ["call"] = "K1ABC" }, TestContext.Current.CancellationToken);
+        (r.Accepted, r.Permanent).Should().Be((false, true));
+        r.Error.Should().Contain("must be a number");
+        calls.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Created, """{"data":{"parsed":1,"imported":1,"skipped":0,"messages":[]}}""", true, false, null)]
+    [InlineData(HttpStatusCode.Created, """{"data":{"parsed":1,"imported":0,"skipped":1,"messages":["Duplicate for K1ABC"]}}""", true, false, null)]
+    [InlineData(HttpStatusCode.Conflict, """{"error":{"code":"conflict","message":"Duplicate"}}""", true, false, null)]
+    [InlineData(HttpStatusCode.Created, """{"data":{"parsed":0,"imported":0,"skipped":0,"messages":["No QSO found"]}}""", false, false, "No QSO found")]
+    [InlineData(HttpStatusCode.Unauthorized, """{"error":{"code":"invalid_token","message":"Unknown token"}}""", false, true, "unknown or revoked")]
+    [InlineData(HttpStatusCode.Unauthorized, """{"error":{"code":"token_expired","message":"Expired"}}""", false, true, "expired")]
+    [InlineData(HttpStatusCode.Forbidden, """{"error":{"code":"insufficient_scope","message":"Missing scope","details":{"required_scope":"qso:write"}}}""", false, true, "qso:write")]
+    [InlineData(HttpStatusCode.Forbidden, """{"error":{"code":"forbidden","message":"Station not owned"}}""", false, true, "Station not owned")]
+    [InlineData(HttpStatusCode.NotFound, "<html>Not found</html>", false, true, "Wavelog 3.1")]
+    [InlineData(HttpStatusCode.TooManyRequests, """{"error":{"code":"rate_limited","message":"Slow down","details":{"retry_after":90}}}""", false, false, "slow down")]
+    [InlineData(HttpStatusCode.BadRequest, """{"error":{"code":"validation_error","message":"band is invalid"}}""", false, false, "band is invalid")]
+    [InlineData(HttpStatusCode.OK, "<html>Sign in</html>", false, false, "check the address")]
+    public void ParseV2Upload_Answer_AcceptedPermanentOrRetry(HttpStatusCode code, string body, bool accepted, bool permanent, string? says)
+    {
+        var r = CloudlogClient.ParseV2Upload(code, body, "wl2_secret");
+        (r.Accepted, r.Permanent).Should().Be((accepted, permanent));
+        if (says is not null) r.Error.Should().ContainEquivalentOf(says);
+    }
+
+    [Fact]
+    public void ParseV2Upload_RateLimited_CarriesTheWait()
+    {
+        var r = CloudlogClient.ParseV2Upload(HttpStatusCode.TooManyRequests, """{"error":{"code":"rate_limited","details":{"retry_after":90}}}""");
+        r.RetryAfter.Should().Be(TimeSpan.FromSeconds(90));
+    }
+
+    [Fact]
+    public void ParseV2Upload_MessageQuotingTheToken_TokenRemoved() =>
+        CloudlogClient.ParseV2Upload(HttpStatusCode.BadRequest, """{"error":{"code":"validation_error","message":"bad wl2_secret"}}""", "wl2_secret")
+            .Error.Should().NotContain("wl2_secret");
+
+    [Fact]
+    public void ParseV2Token_DocumentedExample_ReadsScopesAndExpiry()
+    {
+        var t = CloudlogClient.ParseV2Token("""
+            {"data":{"id":15,"name":"my logger","owner":"N0CALL","user_id":1,"scopes":["qso:read","qso:write","lookup:read"],"expires_at":"2026-08-16 12:05:50"}}
+            """)!;
+        t.Name.Should().Be("my logger");
+        (t.CanRead, t.CanWrite, t.CanListStations).Should().Be((true, true, false));
+        t.ExpiresAt.Should().Be(new DateTime(2026, 8, 16, 12, 5, 50));
+        CloudlogClient.ParseV2Token("""{"data":{"name":"forever","scopes":["qso:read"],"expires_at":null}}""")!.ExpiresAt.Should().BeNull();
+        CloudlogClient.ParseV2Token("""{"error":{"code":"invalid_token"}}""").Should().BeNull();
+    }
+
+    [Fact]
+    public void ParseV2Stations_DocumentedFields_ReadsLocations()
+    {
+        var list = CloudlogClient.ParseV2Stations("""
+            {"data":[{"id":1,"name":"Home","callsign":"w7lit","gridsquare":"DN40","active":true},
+                     {"id":2,"name":"Portable","callsign":"W7LIT/P","active":false}],"meta":{}}
+            """)!;
+        list.Should().Equal(new CloudlogStation("1", "Home", "W7LIT", true), new CloudlogStation("2", "Portable", "W7LIT/P", false));
+        CloudlogClient.ParseV2Stations("""[{"station_id":"1"}]""").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Stations_V2Token_AsksTheV2StationResource()
+    {
+        Uri? asked = null;
+        using var handler = new Handler((request, _) =>
+        {
+            asked = request.RequestUri;
+            request.Headers.Authorization!.Parameter.Should().Be("wl2_t");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"data":[{"id":7,"name":"Club","callsign":"W7ABC","active":true}]}""") });
+        });
+        using var http = HttpFactory.Create("W7LIT", handler);
+        var list = await new CloudlogClient(http).StationsAsync(Site, "wl2_t", TestContext.Current.CancellationToken);
+        asked.Should().Be(new Uri("https://log.example.com/index.php/api/v2/station"));
+        list!.Single().Id.Should().Be("7");
+    }
+
+    [Fact]
+    public async Task Token_V1Key_AsksNothing()
+    {
+        var calls = 0;
+        using var handler = new Handler((_, _) => { calls++; return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)); });
+        using var http = HttpFactory.Create("W7LIT", handler);
+        (await new CloudlogClient(http).TokenAsync(Site, "cl123", TestContext.Current.CancellationToken)).Should().BeNull();
+        calls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Queue_V2RateLimited_WaitsAsLongAsAsked()
+    {
+        var db = SqliteDatabase.InMemory(out var keepAlive);
+        using var connection = keepAlive;
+        var qsos = new QsoRepository(db);
+        var queue = new UploadQueueRepository(db);
+        var clock = new ManualClock(Now);
+        var id = qsos.Insert(new QsoRecord { ProfileId = "home", StationCallsign = "W7LIT", Call = "K1ABC", Band = "20m", Mode = "FT8", QsoDateOn = Now });
+        queue.Enqueue(id, CloudlogUploadService.Target, Now);
+        using var handler = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+        {
+            Content = new StringContent("""{"error":{"code":"rate_limited","message":"Too many","details":{"retry_after":600}}}"""),
+        }));
+        using var http = HttpFactory.Create("W7LIT", handler);
+        var worker = new CloudlogUploadService(new CloudlogClient(http), qsos, queue, clock, (wait, _) => { clock.Advance(wait); return Task.CompletedTask; });
+
+        (await worker.ProcessDueAsync("home", "W7LIT", Site, "wl2_t", "1", TestContext.Current.CancellationToken)).Should().Be(0);
+
+        queue.All().Single().NextTryUtc.Should().Be(clock.UtcNow + TimeSpan.FromSeconds(600));
+    }
+
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => send(request, cancellationToken);

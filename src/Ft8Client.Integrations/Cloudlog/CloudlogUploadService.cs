@@ -55,7 +55,9 @@ public sealed class CloudlogUploadService(CloudlogClient client, QsoRepository q
                 done++;
                 continue;
             }
-            var next = clock.UtcNow + (result.Permanent ? PermanentRetry : _backoff.DelayFor(item.Attempts + 1));
+            var retryIn = result.Permanent ? PermanentRetry : _backoff.DelayFor(item.Attempts + 1);
+            if (result.RetryAfter is { } asked && asked > retryIn) retryIn = asked;
+            var next = clock.UtcNow + retryIn;
             queue.Retry(item.Id, result.Error ?? "Upload failed", next);
             Status = new(result.Permanent ? ServiceHealth.Down : ServiceHealth.Degraded, result.Error ?? "Waiting to retry", clock.UtcNow);
             break;
