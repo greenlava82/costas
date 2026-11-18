@@ -112,11 +112,13 @@ public class CloudlogTests
         item.Attempts.Should().Be(1);
         item.NextTryUtc.Should().Be(clock.UtcNow + CloudlogUploadService.PermanentRetry);
         worker.Status.Message.Should().ContainEquivalentOf("api key");
+        (qsos.Get(id)!.WavelogUploadState, qsos.Get(id)!.WavelogUploadError).Should().Be((UploadState.Queued, "The logbook refused the upload: missing or wrong api key."));
 
         clock.Advance(TimeSpan.FromHours(1));
         (code, reply) = (HttpStatusCode.Created, """{"status":"created"}""");
         (await worker.ProcessDueAsync("home", "W7LIT", Site, "good", "1", TestContext.Current.CancellationToken)).Should().Be(1);
         queue.All().Should().HaveCount(2, "the QRZ item and the other profile's contact stay");
+        (qsos.Get(id)!.WavelogUploadState, qsos.Get(id)!.WavelogUploadError).Should().Be((UploadState.Uploaded, null));
         queue.All().Should().Contain(i => i.QsoId == other && i.Target == CloudlogUploadService.Target);
     }
 

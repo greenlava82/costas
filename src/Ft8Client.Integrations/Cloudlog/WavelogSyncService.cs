@@ -50,6 +50,8 @@ public sealed class WavelogSyncService(CloudlogClient client, QsoRepository qsos
                     .Select(a => AdifMapper.ToQso(a, profileId, callsign, QsoSource.Wavelog, countries))
                     .OfType<QsoRecord>()
                     .ToList();
+                // Wavelog has these, so they count as delivered there.
+                foreach (var q in records) q.WavelogUploadState = UploadState.Uploaded;
                 fetched += records.Count;
                 foreach (var (id, isNew) in qsos.UpsertEach(records))
                 {

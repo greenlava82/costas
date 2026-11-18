@@ -56,6 +56,7 @@ public sealed class WavelogSyncServiceTests : IDisposable
         _asked[1].Should().Contain("since_id=41");
         _qsos.List().Should().OnlyContain(q => q.Source == QsoSource.Wavelog && q.StationCallsign == "W7LIT" && q.ProfileId == "home");
         _queue.All().Should().BeEmpty("a downloaded contact is never sent back to Wavelog");
+        _qsos.List().Should().OnlyContain(q => q.WavelogUploadState == UploadState.Uploaded, "Wavelog has them");
 
         _pages.Enqueue("""{"data":{"exported":0,"lastfetchedid":57,"adif":null},"meta":{"has_more":false}}""");
         var again = await Sync();
@@ -80,6 +81,7 @@ public sealed class WavelogSyncServiceTests : IDisposable
         (r.Inserted, r.Merged).Should().Be((0, 1));
         _qsos.Get(id)!.Gridsquare.Should().Be("FN42", "missing fields are taken from Wavelog");
         _queue.All().Select(i => i.Target).Should().Equal("clublog");
+        _qsos.Get(id)!.WavelogUploadState.Should().Be(UploadState.Uploaded, "Wavelog already has the contact");
     }
 
     [Fact]

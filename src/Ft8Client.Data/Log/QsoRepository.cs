@@ -25,13 +25,15 @@ public sealed class QsoRepository(SqliteDatabase db)
     private const string Columns = """
         profile_id, call, qso_date_on, qso_date_off, band, freq_hz, mode, submode, rst_sent, rst_rcvd, gridsquare, name, qth, state,
         country, dxcc, entity_key, continent, station_callsign, my_gridsquare, tx_pwr, comment, confirmed, need_tier, source, qrz_logid,
-        upload_state, upload_error, eqsl_upload_state, eqsl_upload_error, eqsl_confirmed, raw_adif, created_utc, modified_utc, lotw_confirmed, lotw_upload_state, edited_utc
+        upload_state, upload_error, eqsl_upload_state, eqsl_upload_error, eqsl_confirmed, raw_adif, created_utc, modified_utc, lotw_confirmed, lotw_upload_state, edited_utc,
+        wavelog_upload_state, wavelog_upload_error
         """;
 
     private const string Values = """
         @ProfileId, @Call, @QsoDateOn, @QsoDateOff, @Band, @FreqHz, @Mode, @Submode, @RstSent, @RstRcvd, @Gridsquare, @Name, @Qth, @State,
         @Country, @Dxcc, @EntityKey, @Continent, @StationCallsign, @MyGridsquare, @TxPwr, @Comment, @Confirmed, @NeedTier, @Source, @QrzLogid,
-        @UploadState, @UploadError, @EqslUploadState, @EqslUploadError, @EqslConfirmed, @RawAdif, @CreatedUtc, @ModifiedUtc, @LotwConfirmed, @LotwUploadState, @EditedUtc
+        @UploadState, @UploadError, @EqslUploadState, @EqslUploadError, @EqslConfirmed, @RawAdif, @CreatedUtc, @ModifiedUtc, @LotwConfirmed, @LotwUploadState, @EditedUtc,
+        @WavelogUploadState, @WavelogUploadError
         """;
 
     private const string Updates = """
@@ -40,7 +42,8 @@ public sealed class QsoRepository(SqliteDatabase db)
         dxcc=@Dxcc, entity_key=@EntityKey, continent=@Continent, station_callsign=@StationCallsign, my_gridsquare=@MyGridsquare, tx_pwr=@TxPwr,
         comment=@Comment, confirmed=@Confirmed, need_tier=@NeedTier, source=@Source, qrz_logid=@QrzLogid, upload_state=@UploadState,
         upload_error=@UploadError, eqsl_upload_state=@EqslUploadState, eqsl_upload_error=@EqslUploadError, eqsl_confirmed=@EqslConfirmed, raw_adif=@RawAdif, modified_utc=@ModifiedUtc,
-        lotw_confirmed=@LotwConfirmed, lotw_upload_state=@LotwUploadState, edited_utc=@EditedUtc
+        lotw_confirmed=@LotwConfirmed, lotw_upload_state=@LotwUploadState, edited_utc=@EditedUtc,
+        wavelog_upload_state=@WavelogUploadState, wavelog_upload_error=@WavelogUploadError
         """;
 
     /// <summary>Inserts a contact and returns its id.</summary>
@@ -242,6 +245,15 @@ public sealed class QsoRepository(SqliteDatabase db)
         Changed?.Invoke();
     }
 
+    /// <summary>Sets Wavelog/Cloudlog delivery state without changing QRZ or eQSL delivery.</summary>
+    public void SetWavelogUploadState(long id, string state, string? error)
+    {
+        using var c = db.Open();
+        c.Execute("UPDATE qso SET wavelog_upload_state=@state, wavelog_upload_error=@error, modified_utc=@now WHERE id=@id",
+            new { id, state, error, now = DateTime.UtcNow });
+        Changed?.Invoke();
+    }
+
     /// <summary>Contacts for the log index of a station callsign.</summary>
     public IReadOnlyList<LogContact> LogContacts(string stationCallsign)
     {
@@ -339,6 +351,7 @@ public sealed class QsoRepository(SqliteDatabase db)
         target.LotwConfirmed |= source.LotwConfirmed;
         target.Confirmed |= source.Confirmed || target.EqslConfirmed || target.LotwConfirmed;
         if (source.LotwUploadState == UploadState.Uploaded) target.LotwUploadState = UploadState.Uploaded;
+        TakeWavelogCopy(target, source);
         if (target.QrzLogid is null && source.QrzLogid is not null)
         {
             target.QrzLogid = source.QrzLogid;
@@ -357,6 +370,14 @@ public sealed class QsoRepository(SqliteDatabase db)
         }
     }
 
+    // A copy from a Wavelog download means Wavelog has the contact: it counts as delivered there.
+    private static void TakeWavelogCopy(QsoRecord target, QsoRecord source)
+    {
+        if (source.Source != QsoSource.Wavelog) return;
+        target.WavelogUploadState = UploadState.Uploaded;
+        target.WavelogUploadError = null;
+    }
+
     // A contact the operator edited keeps every field as edited. Only what the other services know better is taken:
     // confirmations, the QRZ log id and the upload states.
     private static void MergeIntoEdited(QsoRecord target, QsoRecord source)
@@ -364,6 +385,7 @@ public sealed class QsoRepository(SqliteDatabase db)
         target.EqslConfirmed |= source.EqslConfirmed;
         target.LotwConfirmed |= source.LotwConfirmed;
         if (source.LotwUploadState == UploadState.Uploaded) target.LotwUploadState = UploadState.Uploaded;
+        TakeWavelogCopy(target, source);
         if (target.QrzLogid is null && source.QrzLogid is not null)
         {
             target.QrzLogid = source.QrzLogid;
