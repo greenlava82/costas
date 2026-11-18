@@ -423,7 +423,7 @@ public class OperateCompactLayoutTests
         SqliteDatabase? database = null;
         try
         {
-            await using var host = await AppHost.StartAsync(new CommandLine { Home = dir, SimulateFolder = Path.Combine(TestPaths.Samples, "ft8") });
+            await using var host = await AppHost.StartAsync(TestHost.Args(dir));
             database = host.Database;
             var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(OperateCompactLayoutTests).Assembly);
             await session.Dispatch(() =>

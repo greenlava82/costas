@@ -9,7 +9,6 @@
 using Avalonia.Headless;
 using Ft8Client.App.ViewModels;
 using Ft8Client.Data.Database;
-using Ft8Client.Data.Secrets;
 using Ft8Client.Data.Settings;
 using Microsoft.Data.Sqlite;
 
@@ -137,8 +136,8 @@ public class SettingsApplyTests
         host.Settings.Current.Profiles[0].RigDescription.Should().Be("FT-710");
     });
 
-    // A simulated host in a temporary folder, with an in-memory credential store so nothing here touches the
-    // operator's saved passwords.
+    // A simulated host in a temporary folder (TestHost: an in-memory credential store, so nothing here touches the
+    // operator's saved passwords).
     private static async Task WithSettings(Action<AppHost, SettingsViewModel, Func<int>> test)
     {
         var dir = Path.Combine(Path.GetTempPath(), "costas-apply-" + Guid.NewGuid());
@@ -154,10 +153,7 @@ public class SettingsApplyTests
         SqliteDatabase? database = null;
         try
         {
-            await using var host = await AppHost.StartAsync(new CommandLine
-            {
-                Home = dir, SimulateFolder = Path.Combine(TestPaths.Samples, "ft8"), Secrets = new InMemorySecretStore(),
-            });
+            await using var host = await AppHost.StartAsync(TestHost.Args(dir));
             database = host.Database;
             var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(SettingsApplyTests).Assembly);
             await session.Dispatch(() =>
