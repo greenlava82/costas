@@ -47,6 +47,7 @@ Ordered by value to an FT8 operator against effort. Anything that changes what g
 | C8 | Automatic log backup and per-profile ADIF export with QSL state | Protects the log; today's export mixes profiles and drops QSL status | S |
 | C9 | Audio device comes back after USB re-plug or sleep | Today a reconnected sound card needs a Costas restart | S |
 | C10 | ~~Linux transmit~~ (turned on 2026-10-31, D17); a Linux user checking it with a real radio | Ends the preview label | S |
+| C11 | ~~Licence-class transmit lockout~~ Done 2026-11-18 (owner request): a US licence class per station profile, and Transmit, Tune and CQ refused outside its data segments | A General or Technician could be let through onto frequencies their licence does not allow | S |
 
 ## Reliability and finishing
 

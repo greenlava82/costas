@@ -28,6 +28,36 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
   modifier or contest), your answer is `<K1ABC> VE3/W7LIT`, reports go as `K1ABC <VE3/W7LIT> R-10` (your call as
   a short code the other station's program recognises) and the sign-off as `<K1ABC> VE3/W7LIT RR73`. The message
   preview under **Contacts** shows exactly what will go out.
+- **US licence class**: Amateur Extra, Advanced, General, Technician, or Not US / don't check. Costas refuses to
+  transmit, tune or call CQ anywhere your class may not send data such as FT8, and says where you can. Each profile
+  keeps its own, so a club or a second operator's profile can have another class. Until you choose one, a profile
+  uses the Amateur Extra segments (or none, if you had turned off *US data segments only* in an earlier version).
+  Choose **Not US** if you are licensed in another country: then only the band limits apply.
+
+  ![Settings: Station, US licence class](images/settings-licence-class.png)
+
+  | Band | Amateur Extra | General and Advanced | Technician |
+  | --- | --- | --- | --- |
+  | 160 m | 1.800-2.000 | 1.800-2.000 | receive only |
+  | 80 m | 3.500-3.600 | 3.525-3.600 | receive only |
+  | 60 m | the four channels and 5.3515-5.3665 | same | receive only |
+  | 40 m | 7.000-7.125 | 7.025-7.125 | receive only |
+  | 30 m | 10.100-10.150 | 10.100-10.150 | receive only |
+  | 20 m | 14.000-14.150 | 14.025-14.150 | receive only |
+  | 17 m | 18.068-18.110 | 18.068-18.110 | receive only |
+  | 15 m | 21.000-21.200 | 21.025-21.200 | receive only |
+  | 12 m | 24.890-24.930 | 24.890-24.930 | receive only |
+  | 10 m | 28.000-28.300 | 28.000-28.300 | 28.000-28.300 |
+  | 6 m | 50.100-54.000 | 50.100-54.000 | 50.100-54.000 |
+
+  All in MHz, from FCC rules 97.301 and 97.305 (checked November 2026). The whole signal has to fit, so FT8 at an
+  audio offset of 1,000 Hz on a dial of 14.024 MHz is allowed for a General (it starts on 14.025) and 999 Hz is not.
+  Bands that are receive only for your class say so in the band menu; you can still pick them to listen.
+
+  ![The band menu for a Technician](images/band-menu-receive-only.png)
+
+  Since 13 February 2026 the US 60 m segment allows at most 9.15 W ERP (100 W ERP on the channels): set the radio's
+  power yourself.
 - **Power (watts)**: recorded in the log when the radio cannot report its own power setting. It does not change the
   radio's power.
 - **Radio's top power (watts)**: empty (automatic) by default, which uses the range Hamlib reports for your radio. If
@@ -48,7 +78,7 @@ Call CQ.
 | **Adjust automatically from the radio's ALC** | on | After each transmission Costas reads the radio's ALC and nudges the level so ALC barely moves: up 0.5 dB when ALC did not move, down when it moved too much. Only the next transmission changes. It never goes more than 6 dB above, or 20 dB below, a level you type here. Turn it off to keep the level fixed. Needs a radio that reports ALC over CAT, such as the FT-710 or IC-7300 |
 | **Stop transmitting when the SWR stays at 3.0 or above** | on | While Costas sends, it reads the radio's SWR meter twice a second. Two readings in a row at 3.0 or more stop the transmission (as Halt Tx does) and the bottom bar says why. Tune is never stopped, so the radio's tuner can work. Needs a radio that reports SWR over CAT |
 | **Watchdog** | 6 minutes | Transmitting stops if you have not touched the app for this long. A contact the other station is answering is finished first |
-| **US data segments only** | on | Refuses to transmit outside the parts of each band where US rules allow data modes such as FT8: for example above 14.150 MHz on 20 m, above 7.125 MHz on 40 m or above 3.600 MHz on 80 m, and on 60 m outside the four channels and 5351.5 to 5366.5 kHz. These are the Extra class segments; a General licence has narrower ones at the bottom of some bands. Turn it off if you are licensed in another country; the band limits still apply. Since 13 February 2026 the US 60 m segment allows at most 9.15 W ERP (100 W ERP on the channels): set the radio's power yourself |
+| **Where to transmit** | | Set by the **US licence class** on the Station page: Costas keeps to that class's data segments, or only to the band limits for *Not US*. This replaces the *US data segments only* switch of earlier versions |
 | **Clock limit** | 2.0 seconds | Transmitting is blocked when the PC clock is off by more than this |
 | **Clock correction** | on | When the PC clock is off, Costas times its slots, transmissions and log entries from internet time instead, checked every 15 minutes. The PC clock itself is not changed. Offsets over a minute are not corrected: set the Windows clock and time zone instead |
 
