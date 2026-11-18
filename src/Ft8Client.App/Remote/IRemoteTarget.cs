@@ -37,6 +37,9 @@ public interface IRemoteTarget
     /// <summary>Starts or stops calling CQ.</summary>
     void ToggleCq();
 
+    /// <summary>Stops calling CQ; does nothing when CQ is not on, so a tap that arrives late never starts it.</summary>
+    void StopCq();
+
     /// <summary>Resends the current step.</summary>
     void Resend();
 

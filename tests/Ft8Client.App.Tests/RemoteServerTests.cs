@@ -299,6 +299,21 @@ public sealed class RemoteServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task HandleAsync_LinkedUserStopsCq_StopsWithoutSwitching()
+    {
+        AddUser("Ash", "another long password");
+        var token = await LoginAsync("ash", "another long password");
+        var asked = 0;
+        var rc = new RemoteControl(_target, _clock, new DeviceTokens(), _ => { }, users: _users,
+            switchProfile: _ => { asked++; return ("busy", null); });
+
+        (await rc.HandleAsync(rc.SignIn(token)!.DeviceId, new RemoteCommand("cqStop"))).Should().BeNull();
+
+        asked.Should().Be(0, "stopping a CQ only ends a transmission, so it works whoever's profile is in use");
+        _target.Calls.Should().Equal("cqStop");
+    }
+
+    [Fact]
     public async Task Login_WrongPassword_RefusedThenTooManyTries()
     {
         AddUser("dan", "correct horse battery");

@@ -564,7 +564,8 @@ function contactButtons(s) {
     ? s.macros.map(m => [m.caption, m.next ? "next" : "", "macro", false, m.key])
         .concat(!idle && c.active ? (c.canLogNow ? [["Log now", "", "logNow", false]] : []).concat([["Abandon", "red", "abandon", false]]) : [])
     : idle || !c.active
-    ? [[s.callingCq ? "Stop CQ" : "Call CQ", s.callingCq ? "red" : "", "cq", cqOff]]
+    // Stop CQ is its own command, so a tap that lands just after CQ ended cannot start it again.
+    ? [s.callingCq ? ["Stop CQ", "red", "cqStop", false] : ["Call CQ", "", "cq", cqOff]]
     : [["Resend", "", "resend", false]].concat(c.canLogNow ? [["Log now", "", "logNow", false]] : [], [["Abandon", "red", "abandon", false]]);
 }
 

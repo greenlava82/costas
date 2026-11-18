@@ -200,10 +200,10 @@ public sealed class RemoteControl
         // A message the station cannot act on changes nothing: it must not take control or reset the Tx watchdog.
         if (!Understood(cmd, call)) return "The station did not understand that.";
         // A user linked to a station profile operates as it (D25): switched in now if the station is idle, otherwise the
-        // command is refused so nothing goes out under another operator's callsign. Stop and Abandon always work and
-        // never switch.
+        // command is refused so nothing goes out under another operator's callsign. Stop, Stop CQ and Abandon only ever
+        // end a transmission, so they always work and never switch.
         string? nowAs = null;
-        if (cmd.Type is not ("halt" or "abandon") && _switchProfile is not null && _userIds.TryGetValue(deviceId, out var userId))
+        if (cmd.Type is not ("halt" or "abandon" or "cqStop") && _switchProfile is not null && _userIds.TryGetValue(deviceId, out var userId))
         {
             (var refusal, nowAs) = _switchProfile(userId);
             if (refusal is not null) return refusal;
@@ -254,6 +254,9 @@ public sealed class RemoteControl
             case "cq":
                 _target.ToggleCq();
                 return null;
+            case "cqStop":
+                _target.StopCq();
+                return null;
             case "resend":
                 _target.Resend();
                 return null;
@@ -301,7 +304,7 @@ public sealed class RemoteControl
 
     private static bool Understood(RemoteCommand cmd, string call) => cmd.Type switch
     {
-        "halt" or "abandon" or "cq" or "resend" or "logNow" or "band" or "offsetAuto" or "goTo" => true,
+        "halt" or "abandon" or "cq" or "cqStop" or "resend" or "logNow" or "band" or "offsetAuto" or "goTo" => true,
         "call" or "answer" or "answerAfter" or "dismiss" => call.Length > 0,
         "jump" => cmd.Step is not null,
         "offset" => cmd.Hz is not null,
