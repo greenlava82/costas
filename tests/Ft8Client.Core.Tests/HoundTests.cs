@@ -195,6 +195,28 @@ public class HoundTests
     }
 
     [Fact]
+    public void OnDecodes_FoxRr73ForLastRReportDecodedAfterSlotStart_Logs()
+    {
+        var s = new Sim();
+        s.CallFox();
+        s.Step();
+        s.Step();
+        s.Step(("W7LIT KH1X -14", 360, -3));
+        while (s.Slot < 12) s.Step();
+        s.Sent.Last().Slot.Should().Be(11, "the last R-report inside the 11 slots after the Fox's report");
+
+        // Slot 13 starts before the quick decode of the Fox's slot 12 is in: the R-report limit ends the contact first.
+        s.E.PlanTransmission(Sim.Start(13), Mode.Ft8, Sim.Start(13).AddSeconds(-0.5)).Should().BeNull();
+        s.E.View!.Outcome.Should().Be(ContactOutcome.NoReply);
+        var rr73 = HeardMessage.From(new Decode(Sim.Start(12), -4, 0.1, 360, "W7LIT KH1X RR73", false));
+        s.E.OnDecodes(Sim.Start(12), Mode.Ft8, [rr73], Sim.Start(13).AddSeconds(2));
+
+        s.Logs.Should().ContainSingle().Which.Call.Should().Be("KH1X");
+        s.E.View!.Outcome.Should().Be(ContactOutcome.Logged);
+        s.E.Waiting.Should().BeEmpty();
+    }
+
+    [Fact]
     public void AnswerCaller_FoxReportAfterCallingStopped_ResumesWithRReportOnItsFrequency()
     {
         var s = new Sim();

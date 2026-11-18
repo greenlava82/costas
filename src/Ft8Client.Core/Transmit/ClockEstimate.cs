@@ -27,9 +27,15 @@ public static class ClockEstimate
     /// The clock offset to act on. SNTP is the better measurement, but it is taken only at start and hourly; when the
     /// decodes' median DT disagrees with it by more than a second, the clock has moved since (a step after sleep, or the
     /// operator fixed it), and the live median DT is used instead.
+    /// The two have opposite signs: the SNTP offset is server time minus PC time (negative when the PC clock is fast),
+    /// while a fast PC clock makes signals start late in its slots, so the median DT is positive. The DT is turned
+    /// into the SNTP sense before they are compared, and the result is in that sense.
     /// </summary>
-    public static double? Offset(double? sntpSeconds, double? medianDtSeconds) =>
-        sntpSeconds is { } s && medianDtSeconds is { } m && Math.Abs(Math.Abs(s) - Math.Abs(m)) > 1.0 ? m : sntpSeconds ?? medianDtSeconds;
+    public static double? Offset(double? sntpSeconds, double? medianDtSeconds)
+    {
+        var fromDt = -medianDtSeconds;
+        return sntpSeconds is { } s && fromDt is { } d && Math.Abs(s - d) > 1.0 ? d : sntpSeconds ?? fromDt;
+    }
 
     /// <summary>True when transmitting is allowed with this offset.</summary>
     public static bool TransmitAllowed(double? offsetSeconds, double blockAboveSeconds, out string reason)

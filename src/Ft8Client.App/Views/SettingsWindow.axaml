@@ -699,7 +699,12 @@
                   </StackPanel>
                 </Grid>
                 <CheckBox Content="Upload each new contact as soon as it is logged" IsChecked="{Binding ClubLogUploadOnComplete}" />
-                <TextBlock Classes="help" Text="Save to apply. Club Log real-time upload is for new contacts only; to send an old log, upload an ADIF file on the Club Log site. If Club Log refuses the login, uploads stop until you change the email or password here, as Club Log asks. Simulation never contacts Club Log." />
+                <StackPanel Spacing="6" IsVisible="{Binding ClubLogStopText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                  <TextBlock Classes="help" Foreground="{DynamicResource CautionBrush}" Text="{Binding ClubLogStopText}" TextWrapping="Wrap" />
+                  <Button Content="Resume Club Log uploads" Command="{Binding ResumeClubLogCommand}" HorizontalAlignment="Left"
+                          ToolTip.Tip="Only once the login works on the Club Log site: Club Log blocks an address that keeps sending a refused login. Save to apply." />
+                </StackPanel>
+                <TextBlock Classes="help" Text="Save to apply. Club Log real-time upload is for new contacts only; to send an old log, upload an ADIF file on the Club Log site. If Club Log refuses the login, uploads stop, even across restarts, until you change the email or password here or resume them, as Club Log asks. Simulation never contacts Club Log." />
               </StackPanel>
             </Expander>
             <Expander Classes="logbook" HorizontalAlignment="Stretch">

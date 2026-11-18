@@ -15,7 +15,7 @@ namespace Ft8Client.Integrations.Qrz;
 
 /// <summary>
 /// QRZ XML data client (https://www.qrz.com/XML/current_spec.html). Logs in once, caches the session key, and logs in
-/// again once when the session expires.
+/// again once when a lookup answers with an error other than "not found".
 /// </summary>
 public sealed class QrzXmlClient(HttpClient http, Func<(string User, string Password)?> credentials, Uri? endpoint = null)
 {
@@ -30,18 +30,31 @@ public sealed class QrzXmlClient(HttpClient http, Func<(string User, string Pass
     public async Task<bool> TestAsync(CancellationToken ct)
     {
         _sessionKey = null;
-        return await LoginAsync(ct).ConfigureAwait(false) is not null;
+        try
+        {
+            await LoginAsync(ct).ConfigureAwait(false);
+            return true;
+        }
+        catch (QrzException ex) when (ex.IsAuth)
+        {
+            return false;
+        }
     }
 
-    /// <summary>Looks up a call. Returns null when not found.</summary>
+    /// <summary>
+    /// Looks up a call. Returns null only when QRZ says the call is not found. Any other QRZ error (a lookup limit, a
+    /// lapsed subscription, a session that will not renew) throws <see cref="QrzException"/>, so it is never taken for a
+    /// miss; a refused login throws with <see cref="QrzException.IsAuth"/> set.
+    /// </summary>
     public async Task<QrzLookupResult?> LookupAsync(string call, CancellationToken ct)
     {
         await _lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            string? lastError = null;
             for (var attempt = 0; attempt < 2; attempt++)
             {
-                var key = _sessionKey ?? await LoginAsync(ct).ConfigureAwait(false) ?? throw new QrzException("QRZ lookup login failed.", isAuth: true);
+                var key = _sessionKey ?? await LoginAsync(ct).ConfigureAwait(false);
                 var doc = await GetAsync($"s={Uri.EscapeDataString(key)};callsign={Uri.EscapeDataString(call)}", ct).ConfigureAwait(false);
                 var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
                 var session = doc.Root?.Element(ns + "Session");
@@ -49,14 +62,11 @@ public sealed class QrzXmlClient(HttpClient http, Func<(string User, string Pass
                 var cs = doc.Root?.Element(ns + "Callsign");
                 if (cs is not null) return Map(cs, ns);
                 if (error is not null && error.Contains("not found", StringComparison.OrdinalIgnoreCase)) return null;
-                if (session?.Element(ns + "Key") is null || error is not null)
-                {
-                    _sessionKey = null;
-                    continue;
-                }
-                return null;
+                // A session error (expired key) or anything else: log in again once, then give up without calling it a miss.
+                lastError = error;
+                _sessionKey = null;
             }
-            return null;
+            throw new QrzException(lastError is null ? "QRZ lookup returned no record and no reason." : $"QRZ lookup failed: {lastError.Trim()}");
         }
         finally
         {
@@ -64,15 +74,17 @@ public sealed class QrzXmlClient(HttpClient http, Func<(string User, string Pass
         }
     }
 
-    private async Task<string?> LoginAsync(CancellationToken ct)
+    private async Task<string> LoginAsync(CancellationToken ct)
     {
-        var c = credentials();
-        if (c is null) return null;
+        var c = credentials() ?? throw new QrzException("QRZ username and password are not set.", isAuth: true);
         var agent = AppInfo.Id + AppInfo.Version;
-        var doc = await GetAsync($"username={Uri.EscapeDataString(c.Value.User)};password={Uri.EscapeDataString(c.Value.Password)};agent={agent}", ct).ConfigureAwait(false);
+        var doc = await GetAsync($"username={Uri.EscapeDataString(c.User)};password={Uri.EscapeDataString(c.Password)};agent={agent}", ct).ConfigureAwait(false);
         var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
-        _sessionKey = doc.Root?.Element(ns + "Session")?.Element(ns + "Key")?.Value;
-        return _sessionKey;
+        var session = doc.Root?.Element(ns + "Session");
+        _sessionKey = session?.Element(ns + "Key")?.Value is { Length: > 0 } k ? k : null;
+        if (_sessionKey is not null) return _sessionKey;
+        var error = session?.Element(ns + "Error")?.Value?.Trim();
+        throw new QrzException(string.IsNullOrEmpty(error) ? "QRZ refused the lookup login." : $"QRZ refused the lookup login: {error}", isAuth: true);
     }
 
     private async Task<XDocument> GetAsync(string query, CancellationToken ct)

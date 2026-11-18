@@ -158,6 +158,9 @@ public sealed class RigctldRig : IRig
     }
 
     /// <inheritdoc />
+    public Task<long> GetFrequencyAsync(CancellationToken ct) => Run(c => c.GetFrequencyAsync(ct), ct);
+
+    /// <inheritdoc />
     public Task SetFrequencyAsync(long hz, CancellationToken ct) =>
         Run(c => c.SetAsync($"F {hz.ToString(System.Globalization.CultureInfo.InvariantCulture)}", ct), ct);
 

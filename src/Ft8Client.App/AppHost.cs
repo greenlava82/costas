@@ -12,6 +12,7 @@ using Ft8Client.App.Remote;
 using Ft8Client.App.Services;
 using Ft8Client.App.Services.Notifications;
 using Ft8Client.Audio.Backends;
+using Ft8Client.Audio.Dsp;
 using Ft8Client.Audio.Timing;
 using Ft8Client.Core;
 using Ft8Client.Core.Bands;
@@ -955,7 +956,7 @@ public sealed class AppHost : IAsyncDisposable
         try
         {
             input = AudioBackend.OpenInput(id, 48_000);
-            var pump = new CapturePump(input, _recorder!);
+            var pump = NewPump(input, _recorder!, Keyboard?.Input);
             input.Stopped += OnInputStopped;
             // Current before it starts: a device that stops at once must find itself the one in use.
             (_input, _pump) = (input, pump);
@@ -972,6 +973,11 @@ public sealed class AppHost : IAsyncDisposable
             return ex.Message;
         }
     }
+
+    // Every new pump (start-up, a USB re-plug, a Setup input change) feeds the keyboard modes' continuous stream too;
+    // before the keyboard session exists it is wired up when that is made.
+    internal static CapturePump NewPump(IAudioInput input, SlotRecorder recorder, SpscRingBuffer? keyboardInput) =>
+        new(input, recorder) { Continuous = keyboardInput };
 
     private void OnInputStopped(object? sender, string why)
     {
@@ -1229,11 +1235,20 @@ public sealed class AppHost : IAsyncDisposable
             try
             {
                 await Task.Delay(1000, _cts.Token).ConfigureAwait(false);
-                // Never poll during a transmission, or with one about to start: the poll's four commands share the
-                // radio's line with the PTT command.
-                if (Transmitter.Transmitting || Transmitter.Pending is not null) continue;
+                // The full poll's four commands share the radio's line with the PTT command, so it never runs during
+                // a transmission or with one about to start. On the air, the dial alone is read, so a VFO moved
+                // during the transmission still meets the band-edge check (Session.SetDial).
+                var poll = PollNow(Transmitter.Transmitting, Transmitter.Pending is not null);
+                if (poll == RadioPoll.Nothing) continue;
                 var retunes = Volatile.Read(ref _retunesDone);
                 if (Volatile.Read(ref _retunesRunning) > 0) continue;
+                if (poll == RadioPoll.FrequencyOnly)
+                {
+                    var hz = await _rig.GetFrequencyAsync(_cts.Token).ConfigureAwait(false);
+                    if (Volatile.Read(ref _retunesRunning) == 0 && Volatile.Read(ref _retunesDone) == retunes && hz != Session.Snapshot.DialHz)
+                        Session.SetDial(hz);
+                    continue;
+                }
                 var st = await _rig.GetStateAsync(_cts.Token).ConfigureAwait(false);
                 // Costas retuned while this poll was out: what it read may be the old frequency.
                 if (Volatile.Read(ref _retunesRunning) > 0 || Volatile.Read(ref _retunesDone) != retunes) continue;
@@ -1257,6 +1272,11 @@ public sealed class AppHost : IAsyncDisposable
             }
         }
     }
+
+    // What the radio poll reads: the whole state when idle, the dial alone while on the air, nothing while PTT is
+    // about to be keyed for a prepared transmission (its PTT command must not wait behind a poll).
+    internal static RadioPoll PollNow(bool transmitting, bool pending) =>
+        pending ? RadioPoll.Nothing : transmitting ? RadioPoll.FrequencyOnly : RadioPoll.State;
 
     // The operator changed band on the radio itself: the radio is right, so Costas moves to that band (menu, station list,
     // per-band transmit level, saved band) without retuning it. A transmission prepared for the old band never starts.

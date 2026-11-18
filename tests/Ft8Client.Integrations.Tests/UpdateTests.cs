@@ -192,4 +192,102 @@ public class UpdateTests
         await act.Should().ThrowAsync<InvalidDataException>();
         fake.Requests.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task DownloadAsync_HttpInstallerUrl_RefusedBeforeDownloading()
+    {
+        var fake = new FakeGitHub(_ => Ok("x"));
+        using var http = new HttpClient(fake);
+        var release = UpdateChecker.Parse(Release("v0.1.0.42"))! with { InstallerUrl = "http://example.invalid/Costas-Setup.exe" };
+        var act = () => new UpdateDownloader(http).DownloadAsync(release, Path.GetTempPath(), null, TestContext.Current.CancellationToken);
+        await act.Should().ThrowAsync<InvalidDataException>();
+        fake.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task LatestAsync_ShaAssetOverHttp_NotReadAndNoChecksum()
+    {
+        var json = Release("v0.1.0.42", digest: false, shaAsset: true).Replace("https://example.invalid/sha", "http://example.invalid/sha", StringComparison.Ordinal);
+        var fake = new FakeGitHub(u => u.AbsolutePath.EndsWith("/sha", StringComparison.Ordinal) ? Ok(InstallerSha) : Ok(json));
+        using var http = new HttpClient(fake);
+        var r = await new UpdateChecker(http, "somedudenamedtony/costas").LatestAsync(TestContext.Current.CancellationToken);
+        r!.Sha256.Should().BeNull();
+        fake.Requests.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Constructor_HttpApiBase_Throws()
+    {
+        using var http = new HttpClient(new FakeGitHub(_ => Ok("{}")));
+        var act = () => new UpdateChecker(http, "x/y", new Uri("http://api.github.com/"));
+        act.Should().Throw<ArgumentException>();
+    }
+
+    private sealed class FakeVerifier(InstallerSignature result) : IInstallerSignatureVerifier
+    {
+        public List<string> Checked { get; } = [];
+
+        public InstallerSignature Check(string path)
+        {
+            Checked.Add(path);
+            File.Exists(path).Should().BeTrue();
+            return result;
+        }
+    }
+
+    [Fact]
+    public async Task DownloadAsync_SignedByExpectedPublisher_SavesInstaller()
+    {
+        var dir = Directory.CreateTempSubdirectory("costas-upd").FullName;
+        try
+        {
+            using var http = new HttpClient(new FakeGitHub(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Installer) }));
+            var verifier = new FakeVerifier(new InstallerSignature(InstallerSignatureStatus.Valid, "Example Publisher"));
+            var path = await new UpdateDownloader(http, verifier, "Example Publisher")
+                .DownloadAsync(UpdateChecker.Parse(Release("v0.1.0.42"))!, dir, null, TestContext.Current.CancellationToken);
+            verifier.Checked.Should().Equal(path);
+            File.Exists(path).Should().BeTrue();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public async Task DownloadAsync_SignedByAnotherPublisher_RefusedAndNothingLeft()
+    {
+        var dir = Directory.CreateTempSubdirectory("costas-upd").FullName;
+        try
+        {
+            using var http = new HttpClient(new FakeGitHub(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Installer) }));
+            var verifier = new FakeVerifier(new InstallerSignature(InstallerSignatureStatus.Valid, "Someone Else"));
+            var act = () => new UpdateDownloader(http, verifier, "Example Publisher")
+                .DownloadAsync(UpdateChecker.Parse(Release("v0.1.0.42"))!, dir, null, TestContext.Current.CancellationToken);
+            await act.Should().ThrowAsync<InvalidDataException>();
+            Directory.EnumerateFiles(dir).Should().BeEmpty();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public async Task DownloadAsync_UnsignedDevelopmentBuild_SavesInstaller()
+    {
+        var dir = Directory.CreateTempSubdirectory("costas-upd").FullName;
+        try
+        {
+            using var http = new HttpClient(new FakeGitHub(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Installer) }));
+            var verifier = new FakeVerifier(new InstallerSignature(InstallerSignatureStatus.Unsigned, null));
+            var release = UpdateChecker.Parse(Release("v0.1.0.42"))! with { IsDevelopment = true };
+            var path = await new UpdateDownloader(http, verifier, "Example Publisher").DownloadAsync(release, dir, null, TestContext.Current.CancellationToken);
+            File.Exists(path).Should().BeTrue();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
 }

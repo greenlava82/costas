@@ -29,13 +29,13 @@ public partial class LogView : UserControl
     {
         if (DataContext is not LogViewModel vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
         var files = await sp.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Import ADIF", FileTypeFilter = [Adif] });
-        if (files.Count > 0 && files[0].TryGetLocalPath() is { } path) vm.Import(path);
+        if (files.Count > 0 && files[0].TryGetLocalPath() is { } path) await vm.ImportAsync(path);
     }
 
     private async void OnExport(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not LogViewModel vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
         var file = await sp.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Export ADIF", SuggestedFileName = "log.adi", FileTypeChoices = [Adif] });
-        if (file?.TryGetLocalPath() is { } path) vm.Export(path);
+        if (file?.TryGetLocalPath() is { } path) await vm.ExportAsync(path);
     }
 }

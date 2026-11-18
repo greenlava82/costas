@@ -16,7 +16,8 @@ namespace Ft8Client.Core.Awards;
 
 /// <summary>
 /// Counts award progress from logged contacts: DXCC (mixed and per band), 5-band DXCC, WAS, WAZ and VUCC on 6 m.
-/// "Confirmed" is <see cref="LogContact.Confirmed"/>. Pure: no I/O.
+/// "Confirmed" follows the operator's confirmed-by setting, as <see cref="LogIndex.Counts(LogContact, ConfirmationSource)"/>
+/// decides it: with LoTW only, a QRZ, eQSL or paper-card confirmation does not count. Pure: no I/O.
 /// </summary>
 public static class AwardBuilder
 {
@@ -42,7 +43,8 @@ public static class AwardBuilder
     /// <summary>Builds the summary.</summary>
     /// <param name="contacts">Logged contacts. Contacts without an entity key are looked up by call.</param>
     /// <param name="countries">The country file: the list of entities, and the CQ zone of each prefix.</param>
-    public static AwardSummary Build(IEnumerable<LogContact> contacts, CountryFile countries)
+    /// <param name="source">Which confirmations count: LoTW only, or any (QRZ, LoTW, eQSL or a card).</param>
+    public static AwardSummary Build(IEnumerable<LogContact> contacts, CountryFile countries, ConfirmationSource source)
     {
         var worked = new Tally();
         var byBand = new Dictionary<string, Tally>(StringComparer.Ordinal);
@@ -55,16 +57,17 @@ public static class AwardBuilder
             var match = countries.Lookup(c.Call);
             var key = c.EntityKey is { Length: > 0 } k ? k : match?.Entity.Key;
             var band = c.Band.ToLowerInvariant();
+            var confirmed = LogIndex.Counts(c, source);
             if (key is not null)
             {
-                worked.Add(key, c.Confirmed);
+                worked.Add(key, confirmed);
                 if (!byBand.TryGetValue(band, out var t)) byBand[band] = t = new Tally();
-                t.Add(key, c.Confirmed);
-                if (StateOf(key, c.Region) is { } st) states.Add(st, c.Confirmed);
+                t.Add(key, confirmed);
+                if (StateOf(key, c.Region) is { } st) states.Add(st, confirmed);
                 var zone = match is not null && match.Entity.Key == key ? match.CqZone : countries.FindByKey(key)?.CqZone;
-                if (zone is >= 1 and <= ZoneCount) zones.Add(zone.Value.ToString(CultureInfo.InvariantCulture), c.Confirmed);
+                if (zone is >= 1 and <= ZoneCount) zones.Add(zone.Value.ToString(CultureInfo.InvariantCulture), confirmed);
             }
-            if (band == VuccBand && Grid.Grid4(c.Grid) is { } g) grids6.Add(g, c.Confirmed);
+            if (band == VuccBand && Grid.Grid4(c.Grid) is { } g) grids6.Add(g, confirmed);
         }
 
         var entities = countries.Entities.Select(e => new AwardItem(e.Key, e.Name)).OrderBy(i => i.Name, StringComparer.Ordinal).ToList();
