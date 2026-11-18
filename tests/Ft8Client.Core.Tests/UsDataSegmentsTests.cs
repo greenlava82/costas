@@ -27,18 +27,18 @@ public class UsDataSegmentsTests
     [InlineData("40m", 7_074_000, 2900, true)]
     [InlineData("40m", 7_200_000, 1500, false)]
     [InlineData("60m", 5_357_000, 2900, true)]
-    public void TransmitAllowed_UsDataSegments_RefusesPhoneSegments(string band, long dial, int offset, bool allowed)
+    public void TransmitAllowed_DefaultExtra_RefusesPhoneSegments(string band, long dial, int offset, bool allowed)
     {
         var t = Table();
         t.TransmitAllowed(band, Mode.Ft8, dial, offset, out var why).Should().Be(allowed);
-        if (!allowed) why.Should().Contain("US data segments");
+        if (!allowed) why.Should().Contain("Amateur Extra licence").And.Contain("Settings › Station");
     }
 
     [Fact]
-    public void TransmitAllowed_UsDataSegmentsOff_UsesOnlyTheBandLimits()
+    public void TransmitAllowed_NotUs_UsesOnlyTheBandLimits()
     {
         var t = Table();
-        t.UsDataSegmentsOnly = false;
+        t.Licence = UsLicenceClass.NotUs;
         t.TransmitAllowed("40m", Mode.Ft8, 7_200_000, 1500, out _).Should().BeTrue("outside the US, 40 m data can go above 7.125 MHz");
         t.TransmitAllowed("40m", Mode.Ft8, 7_299_000, 1500, out _).Should().BeFalse("the band limit still applies");
     }

@@ -98,7 +98,7 @@ public sealed class AppHost : IAsyncDisposable
         BandStats = new BandStatRepository(Database);
         Countries = ReferenceData.LoadCountries(paths);
         Frequencies = ReferenceData.LoadFrequencies(paths);
-        Frequencies.UsDataSegmentsOnly = Settings.Current.Operating.UsDataSegmentsOnly;
+        Frequencies.Licence = Settings.Current.Operating.UsDataSegmentsOnly ? UsLicenceClass.AmateurExtra : UsLicenceClass.NotUs;
         _rig = new SimulatedRig(Clock);
     }
 
@@ -557,7 +557,7 @@ public sealed class AppHost : IAsyncDisposable
                 confirmedBy = SettingsMapper.ConfirmationSource(Settings.Current);
                 RebuildLogIndex();
             }
-            Frequencies.UsDataSegmentsOnly = Settings.Current.Operating.UsDataSegmentsOnly;
+            Frequencies.Licence = Settings.Current.Operating.UsDataSegmentsOnly ? UsLicenceClass.AmateurExtra : UsLicenceClass.NotUs;
             TxLevel.Apply();
             Pota.Wake();
             Dxpeditions.Wake();

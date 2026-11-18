@@ -12,10 +12,10 @@ namespace Ft8Client.Core.Bands;
 public sealed class FrequencyTable(IReadOnlyList<FrequencyEntry> entries)
 {
     /// <summary>
-    /// Also keep transmissions inside the US data segments (<see cref="UsDataSegments"/>), not only the band limits in the
-    /// table. On by default; operators licensed elsewhere turn it off.
+    /// Also keep transmissions inside this US licence class's data segments (<see cref="UsDataSegments"/>), not only the
+    /// band limits in the table. Amateur Extra by default; <see cref="UsLicenceClass.NotUs"/> checks the band limits only.
     /// </summary>
-    public bool UsDataSegmentsOnly { get; set; } = true;
+    public UsLicenceClass Licence { get; set; } = UsLicenceClass.AmateurExtra;
 
     /// <summary>All entries.</summary>
     public IReadOnlyList<FrequencyEntry> Entries { get; } = entries;
@@ -33,7 +33,7 @@ public sealed class FrequencyTable(IReadOnlyList<FrequencyEntry> entries)
 
     /// <summary>
     /// The band-edge guard: true when the whole transmitted signal (dial + offset to dial + offset + bandwidth)
-    /// lies inside the allowed range for the band and, with <see cref="UsDataSegmentsOnly"/>, inside a US data segment.
+    /// lies inside the allowed range for the band and inside one of <see cref="Licence"/>'s US data segments.
     /// </summary>
     public bool TransmitAllowed(string band, Mode mode, long dialHz, int offsetHz, out string reason) =>
         TransmitAllowed(band, mode, dialHz, offsetHz, null, out reason);
@@ -66,12 +66,38 @@ public sealed class FrequencyTable(IReadOnlyList<FrequencyEntry> entries)
             reason = $"{low / 1000.0:0.000} kHz is outside {BandPlan.Display(e.Band)} transmit limits.";
             return false;
         }
-        if (UsDataSegmentsOnly && !UsDataSegments.Contains(low, high))
+        if (!UsDataSegments.Contains(Licence, low, high))
         {
-            reason = $"{low / 1000.0:0.000} kHz is outside the US data segments on {BandPlan.Display(e.Band)}. Licensed elsewhere? Turn off \"US data segments only\" in Settings › Transmitting.";
+            reason = LicenceRefusal(e, low, high);
             return false;
         }
         reason = string.Empty;
         return true;
+    }
+
+    /// <summary>
+    /// True when <see cref="Licence"/> has no data segment anywhere inside the band's transmit limits for a mode, so the
+    /// band is receive only for this operator. False when the band has no row, or for <see cref="UsLicenceClass.NotUs"/>.
+    /// </summary>
+    public bool ReceiveOnly(string band, Mode mode)
+    {
+        var e = Find(band, mode) ?? Entries.FirstOrDefault(x => string.Equals(x.Band, band, StringComparison.OrdinalIgnoreCase));
+        return e is not null && Licence != UsLicenceClass.NotUs && UsDataSegments.Within(Licence, e.LowHz, e.HighHz).Count == 0;
+    }
+
+    // Rule 4: say exactly where this class may send data on the band, and where the signal would have gone.
+    private string LicenceRefusal(FrequencyEntry e, long low, long high)
+    {
+        var name = UsDataSegments.Name(Licence);
+        var band = BandPlan.Display(e.Band);
+        const string Fix = "Wrong licence class, or licensed outside the US? Change it in Settings › Station.";
+        var allowed = UsDataSegments.Within(Licence, e.LowHz, e.HighHz);
+        if (allowed.Count == 0)
+        {
+            var where = Licence == UsLicenceClass.Technician ? " Technicians may send data on 10 m (28.000-28.300 MHz), 6 m and 2 m." : string.Empty;
+            return $"Not sent: your {name} licence doesn't allow data on {band}, so the band is receive only for you.{where} {Fix}";
+        }
+        return $"Not sent: your {name} licence allows data on {band} only on {UsDataSegments.Describe(allowed)}, and this signal would take " +
+            $"{UsDataSegments.Mhz(low)}-{UsDataSegments.Mhz(high)} MHz. {Fix}";
     }
 }
