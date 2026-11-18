@@ -344,7 +344,9 @@ public sealed class UpdateService : IDisposable
             return null;
         }
         using var http = HttpFactory.Create(_settings.Current.Profile.Callsign, _handler, TimeSpan.FromMinutes(15));
-        return await new UpdateDownloader(http).DownloadAsync(release, _downloadFolder, progress, ct).ConfigureAwait(false);
+        // Windows checks the installer's Authenticode signature too; elsewhere the update opens the release page instead.
+        var verifier = OperatingSystem.IsWindows() ? new AuthenticodeVerifier() : null;
+        return await new UpdateDownloader(http, verifier).DownloadAsync(release, _downloadFolder, progress, ct).ConfigureAwait(false);
     }
 
     /// <summary>

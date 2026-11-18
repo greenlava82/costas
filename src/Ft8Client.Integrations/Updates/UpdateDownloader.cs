@@ -10,13 +10,17 @@ using System.Security.Cryptography;
 
 namespace Ft8Client.Integrations.Updates;
 
-/// <summary>Downloads a release's installer and checks it against the published SHA-256 before anything runs it.</summary>
-public sealed class UpdateDownloader(HttpClient http)
+/// <summary>
+/// Downloads a release's installer and checks it against the published SHA-256 and, when a <paramref name="verifier"/> is
+/// given (Windows), its code signature (<see cref="InstallerTrust"/>), before anything runs it.
+/// <paramref name="expectedPublisher"/> is normally <see cref="InstallerTrust.ExpectedPublisher"/>.
+/// </summary>
+public sealed class UpdateDownloader(HttpClient http, IInstallerSignatureVerifier? verifier = null, string? expectedPublisher = InstallerTrust.ExpectedPublisher)
 {
     /// <summary>
     /// Downloads to <paramref name="folder"/> and returns the installer path. Throws <see cref="InvalidDataException"/> when
-    /// the release publishes no checksum, the installer's address is not HTTPS, or the file does not match the checksum; a
-    /// file that fails the check is deleted.
+    /// the release publishes no checksum, the installer's address is not HTTPS, the file does not match the checksum, or its
+    /// signature is refused; a file that fails a check is deleted.
     /// </summary>
     public async Task<string> DownloadAsync(ReleaseInfo release, string folder, IProgress<double>? progress, CancellationToken ct)
     {
@@ -53,6 +57,11 @@ public sealed class UpdateDownloader(HttpClient http)
             if (!string.Equals(actual, release.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("The downloaded installer does not match the published checksum.");
             File.Move(partial, path, overwrite: true);
+            if (verifier is not null && InstallerTrust.Refusal(verifier.Check(path), release.IsDevelopment, expectedPublisher) is { } refusal)
+            {
+                File.Delete(path);
+                throw new InvalidDataException(refusal);
+            }
             return path;
         }
         finally

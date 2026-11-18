@@ -14,6 +14,10 @@ page will name the certificate provider, and the installer will name its publish
 Each release has a `.sha256` file next to every download, so you can check that the file you have is the one the
 build produced.
 
+When Costas downloads a full installer to update itself on Windows, it checks the installer's signature before running
+it and refuses one whose signature is broken. Once releases are signed, it will also refuse a release installer that is
+unsigned or signed by anyone other than Costas's publisher.
+
 ## How releases are built
 
 - Every release is built by [GitHub Actions](https://github.com/somedudenamedtony/costas/actions/workflows/ci.yml)
