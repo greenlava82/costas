@@ -160,7 +160,25 @@ terminator (`RG` then nothing, `RPRT -5`); 4.6.5 sends `RG0nnn;`. Hamlib also ha
 
 Other notes from M2:
 
-- 60 m transmit limits in `frequencies.json` use the ITU WRC-15 range 5351.5 to 5366.5 kHz. Checked 2026-10-31: the FCC opened 5351.5-5366.5 kHz to US General class and up on 13 February 2026 (ARRL news, FCC 25-60), at most 9.15 W ERP and 2.8 kHz; the channels at 5332, 5348, 5373 and 5405 kHz stay (100 W ERP) and the 5358.5 kHz channel is gone. Settings › Transmitting › "US data segments only" (on by default) also keeps transmissions inside the 97.305(c) data segments read from eCFR the same day (`UsDataSegments`). Power is not limited by Costas.
+- 60 m transmit limits in `frequencies.json` use the ITU WRC-15 range 5351.5 to 5366.5 kHz. Checked 2026-10-31: the FCC opened 5351.5-5366.5 kHz to US General class and up on 13 February 2026 (ARRL news, FCC 25-60), at most 9.15 W ERP and 2.8 kHz; the channels at 5332, 5348, 5373 and 5405 kHz stay (100 W ERP) and the 5358.5 kHz channel is gone. The "US data segments only" switch (on by default; since 2026-11-18 the licence class on the Station page) also keeps transmissions inside the 97.305(c) data segments read from eCFR the same day (`UsDataSegments`). Power is not limited by Costas.
+- US data privileges by licence class (checked 2026-11-18 for the licence-class transmit lockout). Read from eCFR, Title 47 Part 97 "up to date as of 2026-11-16", through the eCFR versioner API (`api/versioner/v1/full/2026-11-16/title-47.xml?part=97&section=…`): 97.301(b) to (e) (bands per class, ITU Region 2, last amended 91 FR 1430, 14 Jan 2026), 97.303(h) (60 m: 5351.5-5366.5 kHz and the channels at 5332, 5348, 5373 and 5405 kHz, carrier 1.5 kHz below centre, 2.8 kHz wide), 97.305(c) (RTTY/data segments, last amended 91 FR 1431) and 97.307(f)(9) (a Novice or Technician may send only CW in the 80, 40 and 15 m data segments). The data segments per class are each 97.305(c) segment cut to the class's 97.301 bands:
+
+  | Band | Amateur Extra | Advanced | General | Technician |
+  | --- | --- | --- | --- | --- |
+  | 160 m | 1.800-2.000 | 1.800-2.000 | 1.800-2.000 | none |
+  | 80 m | 3.500-3.600 | 3.525-3.600 | 3.525-3.600 | none (CW only, 97.307(f)(9)) |
+  | 60 m | channels + 5.3515-5.3665 | same | same | none (not in 97.301(e)) |
+  | 40 m | 7.000-7.125 | 7.025-7.125 | 7.025-7.125 | none (CW only) |
+  | 30 m | 10.100-10.150 | 10.100-10.150 | 10.100-10.150 | none |
+  | 20 m | 14.000-14.150 | 14.025-14.150 | 14.025-14.150 | none |
+  | 17 m | 18.068-18.110 | 18.068-18.110 | 18.068-18.110 | none |
+  | 15 m | 21.000-21.200 | 21.025-21.200 | 21.025-21.200 | none (CW only) |
+  | 12 m | 24.890-24.930 | 24.890-24.930 | 24.890-24.930 | none |
+  | 10 m | 28.000-28.300 | 28.000-28.300 | 28.000-28.300 | 28.000-28.300 |
+  | 6 m | 50.1-54.0 | 50.1-54.0 | 50.1-54.0 | 50.1-54.0 |
+  | 2 m | 144.1-148.0 | 144.1-148.0 | 144.1-148.0 | 144.1-148.0 |
+
+  Advanced and General have the same data segments; they differ only in phone (97.301(c), (d)). Findings: the 75 m phone rows and the 40 m 7.125-7.300 phone rows do not touch data. 630 m and 2200 m allow data for General and up (97.305(c)(1), (2)) but need prior notification to UTC (97.303(g)); Costas has no rows for them, so they stay refused under the check, as before. Bands above 2 m are not in Costas's band list. Novice is not offered: no new Novice licences are issued.
 
 ## Risks
 
