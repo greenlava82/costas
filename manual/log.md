@@ -21,12 +21,13 @@ The row under the buttons narrows the list. The filters combine with each other 
 
 | Filter | Choices |
 | --- | --- |
+| Station | Your callsign (the current station profile's log: the default), or All stations. Contacts made under another callsign, such as another operator's profile or a log imported from an old call, show only with All stations |
 | Band | All bands, or any band you have a contact on |
 | Mode | All digital (the default: everything but phone and CW), All modes, FT8, FT4, PSK (PSK31 and PSK63) or RTTY |
 | Date | All time, Today (UTC), Last 7 days, Last 30 days, This year. Days are UTC days, as the log shows them |
 | Confirmed | Confirmed or not, Confirmed (by QRZ, the ADIF you imported, or LoTW), Not confirmed |
 
-All digital is the starting point, so it does not count as a filter. While another filter is set, the status line says *Showing 120 of 3,400 contacts* and **Clear filters** puts them all back.
+Your callsign and All digital are the starting point, so they do not count as filters, and Clear filters leaves the station as it is; the totals count your station's contacts only. While another filter is set, the status line says *Showing 120 of 3,400 contacts* and **Clear filters** puts them all back.
 The search text is kept. The list shows the newest 5,000 matching contacts; the totals always count all of them.
 
 | Button | What it does |
@@ -36,7 +37,7 @@ The search text is kept. The list shows the newest 5,000 matching contacts; the 
 | **Edit** | Opens the selected contact to correct it (call, grid, reports, name, power, comment). Your corrections stay: a later QRZ sync adds confirmations but does not change what you edited. The change is not sent to QRZ; correct it there too if you want both to match |
 | **Delete** | Removes the selected contact from the local log. Press it twice to confirm. It is **not** deleted from QRZ, but QRZ syncs and LoTW downloads will not bring it back. Importing an ADIF file that holds it does |
 | **Import ADIF** | Reads an `.adi` file (from WSJT-X, another logger, or a QRZ export). Duplicates are merged, not added twice; Costas reports how many were imported, merged and skipped |
-| **Export ADIF** | Writes the whole log to an `.adi` file |
+| **Export ADIF** | Writes your station's contacts to an `.adi` file, or every station's when the Station filter is All stations |
 | **Sync with QRZ now** | Reads your QRZ logbook and uploads anything waiting |
 
 ## What Costas logs

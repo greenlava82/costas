@@ -107,6 +107,12 @@ public class SessionSimulationTests
         queue.Count().Should().Be(logged.Count);
         logged.Should().OnlyContain(q => q.UploadState == UploadState.Queued);
         d.Session.Snapshot.Tonight.Should().HaveCount(logged.Count);
+        // Another operator's profile starts their own evening; switching back shows these again.
+        d.Session.Reconfigure(config with { MyCall = "K0GST" });
+        d.Session.Snapshot.Tonight.Should().BeEmpty();
+        d.Session.Snapshot.Summary!.TonightContacts.Should().Be(0, "the band summary counts only this station's evening too");
+        d.Session.Reconfigure(config);
+        d.Session.Snapshot.Tonight.Should().HaveCount(logged.Count);
         d.Session.Snapshot.LastLogged.Should().NotBeNull();
         d.Session.Snapshot.LastLogged!.Id.Should().Be(logged.Count, "each logged contact gets the next id, so its notice shows once");
         d.Session.Snapshot.LastLogged.Call.Should().Be(logged.OrderBy(q => q.Id).Last().Call);

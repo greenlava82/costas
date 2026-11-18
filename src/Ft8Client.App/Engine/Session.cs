@@ -52,7 +52,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     private readonly Dictionary<string, ServiceStatus> _services = new(StringComparer.Ordinal);
     private string? _receiveLevelWarning;
     private readonly Dictionary<string, CallsignCacheEntry> _lookups = new(StringComparer.Ordinal);
-    private readonly List<TonightContact> _tonight = [];
+    // Each contact with the callsign it was made under: after a switch to another station profile (another operator)
+    // Worked tonight shows only that station's, and switching back shows the first one's again.
+    private readonly List<(string Station, TonightContact Contact)> _tonight = [];
     private readonly List<string> _callWhenFree = []; // Watching rows marked "call when free", oldest first
     private const int MaxNeighbourReports = 50000;
     private IReadOnlyDictionary<string, BandOpening> _openings = new Dictionary<string, BandOpening>(StringComparer.Ordinal);
@@ -837,7 +839,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             AddContestQso(entry, frequencyHz);
             if (entry.TimeOffUtc - _lastContactUtc > TimeSpan.FromHours(2)) _tonight.Clear();
             _lastContactUtc = entry.TimeOffUtc;
-            _tonight.Add(new TonightContact(entry.Call, _config.Band, entry.TimeOffUtc, need.Tag, LogModeKey.Of(_config.Mode)));
+            _tonight.Add((_config.MyCall, new TonightContact(entry.Call, _config.Band, entry.TimeOffUtc, need.Tag, LogModeKey.Of(_config.Mode))));
             _logIndex.Add(new LogContact(entry.Call, _config.Band, LogModeKey.Of(_config.Mode), entry.Grid, entity?.Entity.Key, lk?.State,
                 false, entry.TimeOnUtc));
             if (ModeInfo.IsSlotted(_config.Mode)) _finishedShownAt ??= SlotMath.SlotStart(_clock.UtcNow, _config.Mode);
@@ -1570,7 +1572,8 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             var stations = _tracker.Stations.ToList();
             var contestScore = ScoreNow();
             var rank = Ranker.Rank(RankInputAt(stations, now, contestScore));
-            var summary = BandSummaryCalculator.Compute(stations, _logIndex, _config.Band, LogModeKey.Of(_config.Mode), now, _slotCounts, _tonight,
+            var tonight = _tonight.Where(t => string.Equals(t.Station, _config.MyCall, StringComparison.Ordinal)).Select(t => t.Contact).ToList();
+            var summary = BandSummaryCalculator.Compute(stations, _logIndex, _config.Band, LogModeKey.Of(_config.Mode), now, _slotCounts, tonight,
                 _config.Ranking);
             snap = new SessionSnapshot
             {
@@ -1590,7 +1593,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 LastDecodeTime = _lastDecodeTime,
                 MedianDt = _medianDt,
                 LogIsEmpty = _logIndex.IsEmpty,
-                Tonight = _tonight.ToList(),
+                Tonight = tonight,
                 Reports = _hearsMe.Reports.OrderByDescending(r => r.TimeUtc).ToList(),
                 ReceptionHistory = _receptionHistory.Buckets(_config.Band, ModeInfo.Name(_config.Mode), now),
                 Neighbours = NeighbourComparison.Compare(_hearsMe.Reports, _neighbours, _config.MyCall, _config.MyGrid, _config.Band,

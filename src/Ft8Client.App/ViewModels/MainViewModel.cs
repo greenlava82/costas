@@ -1195,6 +1195,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     private void ApplySettings()
     {
         var s = _host.Settings.Current;
+        // Another profile may be another callsign, whose log the Log view then shows (Settings' Apply leaves it on screen).
+        if (Tab == 3 || IsOut(3)) LogView.Refresh();
         Operate.ShowRttyReverse(s.Operating.RttyReverse);
         Operate.ShowKeyboardAfc(s.Operating.KeyboardAfc);
         Operate.Layout = OperateViewModel.Layouts.Contains(s.Appearance.Layout) ? s.Appearance.Layout : "automatic";
@@ -1283,7 +1285,11 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     {
         if (s.Tonight.Count == 0) return ([], 0);
         var since = s.Tonight.Min(t => t.TimeUtc).AddMinutes(-30);
-        var rows = _host.Qsos.Since(since).Where(q => q.Source == QsoSource.Local).OrderByDescending(q => q.QsoDateOn).ToList();
+        // Only this station's: after a switch to another operator's profile, their evening starts empty.
+        var station = _host.Settings.Current.Profile.Callsign;
+        var rows = _host.Qsos.Since(since)
+            .Where(q => q.Source == QsoSource.Local && string.Equals(q.StationCallsign, station, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(q => q.QsoDateOn).ToList();
         var list = rows.Take(3).Select(q =>
         {
             var tag = q.NeedTier is { } t and >= 1 and <= 5 ? (Core.Logbook.NeedTag)(t - 1) : Core.Logbook.NeedTag.NewCall;
