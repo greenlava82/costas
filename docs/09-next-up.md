@@ -47,6 +47,7 @@ Ordered by value to an FT8 operator against effort. Anything that changes what g
 | C8 | Automatic log backup and per-profile ADIF export with QSL state | Protects the log; today's export mixes profiles and drops QSL status | S |
 | C9 | Audio device comes back after USB re-plug or sleep | Today a reconnected sound card needs a Costas restart | S |
 | C10 | ~~Linux transmit~~ (turned on 2026-10-31, D17); a Linux user checking it with a real radio | Ends the preview label | S |
+| C11 | ~~Desktop notifications for Hunt alerts and callers~~ Done 2026-11-18 (owner request): Windows toasts and Linux D-Bus, merged and rate-limited, background only by default; the Windows toast still to be checked by hand | Hunt alerts reach the operator while another program is in front | M |
 
 ## Reliability and finishing
 

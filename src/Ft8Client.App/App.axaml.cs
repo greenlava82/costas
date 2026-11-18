@@ -14,6 +14,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Serilog;
 using Ft8Client.App.Services;
+using Ft8Client.App.Services.Notifications;
 using Ft8Client.App.ViewModels;
 using Ft8Client.App.Views;
 
@@ -44,6 +45,8 @@ public sealed class App : Application
             host.Settings.Changed += _ => Dispatcher.UIThread.Post(() => ApplyTheme(host));
             MainViewModel.Dispatch = a => Dispatcher.UIThread.Post(a);
             MainViewModel.Shutdown = () => Dispatcher.UIThread.Post(() => desktop.Shutdown());
+            // Before the first window: on Windows this settles the AppUserModelID the taskbar and toasts use.
+            host.Notifications.UseBackend(DesktopNotifications.PlatformBackend(AppContext.BaseDirectory));
             var vm = new MainViewModel(host);
             var window = new MainWindow { DataContext = vm };
             desktop.MainWindow = window;

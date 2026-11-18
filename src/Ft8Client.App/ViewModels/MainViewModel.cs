@@ -15,6 +15,7 @@ using Ft8Client.App.Services;
 using Ft8Client.Core;
 using Ft8Client.Core.Messages;
 using Ft8Client.Core.Neighbours;
+using Ft8Client.Core.Notifications;
 using Ft8Client.Core.Bands;
 using Ft8Client.Core.Contacts;
 using Ft8Client.Core.Decoding;
@@ -520,7 +521,12 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         BarShowsCqAndSlot = ShowCqAndSlotInBar(Tab);
         FillLookups(s);
         ApplyBandOpenings(s);
-        if (_callers.Update(s.Waiting) && _host.Settings.Current.Operating.ChimeOnCaller) _host.Chime.Play(_host.Clock.UtcNow);
+        if (_callers.Update(s.Waiting))
+        {
+            if (_host.Settings.Current.Operating.ChimeOnCaller) _host.Chime.Play(_host.Clock.UtcNow);
+            var modeKey = Core.Logbook.LogModeKey.Of(s.Mode);
+            foreach (var w in _callers.Fresh) _host.Notifications.Raise(NotificationText.Caller(w, s.Band, modeKey));
+        }
         Raw.Units = Operate.Units;
         Raw.Apply(s.RawDecodes, s.Rank, s.Contact?.DxCall, keyboard: !ModeInfo.IsSlotted(s.Mode), band: s.Band);
         Logged.Apply(s.LastLogged);
@@ -816,7 +822,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         StatusKind = TextKind.Normal;
     }
 
-    // A Hunt list entry was heard: the bar, mini mode and the phone say so; the chime and the taskbar flash when wanted.
+    // A Hunt list entry was heard: the bar, mini mode and the phone say so; a desktop notification, the chime and the
+    // taskbar flash when wanted.
     private void ShowHunt(HuntSighting s)
     {
         _hunt = s;
@@ -824,11 +831,22 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         RefreshHuntGo();
         HuntVisible = true;
         Mini.ShowHunt(HuntText);
+        _host.Notifications.Raise(NotificationText.Hunt(s, _host.Countries, SettingsMapper.Units(_host.Settings.Current)));
         if (_host.Settings.Current.Hunt.Sound)
         {
             _host.Chime.Play(_host.Clock.UtcNow);
             AttentionRequested?.Invoke();
         }
+    }
+
+    /// <summary>
+    /// A desktop notification was clicked: Operate, with the station selected when it is in Next in line. The window
+    /// comes forward separately. Nothing is called, sent or retuned.
+    /// </summary>
+    public void ShowFromNotification(string call)
+    {
+        SelectTab(0);
+        Operate.SelectCall(call);
     }
 
     private string AlertText(HuntSighting s) =>
