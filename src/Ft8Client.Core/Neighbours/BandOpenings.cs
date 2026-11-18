@@ -82,18 +82,56 @@ public static class BandOpenings
     {
         var byContinent = new Dictionary<string, int>(StringComparer.Ordinal);
         var needed = new Dictionary<string, int>(StringComparer.Ordinal);
+        var reach = new Dictionary<string, (HashSet<string> Rx, HashSet<string> Tx, DateTime Latest)>(StringComparer.Ordinal);
         foreach (var r in reports)
         {
             if (countries.Lookup(r.ReceiverCall) is not { } rx) continue;
             byContinent[rx.Continent] = byContinent.GetValueOrDefault(rx.Continent) + 1;
+            if (!reach.TryGetValue(rx.Continent, out var c))
+                reach[rx.Continent] = c = (new HashSet<string>(StringComparer.Ordinal), new HashSet<string>(StringComparer.Ordinal), r.TimeUtc);
+            c.Rx.Add(Callsign.Normalize(r.ReceiverCall));
+            c.Tx.Add(Callsign.Normalize(r.SenderCall));
+            if (r.TimeUtc > c.Latest) reach[rx.Continent] = c with { Latest = r.TimeUtc };
             if (!log.IsEmpty && !log.EntityWorkedOnBand(rx.Entity.Key, band)) needed[rx.Entity.Name] = needed.GetValueOrDefault(rx.Entity.Name) + 1;
         }
         var senders = reports.Select(r => Callsign.Normalize(r.SenderCall)).Distinct(StringComparer.Ordinal).Count();
         var neededNames = needed.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key).ToList();
         int Scaled(int n) => (int)Math.Round(n * scale);
         return new BandOpening(band, Scaled(reports.Count), senders, byContinent.ToDictionary(kv => kv.Key, kv => Scaled(kv.Value), StringComparer.Ordinal),
-            neededNames, sampledFor);
+            neededNames, sampledFor,
+            reach.ToDictionary(kv => kv.Key, kv => new ContinentReach(kv.Value.Rx.Count, kv.Value.Tx.Count, kv.Value.Latest), StringComparer.Ordinal));
     }
+
+    /// <summary>
+    /// The openings the band menu shows for the way reports are followed: bands followed all the time from
+    /// <paramref name="followed"/>, sampled bands from <paramref name="sampled"/>. Nothing when the feed is off or has no grid.
+    /// </summary>
+    /// <param name="followed">From <see cref="Build"/>.</param>
+    /// <param name="sampled">From <see cref="BuildSampled"/>.</param>
+    /// <param name="feed">How the reports are followed.</param>
+    /// <param name="currentBand">ADIF band I am on.</param>
+    public static IReadOnlyDictionary<string, BandOpening> Shown(IReadOnlyDictionary<string, BandOpening> followed,
+                                                                 IReadOnlyDictionary<string, BandOpening> sampled, BandActivityFeed feed, string currentBand)
+    {
+        var current = currentBand.ToLowerInvariant();
+        return followed.Where(kv => IsFollowed(feed, kv.Key, current))
+                       .Concat(sampled.Where(kv => IsSampled(feed, kv.Key, current)))
+                       .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+    }
+
+    /// <summary>True when the band's reports are received all the time.</summary>
+    /// <param name="feed">How the reports are followed.</param>
+    /// <param name="band">ADIF band, lower case.</param>
+    /// <param name="currentBand">ADIF band I am on, lower case.</param>
+    public static bool IsFollowed(BandActivityFeed feed, string band, string currentBand) =>
+        feed == BandActivityFeed.AllBands || (feed == BandActivityFeed.CurrentBandOnly && band == currentBand);
+
+    /// <summary>True when the band is listened to in turns (<see cref="BandSampler"/>).</summary>
+    /// <param name="feed">How the reports are followed.</param>
+    /// <param name="band">ADIF band, lower case.</param>
+    /// <param name="currentBand">ADIF band I am on, lower case.</param>
+    public static bool IsSampled(BandActivityFeed feed, string band, string currentBand) =>
+        feed == BandActivityFeed.Stopped || (feed == BandActivityFeed.CurrentBandOnly && band != currentBand);
 
     /// <summary>How strongly a continent is shaded: 0 for no spots, 1 for a few, 2 for some, 3 for many.</summary>
     public static int Level(int spots) => spots switch
