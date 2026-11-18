@@ -264,9 +264,16 @@ there as soon as it is logged. In **Settings › Logbooks › Wavelog / Cloudlog
    https: the API key goes with every upload.
 2. In your logbook, make an API key with read and write access (under your account's API keys) and paste it into
    **API key**. It stays in the system credential store, not in the settings file.
+   On Wavelog 3.1 or later you can paste a v2 API token instead (it starts `wl2_`). Costas sees the `wl2_` and
+   uses Wavelog's v2 API for it; any other key uses the original API, which Cloudlog and every Wavelog version
+   have. The line under the key says which one. Give a v2 token the **qso:write** scope so it can upload, and
+   **station:read** so Test can list your station locations.
 3. Press **Test and list station locations**. Costas asks the logbook which station locations the key can use and
    picks the one whose callsign matches this profile. Choose another from the list, or type its id, if needed. The
-   logbook only takes contacts for a location with this profile's callsign.
+   logbook only takes contacts for a location with this profile's callsign. With a v2 token, Test first says what
+   the token may do (read contacts, upload them, or both, and until when it works), and warns if uploads are on
+   but the token cannot upload. A token without station:read cannot list locations: type the station's number
+   from Wavelog's Station Locations page.
 4. Tick **Upload each new contact as soon as it is logged** and save.
 
 Contacts queue locally and retry when the site is down, even after restarting Costas. A contact already in that

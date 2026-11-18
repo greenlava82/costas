@@ -433,3 +433,14 @@ Optional uploads to the operator's own Wavelog or Cloudlog site (owner request 2
 - Queue target `cloudlog`, at most one request a second, network failures retry with the usual back-off, 401/403/404 wait an hour. The key and request bodies are never logged; the status line strips the key from any reason quoted. No per-contact delivery column: the queue is the record.
 - **VERIFY** against a live Wavelog and Cloudlog install: the duplicate wording on Cloudlog, and that `index.php/api/...` works on sites with URL rewriting.
 
+### Wavelog API v2 (owner request 2026-11-18, D27)
+
+Read from docs.wavelog.org (API v2 overview, QSO, Station and Token pages) on 2026-11-18. v2 is only in Wavelog 3.1.0 and later. Its tokens start `wl2_`, are refused on the v1 endpoints, and v1 keys are refused on v2 (`401 invalid_token`), so the key picks the API (`CloudlogClient.ApiFor`): `wl2_` means v2, anything else v1. Cloudlog has only v1.
+
+- Every call is `{site}/index.php/api/v2/<resource>` with `Authorization: Bearer wl2_…` and the usual User-Agent. The token is never in a body or a URL.
+- Upload: `POST qso`, JSON `{"import_type": "adif", "station_profile_id": <number>, "adif": "<one ADIF record>"}`, the same record v1 sends. 201 `{"data": {"parsed", "imported", "skipped", "messages"}}`: imported, or skipped as a duplicate, counts as sent. The ADIF import is used rather than the single-QSO JSON create because the docs count duplicates there as skipped, while the JSON create's duplicate answer is not documented. A station id that is not a whole number is refused before sending.
+- Test: `GET token` (any valid token) gives `{"data": {"name", "scopes": [...], "expires_at"}}`; Settings says whether the token can read (`qso:read`) and upload (`qso:write`) and until when, and warns when uploads are on without `qso:write`. Then `GET station` (scope `station:read`) gives `{"data": [{"id", "name", "callsign", "active", …}]}`; without that scope Test asks for the id by hand.
+- Errors are `{"error": {"code", "message", "details"}}`. `401 invalid_token`, `401 token_expired`, `403 insufficient_scope` (the status names `details.required_scope`), `403 forbidden` and `404` wait an hour, like v1's key errors. `409 conflict` (a duplicate) counts as sent. `429 rate_limited` retries after `details.retry_after` seconds when that is longer than the usual back-off. Rate limits are off unless the site's owner turns them on.
+- A pasted `…/api/v2/…` address is reduced to the site base like the v1 ones.
+- **VERIFY** against a live Wavelog 3.1+ site: that one record sent twice comes back as `skipped` (or 409), and the `expires_at` time zone (shown as a date only).
+
