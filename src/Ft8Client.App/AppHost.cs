@@ -10,6 +10,7 @@ using System.Globalization;
 using Ft8Client.App.Engine;
 using Ft8Client.App.Remote;
 using Ft8Client.App.Services;
+using Ft8Client.App.Services.Notifications;
 using Ft8Client.Audio.Backends;
 using Ft8Client.Audio.Timing;
 using Ft8Client.Core;
@@ -65,6 +66,7 @@ public sealed class AppHost : IAsyncDisposable
     private KeyboardRadio _keyboardRadio = new();
     private int _keyboardRadioBusy;
     private ChimePlayer? _chime;
+    private DesktopNotifications? _notifications;
     private SlotLoop? _loop;
     private WorkQueue? _work;
     private IRig _rig;
@@ -268,6 +270,9 @@ public sealed class AppHost : IAsyncDisposable
 
     /// <summary>The audio backend.</summary>
     public IAudioBackend AudioBackend { get; private set; } = new NullAudioBackend();
+
+    /// <summary>Desktop notifications for Hunt list alerts and callers. No backend until the app picks one.</summary>
+    public DesktopNotifications Notifications => _notifications ??= new DesktopNotifications(() => SettingsMapper.Notifications(Settings.Current), Clock);
 
     /// <summary>The new-caller chime.</summary>
     public ChimePlayer Chime => _chime ??= new ChimePlayer(() => AudioBackend, () => Settings.Current.Profile.Audio.OutputId);
@@ -1446,6 +1451,7 @@ public sealed class AppHost : IAsyncDisposable
         // Last: an update starts the new version as soon as this returns, and it must be able to take the lock.
         Instance?.Dispose();
         _decoder?.Dispose();
+        _notifications?.Dispose();
         Guard.Dispose();
         Crashes?.Dispose();
         await Log.CloseAndFlushAsync().ConfigureAwait(false);
