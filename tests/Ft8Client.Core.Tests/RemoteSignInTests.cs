@@ -152,6 +152,71 @@ public class RemoteSignInTests
         t.Wait("DAN", "10.0.0.2", T0).Should().Be(TimeSpan.Zero);
     }
 
+    [Fact]
+    public void TryBegin_FreeTriesStillRunning_FurtherRefusedAsBusy()
+    {
+        var t = new LoginThrottle(maxConcurrent: 100);
+        var running = Enumerable.Range(0, LoginThrottle.FreeFailures + 1)
+            .Select(i => t.TryBegin("dan", "10.0.0.2", T0, out _)).ToList();
+        running.Should().OnlyContain(a => a != null);
+
+        t.TryBegin("dan", "10.0.0.2", T0, out var wait).Should().BeNull("the checks still running use up the free tries");
+        wait.Should().Be(LoginThrottle.BusyWait);
+        t.TryBegin("guest", "10.0.0.2", T0, out _).Should().BeNull("the address is held back too");
+
+        foreach (var a in running) a!.Failed(T0);
+        t.Wait("dan", "10.0.0.2", T0).Should().Be(LoginThrottle.FirstLockout);
+        t.InFlight.Should().Be(0);
+    }
+
+    [Fact]
+    public void TryBegin_OneAfterAnother_SameLimitAsBefore()
+    {
+        var t = new LoginThrottle();
+        for (var i = 0; i <= LoginThrottle.FreeFailures; i++) t.TryBegin("dan", "10.0.0.2", T0, out _)!.Failed(T0);
+        t.TryBegin("dan", "10.0.0.2", T0, out var wait).Should().BeNull();
+        wait.Should().Be(LoginThrottle.FirstLockout);
+
+        var later = T0 + LoginThrottle.FirstLockout;
+        var one = t.TryBegin("dan", "10.0.0.2", later, out _);
+        one.Should().NotBeNull("the lockout is over");
+        t.TryBegin("dan", "10.0.0.2", later, out wait).Should().BeNull("past the free tries, one check at a time");
+        wait.Should().Be(LoginThrottle.BusyWait);
+        one!.Failed(later);
+        t.Wait("dan", "10.0.0.2", later).Should().Be(TimeSpan.FromSeconds(60));
+    }
+
+    [Fact]
+    public void TryBegin_AtConcurrencyCap_RefusedUntilOneFinishes()
+    {
+        var t = new LoginThrottle(maxConcurrent: 2);
+        var a = t.TryBegin("dan", "10.0.0.2", T0, out _);
+        var b = t.TryBegin("guest", "10.0.0.3", T0, out _);
+        t.TryBegin("ann", "10.0.0.4", T0, out var wait).Should().BeNull();
+        wait.Should().Be(LoginThrottle.BusyWait);
+
+        a!.Succeeded();
+        t.TryBegin("ann", "10.0.0.4", T0, out _).Should().NotBeNull();
+        b!.Dispose();
+        t.InFlight.Should().Be(1);
+    }
+
+    [Fact]
+    public void Dispose_Unfinished_ReleasedWithoutCountingAFailure()
+    {
+        var t = new LoginThrottle(maxConcurrent: 1);
+        for (var i = 0; i <= LoginThrottle.FreeFailures; i++)
+        {
+            using var a = t.TryBegin("dan", "10.0.0.2", T0, out _);
+            a.Should().NotBeNull();
+        }
+        t.Wait("dan", "10.0.0.2", T0).Should().Be(TimeSpan.Zero);
+        var done = t.TryBegin("dan", "10.0.0.2", T0, out _)!;
+        done.Failed(T0);
+        done.Dispose();
+        t.InFlight.Should().Be(0, "finishing twice releases once");
+    }
+
     private static readonly IPAddress Phone = IPAddress.Parse("192.168.1.20");
     private static readonly IPAddress OtherProxy = IPAddress.Parse("192.168.1.10");
     private static readonly IPAddress HomeLan = IPAddress.Parse("192.168.1.5");

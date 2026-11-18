@@ -74,8 +74,10 @@ Type: files; Name: "{autodesktop}\FT8 Client.lnk"
 Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\Costas"; Filename: "{app}\Costas.exe"
-Name: "{autodesktop}\Costas"; Filename: "{app}\Costas.exe"; Tasks: desktopicon
+; The AppUserModelID is the one Costas sets on itself when Velopack has not (WindowsToastNotifier.ClassicAppId), so
+; Windows notifications are labelled Costas and the taskbar groups the window with this shortcut.
+Name: "{autoprograms}\Costas"; Filename: "{app}\Costas.exe"; AppUserModelID: "Costas.Costas"
+Name: "{autodesktop}\Costas"; Filename: "{app}\Costas.exe"; Tasks: desktopicon; AppUserModelID: "Costas.Costas"
 
 [Run]
 ; Starts with no radio until one is set up; it never keys a radio on start-up.

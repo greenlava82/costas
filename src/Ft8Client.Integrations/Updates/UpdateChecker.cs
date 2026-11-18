@@ -15,13 +15,16 @@ namespace Ft8Client.Integrations.Updates;
 /// <summary>
 /// Asks GitHub for the latest Costas release. Unauthenticated (60 requests an hour per address; the app asks once a
 /// day). A private or missing repository, no release, or no network all read as "no update", never as an error to show.
+/// Every address it reads is HTTPS (<see cref="UpdateUrls"/>): an <paramref name="apiBase"/> that is not is refused.
 /// </summary>
 public sealed class UpdateChecker(HttpClient http, string repository, Uri? apiBase = null)
 {
     /// <summary>The GitHub repository releases come from.</summary>
     public const string DefaultRepository = "somedudenamedtony/costas";
 
-    private readonly Uri _api = apiBase ?? new Uri("https://api.github.com/");
+    private readonly Uri _api = apiBase is null
+        ? new Uri("https://api.github.com/")
+        : UpdateUrls.IsHttps(apiBase) ? apiBase : throw new ArgumentException("The release feed must be an https address.", nameof(apiBase));
 
     /// <summary>
     /// The tag of the one development release: a GitHub prerelease that CI replaces with each green build of main. GitHub
@@ -135,8 +138,10 @@ public sealed class UpdateChecker(HttpClient http, string repository, Uri? apiBa
         return null;
     }
 
+    // A checksum from a non-HTTPS address is not read; the release then has none, so its download is refused.
     private async Task<string?> ReadShaAsync(string url, CancellationToken ct)
     {
+        if (!UpdateUrls.IsHttps(url)) return null;
         var text = (await http.GetStringAsync(new Uri(url), ct).ConfigureAwait(false)).Trim();
         var hex = text.Split(' ', '\t', '\n')[0].ToLowerInvariant();
         return hex.Length == 64 && hex.All(Uri.IsHexDigit) ? hex : null;

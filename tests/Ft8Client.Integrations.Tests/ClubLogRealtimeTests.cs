@@ -28,12 +28,14 @@ public class ClubLogRealtimeTests
         public readonly UploadQueueRepository Queue;
         public readonly ManualClock Clock = new(Now);
         public readonly List<Dictionary<string, string>> Posts = [];
-        public readonly ClubLogUploadService Worker;
+        public readonly IClubLogStopStore Stops;
+        public ClubLogUploadService Worker;
         public HttpStatusCode Code = HttpStatusCode.OK;
         public string Reply = "QSO OK";
 
-        public Rig()
+        public Rig(IClubLogStopStore? stops = null)
         {
+            Stops = stops ?? new MemoryClubLogStopStore();
             var db = SqliteDatabase.InMemory(out _keepAlive);
             Qsos = new QsoRepository(db);
             Queue = new UploadQueueRepository(db);
@@ -43,8 +45,12 @@ public class ClubLogRealtimeTests
                 Posts.Add(body.Split('&').Select(p => p.Split('=')).ToDictionary(p => Uri.UnescapeDataString(p[0]), p => Uri.UnescapeDataString(p[1].Replace('+', ' '))));
                 return new HttpResponseMessage(Code) { Content = new StringContent(Reply) };
             }));
-            Worker = new ClubLogUploadService(new ClubLogRealtimeClient(_http), Qsos, Queue, Clock, (wait, _) => { Clock.Advance(wait); return Task.CompletedTask; });
+            Worker = NewWorker();
         }
+
+        // A fresh service, as after a restart; the stop store is what survives.
+        public ClubLogUploadService NewWorker() =>
+            new(new ClubLogRealtimeClient(_http), Qsos, Queue, Clock, (wait, _) => { Clock.Advance(wait); return Task.CompletedTask; }, Stops);
 
         public long Contact(string call)
         {
@@ -53,8 +59,8 @@ public class ClubLogRealtimeTests
             return id;
         }
 
-        public Task<int> Run(string password = "app-pass") =>
-            Worker.ProcessDueAsync("home", "W7LIT", "op@example.com", password, "test-key", TestContext.Current.CancellationToken);
+        public Task<int> Run(string password = "app-pass", string email = "op@example.com") =>
+            Worker.ProcessDueAsync("home", "W7LIT", email, password, "test-key", TestContext.Current.CancellationToken);
 
         public void Dispose()
         {
@@ -104,6 +110,51 @@ public class ClubLogRealtimeTests
 
         r.Code = HttpStatusCode.OK;
         (await r.Run("new-pass")).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ProcessDueAsync_LoginRefusedThenNewInstance_SendsNothing()
+    {
+        using var r = new Rig { Code = HttpStatusCode.Forbidden, Reply = "Invalid login" };
+        r.Contact("K1ABC");
+        await r.Run();
+        r.Stops.Load("home").Should().NotBeNull();
+
+        r.Code = HttpStatusCode.OK;
+        r.Worker = r.NewWorker();
+        (await r.Run()).Should().Be(0);
+
+        r.Posts.Should().HaveCount(1, "a restart must not send again after a 403");
+        r.Worker.Stopped.Should().BeTrue();
+        r.Worker.Status.Health.Should().Be(Ft8Client.Core.Services.ServiceHealth.Down);
+        r.Worker.Status.Message.Should().Contain("Invalid login").And.Contain("Settings");
+    }
+
+    [Fact]
+    public async Task ProcessDueAsync_StoredStopEmailChanged_ClearsStopAndSends()
+    {
+        using var r = new Rig { Code = HttpStatusCode.Forbidden, Reply = "Invalid login" };
+        r.Contact("K1ABC");
+        await r.Run();
+
+        r.Code = HttpStatusCode.OK;
+        r.Worker = r.NewWorker();
+        (await r.Run(email: "new@example.com")).Should().Be(1);
+
+        r.Stops.Load("home").Should().BeNull();
+        r.Worker.Stopped.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProcessDueAsync_StoredStopCleared_Sends()
+    {
+        using var r = new Rig { Code = HttpStatusCode.Forbidden, Reply = "Invalid login" };
+        r.Contact("K1ABC");
+        await r.Run();
+
+        r.Code = HttpStatusCode.OK;
+        r.Stops.Save("home", null);
+        (await r.Run()).Should().Be(1, "the operator resumed uploads");
     }
 
     [Fact]

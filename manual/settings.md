@@ -28,6 +28,37 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
   modifier or contest), your answer is `<K1ABC> VE3/W7LIT`, reports go as `K1ABC <VE3/W7LIT> R-10` (your call as
   a short code the other station's program recognises) and the sign-off as `<K1ABC> VE3/W7LIT RR73`. The message
   preview under **Contacts** shows exactly what will go out.
+- **US licence class**: Amateur Extra, Advanced, General, Technician, or Not US / don't check. Costas refuses to
+  transmit, tune or call CQ anywhere your class may not send data such as FT8, and says where you can. Each profile
+  keeps its own, so a club or a second operator's profile can have another class. The check is off until you choose a
+  class: a new install starts on **Not US / don't check**, so only the band limits apply. If you used an earlier
+  version, your profile keeps what *US data segments only* gave you there (the Amateur Extra segments, unless you had
+  turned it off). US operators should pick their class. Licensed in another country? Leave it on **Not US**.
+
+  ![Settings: Station, US licence class](images/settings-licence-class.png)
+
+  | Band | Amateur Extra | General and Advanced | Technician |
+  | --- | --- | --- | --- |
+  | 160 m | 1.800-2.000 | 1.800-2.000 | receive only |
+  | 80 m | 3.500-3.600 | 3.525-3.600 | receive only |
+  | 60 m | the four channels and 5.3515-5.3665 | same | receive only |
+  | 40 m | 7.000-7.125 | 7.025-7.125 | receive only |
+  | 30 m | 10.100-10.150 | 10.100-10.150 | receive only |
+  | 20 m | 14.000-14.150 | 14.025-14.150 | receive only |
+  | 17 m | 18.068-18.110 | 18.068-18.110 | receive only |
+  | 15 m | 21.000-21.200 | 21.025-21.200 | receive only |
+  | 12 m | 24.890-24.930 | 24.890-24.930 | receive only |
+  | 10 m | 28.000-28.300 | 28.000-28.300 | 28.000-28.300 |
+  | 6 m | 50.100-54.000 | 50.100-54.000 | 50.100-54.000 |
+
+  All in MHz, from FCC rules 97.301 and 97.305 (checked November 2026). The whole signal has to fit, so FT8 at an
+  audio offset of 1,000 Hz on a dial of 14.024 MHz is allowed for a General (it starts on 14.025) and 999 Hz is not.
+  Bands that are receive only for your class say so in the band menu; you can still pick them to listen.
+
+  ![The band menu for a Technician](images/band-menu-receive-only.png)
+
+  Since 13 February 2026 the US 60 m segment allows at most 9.15 W ERP (100 W ERP on the channels): set the radio's
+  power yourself.
 - **Power (watts)**: recorded in the log when the radio cannot report its own power setting. It does not change the
   radio's power.
 - **Radio's top power (watts)**: empty (automatic) by default, which uses the range Hamlib reports for your radio. If
@@ -48,7 +79,7 @@ Call CQ.
 | **Adjust automatically from the radio's ALC** | on | After each transmission Costas reads the radio's ALC and nudges the level so ALC barely moves: up 0.5 dB when ALC did not move, down when it moved too much. Only the next transmission changes. It never goes more than 6 dB above, or 20 dB below, a level you type here. Turn it off to keep the level fixed. Needs a radio that reports ALC over CAT, such as the FT-710 or IC-7300 |
 | **Stop transmitting when the SWR stays at 3.0 or above** | on | While Costas sends, it reads the radio's SWR meter twice a second. Two readings in a row at 3.0 or more stop the transmission (as Halt Tx does) and the bottom bar says why. Tune is never stopped, so the radio's tuner can work. Needs a radio that reports SWR over CAT |
 | **Watchdog** | 6 minutes | Transmitting stops if you have not touched the app for this long. A contact the other station is answering is finished first |
-| **US data segments only** | on | Refuses to transmit outside the parts of each band where US rules allow data modes such as FT8: for example above 14.150 MHz on 20 m, above 7.125 MHz on 40 m or above 3.600 MHz on 80 m, and on 60 m outside the four channels and 5351.5 to 5366.5 kHz. These are the Extra class segments; a General licence has narrower ones at the bottom of some bands. Turn it off if you are licensed in another country; the band limits still apply. Since 13 February 2026 the US 60 m segment allows at most 9.15 W ERP (100 W ERP on the channels): set the radio's power yourself |
+| **Where to transmit** | | Set by the **US licence class** on the Station page: Costas keeps to that class's data segments, or only to the band limits for *Not US*. This replaces the *US data segments only* switch of earlier versions |
 | **Clock limit** | 2.0 seconds | Transmitting is blocked when the PC clock is off by more than this |
 | **Clock correction** | on | When the PC clock is off, Costas times its slots, transmissions and log entries from internet time instead, checked every 15 minutes. The PC clock itself is not changed. Offsets over a minute are not corrected: set the Windows clock and time zone instead |
 
@@ -77,7 +108,7 @@ exchange and the reports are fixed by FT8, so only the parts above can change.
 | **Double-click** | off | On: in FT8 and FT4, double-clicking another station in Next in line or Repeats during a contact ends the contact (as Abandon does; one already logged stays logged) and calls the new one. Off: during a contact a double-click does nothing. See [Switching to another station](contacts.md#switching-to-another-station) |
 | **Logging** | on | Log each contact automatically when it completes |
 | **Station is busy** | off | On: keep calling a station that is working someone else, as WSJT-X does. A Call on a station already in a contact calls it anyway, and a station that answers another caller is called again until it answers you, **Give up after** is reached, or you stop. Off: Costas stops and the contact card says *In another contact* |
-| **Calling you › Chime** | off | A chime on the computer's default speakers when a new station calls you. Never on the radio's audio device |
+| **Calling you › Chime** | off | A chime on the computer's default speakers when a new station calls you. Never on the radio's audio device. A desktop notification for a new caller is set in [Notifications](#notifications) |
 
 ## PSK and RTTY
 
@@ -147,12 +178,32 @@ What you are looking for, and how you are told. See [Hunt list and alerts](hunt.
 - **Also watch the bands I am not on, through PSK Reporter**: on. **Count receivers within** 620 miles (1,000 km).
 - **Play the chime and flash Costas in the taskbar**: on.
 
+## Notifications
+
+![Settings: Notifications](images/settings-notifications.png)
+
+Desktop notifications, in Windows' notification centre or your Linux desktop's. Clicking one brings Costas to the
+front with the station selected; it never calls, transmits or changes band. There are no buttons on them.
+
+- **Show desktop notifications**: on.
+- **Notify me when**: *A station on my Hunt list is heard* (on) and *A station calls me* (on). A caller's
+  notification reads *W1ABC is calling you · 20 m FT8 · -9 dB · W7LIT W1ABC FN31*.
+- **Only when Costas is in the background**: on. Background means minimized, in mini mode, or another program in
+  front. Off: notifications show even while you are looking at Costas.
+
+A station is notified at most once every 10 minutes, and several within a minute share one notification
+(*3 stations are calling you*), so a busy band does not flood the notification centre. Notifications are silent:
+the chime settings decide whether Costas makes a sound. Windows Focus Assist and your desktop's Do Not Disturb hold
+them back as they do for any program. If this computer has no notification centre Costas can use, the page says so
+and nothing is shown.
+
 ## Logbooks
 
-![Settings: Logbooks](images/settings-logbooks.png)
+![Settings: Logbooks](images/settings-logbooks.png){ width="900" }
 
 QRZ, LoTW, eQSL, Club Log and Wavelog / Cloudlog are sections of one page; click a section's name to open it. All
-are optional, and passwords and keys are kept in Windows Credential Manager.
+are optional, and passwords and keys are kept in Windows Credential Manager. The last section, Backups, shows where
+Costas keeps copies of your log.
 
 ### QRZ
 
@@ -230,6 +281,17 @@ Club Log is down. A contact Club Log already has counts as sent; one it rejects 
 queue and the **Club Log** indicator says why. If Club Log refuses the login, uploads stop until you change the email
 or password, because Club Log blocks programs that keep trying. Each station profile has its own settings. Off by
 default. Simulation never contacts Club Log.
+### Backups {#backups}
+
+![Settings: Logbooks, Backups](images/settings-backups.png){ width="900" }
+
+Nothing to set: Costas keeps copies of your log on its own. This section shows:
+
+- **Backups folder**: where the copies are, with an **Open folder** button.
+- **ADIF log copy**: the file names (one per station callsign) and when they were last written. If a write failed it
+  says why and when Costas tries again. See [ADIF copy of the log](log.md#adif-copy).
+- **Daily copies**: the newest daily copy of the database. In simulation none are taken, as the picture above shows.
+
 ## PSK Reporter
 
 The page is called **PSK Reporter and RBN** in Settings.

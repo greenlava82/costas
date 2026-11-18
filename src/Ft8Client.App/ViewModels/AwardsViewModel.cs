@@ -243,7 +243,7 @@ public sealed partial class AwardsViewModel : ObservableObject
         var index = _log();
         LogEmpty = index.IsEmpty;
         var mode = SelectedMode;
-        _summary = AwardBuilder.Build(Snapshot(index).Where(c => ModeGroups.Matches(mode, c.ModeKey)), _countries);
+        _summary = AwardBuilder.Build(Snapshot(index).Where(c => ModeGroups.Matches(mode, c.ModeKey)), _countries, index.Source);
         var s = _summary;
 
         Cards.Clear();

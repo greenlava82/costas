@@ -105,6 +105,49 @@ public class TransmitSafetySessionTests
     }
 
     [Fact]
+    public async Task SetDial_OffBandAfterPrepareBeforePtt_NothingKeyedAndSaysWhy()
+    {
+        var r = new Rig();
+        r.Decoder.Script(Slot(0), "CQ ZL2RPA RF70");
+        await r.RunUntilAsync(Slot(0).AddSeconds(14.8));
+        r.Session.CallStation("ZL2RPA").Should().BeTrue();
+        await r.RunUntilAsync(Slot(1).AddSeconds(0.05));
+        r.Tx.Pending.Should().NotBeNull("my call is prepared for slot 1");
+        r.Radio.Ptt.Should().BeFalse();
+
+        r.Session.SetDial(14_349_000);
+        await r.RunUntilAsync(Slot(2));
+
+        r.Radio.PttLog.Should().BeEmpty();
+        r.Sent.Should().BeEmpty();
+        r.Session.Snapshot.Fault.Should().Contain("dial moved");
+    }
+
+    [Fact]
+    public async Task SetDial_OffBandDuringTransmission_ReleasesPtt()
+    {
+        var r = new Rig();
+        await r.ReachMyReportAsync();
+
+        r.Session.SetDial(14_349_000);
+        await r.RunUntilAsync(Slot(3).AddSeconds(5.5));
+
+        r.Tx.Transmitting.Should().BeFalse();
+        r.Radio.Ptt.Should().BeFalse();
+        r.Session.Snapshot.Fault.Should().Contain("dial moved");
+    }
+
+    [Theory]
+    [InlineData(false, false, RadioPoll.State)]
+    [InlineData(true, false, RadioPoll.FrequencyOnly)]
+    [InlineData(true, true, RadioPoll.Nothing)]
+    [InlineData(false, true, RadioPoll.Nothing)]
+    public void PollNow_TransmitState_ReadsTheDialWhileOnTheAir(bool transmitting, bool pending, RadioPoll expected)
+    {
+        AppHost.PollNow(transmitting, pending).Should().Be(expected);
+    }
+
+    [Fact]
     public async Task RadioFault_BeforeAnyReport_AbandonsTheContact()
     {
         var r = new Rig();

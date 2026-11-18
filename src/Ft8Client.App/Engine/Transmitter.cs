@@ -53,6 +53,7 @@ public sealed class Transmitter
     private TxHold? _hold;
     private DateTime? _lastStartedSlot;
     private bool _ptt;
+    private long _haltEpoch; // incremented by every Halt; keying planned before a Halt is refused after it
     private Task<string?>? _pttOn; // the latest PTT-on command; audio waits for its answer
     private DateTime _pttOnAtUtc;
     private AudioStream? _stream;
@@ -132,9 +133,11 @@ public sealed class Transmitter
         if (SilencedText() is { } silent) return silent;
         if (guard.RigFault is not null) return $"Radio fault: {guard.RigFault}";
         if (!_frequencies.TransmitAllowed(guard.Band, mode, guard.DialHz, offsetHz, widthHz, out var bandWhy)) return bandWhy;
+        long epoch;
         lock (_gate)
         {
             if (_ptt || _current is not null || _next is not null || _stream is not null) return "Already transmitting.";
+            epoch = _haltEpoch;
             _stream = stream;
             _streamPlaying = false;
             _streamMode = mode;
@@ -143,7 +146,7 @@ public sealed class Transmitter
             _ptt = true;
             _streamAudioDueUtc = _clock.UtcNow + pttLead;
         }
-        var ptt = KeyOn();
+        var ptt = KeyOn(epoch);
         // A radio that refuses PTT at once has already halted the over: say why instead of reporting it started.
         if (ptt.IsCompletedSuccessfully && ptt.Result is { } failed) return failed;
         lock (_gate)
@@ -160,8 +163,9 @@ public sealed class Transmitter
     }
 
     /// <summary>
-    /// Checks what is on the air now against the band-edge limits at <paramref name="dialHz"/>. Returns null when
-    /// nothing is on the air or it still fits, otherwise why it must stop (the dial moved during a transmission).
+    /// Checks what is on the air now, or prepared to go out, against the band-edge limits at <paramref name="dialHz"/>.
+    /// Returns null when there is nothing or it still fits, otherwise why it must stop (the dial moved during a
+    /// transmission, or after it was prepared and checked at the old dial).
     /// </summary>
     public string? OnAirOutsideBand(string band, long dialHz)
     {
@@ -174,7 +178,7 @@ public sealed class Transmitter
             {
                 (mode, offset, width) = (_streamMode, _streamOffsetHz, _streamWidthHz);
             }
-            else if ((_current ?? (_ptt ? _next : null)) is { } tx)
+            else if ((_current ?? _next) is { } tx)
             {
                 // A Tune tone is checked as FT8 is when it starts.
                 (mode, offset, width) = (tx.Mode, tx.OffsetHz, null);
@@ -204,6 +208,18 @@ public sealed class Transmitter
     {
         get { lock (_gate) return _hold is not null && _next is not null; }
     }
+
+    /// <summary>
+    /// Counts Halts. A caller that decides to transmit under its own lock reads this there and passes it to
+    /// <see cref="Prepare"/>, so a Halt that comes after the decision but before the transmission is installed wins.
+    /// </summary>
+    public long HaltEpoch
+    {
+        get { lock (_gate) return _haltEpoch; }
+    }
+
+    /// <summary>Test seam: called on the slot thread after a slot event has picked its transmission, before acting on it.</summary>
+    internal Action<SlotEvent>? SlotEventCaptured { get; set; }
 
     /// <summary>Slot start of the latest transmission that went on the air, or null.</summary>
     public DateTime? LastStartedSlot
@@ -239,9 +255,14 @@ public sealed class Transmitter
     /// cannot be sent exactly as shown, it would fall outside the band, the clock is off, or a device is missing.
     /// With a <paramref name="hold"/>, the slot's PTT and audio marks are skipped until <see cref="Release"/> or a new
     /// <see cref="Prepare"/>; if neither comes before the hold expires, the transmission starts late by itself.
+    /// <paramref name="haltEpoch"/> is the <see cref="HaltEpoch"/> the caller read when it decided to transmit (the
+    /// current one when null): if a Halt has come since, nothing is installed and null is returned with a null
+    /// <paramref name="refusal"/>, since the Halt already says why nothing goes out.
     /// </summary>
-    public PreparedTx? Prepare(TxPlan plan, Mode mode, int offsetHz, TxGuardInput guard, out string? refusal, TxHold? hold = null)
+    public PreparedTx? Prepare(TxPlan plan, Mode mode, int offsetHz, TxGuardInput guard, out string? refusal, TxHold? hold = null, long? haltEpoch = null)
     {
+        long epoch;
+        lock (_gate) epoch = haltEpoch ?? _haltEpoch;
         refusal = DisabledReason;
         if (refusal is not null) return null;
         if (!guard.AudioReady || _output is null)
@@ -281,9 +302,11 @@ public sealed class Transmitter
             return null;
         }
         var samples = GfskSynth.Render(enc.Tones, mode, offsetHz, _output.SampleRate, Math.Pow(10, GainDb / 20));
-        var tx = new PreparedTx(plan, mode, offsetHz, samples, _output.SampleRate);
+        var tx = new PreparedTx(plan, mode, offsetHz, samples, _output.SampleRate) { HaltEpoch = epoch };
         lock (_gate)
         {
+            // Halted while this was being checked and rendered: the Halt wins.
+            if (_haltEpoch != epoch) return null;
             _next = tx;
             _hold = hold;
         }
@@ -322,23 +345,32 @@ public sealed class Transmitter
     public void OnSlotEvent(SlotEvent e)
     {
         PreparedTx? tx;
+        long epoch;
         lock (_gate)
         {
             tx = _next is { } n && n.Plan.SlotStartUtc == e.SlotStartUtc ? n : null;
             // Held for decodes, or already started late: Poll starts the audio.
             if (_hold is not null || _lateAudioDueUtc is not null) tx = null;
+            epoch = _haltEpoch;
         }
         if (tx is null) return;
+        SlotEventCaptured?.Invoke(e);
 
         switch (e.Mark)
         {
             case SlotMark.PttOn when e.LateBy <= LateStartLimit:
-                lock (_gate) _ptt = true;
-                KeyOn();
+                lock (_gate)
+                {
+                    // A Halt (or a new Prepare, a hold or a late start) since the capture above: leave PTT alone.
+                    if (!StillNext(tx, epoch)) return;
+                    _ptt = true;
+                }
+                KeyOn(epoch);
                 break;
             case SlotMark.TxStart when e.LateBy <= LateStartLimit:
                 lock (_gate)
                 {
+                    if (!StillNext(tx, epoch)) return; // halted or replaced since the capture above
                     if (!_ptt) return; // PTT was not asserted (fault or too late): do not play
                     if (!PttAnswered)
                     {
@@ -354,13 +386,14 @@ public sealed class Transmitter
                     _audioStartedUtc = _clock.UtcNow;
                     _pttOffDueUtc = _audioStartedUtc + tx.Duration + Tail;
                 }
-                _output!.Play(tx.Samples);
+                if (!PlayUnlessHalted(tx.Samples, epoch)) return;
                 Started?.Invoke(tx, _audioStartedUtc);
                 break;
             case SlotMark.PttOn or SlotMark.TxStart:
                 // Too late to start this slot: skip it.
                 lock (_gate)
                 {
+                    if (!StillNext(tx, epoch)) return;
                     _next = null;
                     if (_current is null && _ptt) _pttOffDueUtc = _clock.UtcNow;
                 }
@@ -374,27 +407,34 @@ public sealed class Transmitter
     /// now, audio after the PTT lead. Without <paramref name="alignToUtc"/> the whole message is sent, shifted later.
     /// With it, the message keeps its place in the slot as if it had started at <paramref name="alignToUtc"/> (the Tx
     /// start) and the part that would have been sent already is left out, as WSJT-X does for a late start. The caller
-    /// has checked that the start is within the limit.
+    /// has checked that the start is within the limit. Returns false, keying nothing, when a Halt has come since
+    /// <paramref name="tx"/> was prepared.
     /// </summary>
-    public void BeginLate(PreparedTx tx, TimeSpan pttLead, DateTime? alignToUtc = null)
+    public bool BeginLate(PreparedTx tx, TimeSpan pttLead, DateTime? alignToUtc = null)
     {
+        ArgumentNullException.ThrowIfNull(tx);
         lock (_gate)
         {
+            if (tx.HaltEpoch != _haltEpoch) return false;
             _next = tx;
             _ptt = true;
             _lateAudioDueUtc = _clock.UtcNow + pttLead;
             _lateAlignUtc = alignToUtc;
             _answerWaitMarkUtc = null;
         }
-        KeyOn();
+        KeyOn(tx.HaltEpoch);
+        return true;
     }
+
     /// <summary>Releases PTT when the audio and its tail have finished. Called on the slot thread every millisecond.</summary>
     public void Poll()
     {
         PollStream();
         var keyHeld = false;
+        long epoch;
         lock (_gate)
         {
+            epoch = _haltEpoch;
             if (_hold is { } h && _next is not null && _clock.UtcNow >= h.UntilUtc)
             {
                 // The decodes did not arrive in time: send what was prepared, late but within the limit.
@@ -404,7 +444,7 @@ public sealed class Transmitter
                 keyHeld = true;
             }
         }
-        if (keyHeld) KeyOn();
+        if (keyHeld) KeyOn(epoch);
 
         var unanswered = false;
         lock (_gate)
@@ -420,6 +460,7 @@ public sealed class Transmitter
         PreparedTx? late = null;
         lock (_gate)
         {
+            epoch = _haltEpoch;
             if (_lateAudioDueUtc is { } la && _clock.UtcNow >= la && _next is { } n && _ptt && PttAnswered)
             {
                 _lateAudioDueUtc = null;
@@ -442,11 +483,7 @@ public sealed class Transmitter
                 late = n;
             }
         }
-        if (late is not null)
-        {
-            _output!.Play(late.Samples);
-            Started?.Invoke(late, _audioStartedUtc);
-        }
+        if (late is not null && PlayUnlessHalted(late.Samples, epoch)) Started?.Invoke(late, _audioStartedUtc);
 
         PreparedTx? done = null;
         var streamDone = false;
@@ -473,9 +510,11 @@ public sealed class Transmitter
     private void PollStream()
     {
         AudioStream? start = null;
+        long epoch;
         lock (_gate)
         {
             if (_stream is null) return;
+            epoch = _haltEpoch;
             var now = _clock.UtcNow;
             if (_streamAudioDueUtc is { } due)
             {
@@ -491,16 +530,40 @@ public sealed class Transmitter
         }
         if (start is null) return;
         _output!.PlayStream(start);
-        StreamStarted?.Invoke();
+        lock (_gate)
+        {
+            if (_haltEpoch == epoch)
+            {
+                StreamStarted?.Invoke();
+                return;
+            }
+        }
+        _output.Stop(); // halted while it started: the Halt's Stop came first
     }
 
-    /// <summary>Halt: stops audio and drops PTT immediately.</summary>
-    public async Task HaltAsync()
+    /// <summary>Halt: stops audio and drops PTT immediately. Keying planned before it is refused afterwards.</summary>
+    public Task HaltAsync()
+    {
+        long ignored = 0;
+        return Halt(ref ignored, keepEpoch: false);
+    }
+
+    /// <summary>
+    /// Halts like <see cref="HaltAsync()"/> to make way for a transmission the caller has already decided on (a Tune
+    /// tone giving way to a message): when <paramref name="haltEpoch"/> is still current it is moved past this Halt, so
+    /// that transmission is not refused because of it. A stale one stays stale: another Halt came first and wins.
+    /// </summary>
+    public Task HaltForNextAsync(ref long haltEpoch) => Halt(ref haltEpoch, keepEpoch: true);
+
+    private Task Halt(ref long haltEpoch, bool keepEpoch)
     {
         PreparedTx? cut;
         bool streamCut;
         lock (_gate)
         {
+            var current = haltEpoch == _haltEpoch;
+            _haltEpoch++;
+            if (keepEpoch && current) haltEpoch = _haltEpoch;
             streamCut = _stream is not null;
             _stream = null;
             _streamAudioDueUtc = null;
@@ -516,6 +579,11 @@ public sealed class Transmitter
             _ptt = false;
             _pttOn = null;
         }
+        return FinishHaltAsync(cut, streamCut);
+    }
+
+    private async Task FinishHaltAsync(PreparedTx? cut, bool streamCut)
+    {
         _output?.Stop();
         await SetPttSafe(false).ConfigureAwait(false);
         if (cut is not null) Ended?.Invoke(cut, false);
@@ -552,19 +620,22 @@ public sealed class Transmitter
         var amp = Math.Pow(10, GainDb / 20);
         for (var i = 0; i < n; i++) tone[i] = (float)(amp * Math.Sin(2 * Math.PI * (offsetHz + 25) * i / _output.SampleRate));
         var tx = new PreparedTx(new TxPlan(_clock.UtcNow, Session.TuneMessage, null, null), Mode.Ft8, offsetHz, tone, _output.SampleRate);
+        long epoch;
         lock (_gate)
         {
+            epoch = _haltEpoch;
+            tx = tx with { HaltEpoch = epoch };
             _ptt = true;
             _current = tx;
             _pttOffDueUtc = _clock.UtcNow + tx.Duration + Tail;
         }
-        var failed = await SetPttSafe(true).ConfigureAwait(false);
+        var failed = await KeyOn(epoch).ConfigureAwait(false);
         if (failed is not null) return failed; // halted: PTT released, nothing to play
         lock (_gate)
         {
             if (!ReferenceEquals(_current, tx)) return "The tone was stopped before it started."; // halted meanwhile
         }
-        _output.Play(tone);
+        if (!PlayUnlessHalted(tone, epoch)) return "The tone was stopped before it started.";
         ToneStarted?.Invoke(tx);
         return null;
     }
@@ -572,14 +643,51 @@ public sealed class Transmitter
     // Under _gate. True once the radio has answered the latest PTT-on command (or none is outstanding).
     private bool PttAnswered => _pttOn is null || _pttOn.IsCompleted;
 
-    // Keys the radio and remembers the command, so audio can wait for the radio's answer.
-    private Task<string?> KeyOn()
+    // Under _gate. True while tx is still the one waiting for its slot, with no Halt, hold or late start since.
+    private bool StillNext(PreparedTx tx, long epoch) =>
+        _haltEpoch == epoch && ReferenceEquals(_next, tx) && _hold is null && _lateAudioDueUtc is null;
+
+    // Keys the radio and remembers the command, so audio can wait for the radio's answer. Nothing is keyed when a Halt
+    // has come since epoch was read. A Halt that lands before the radio has answered may have released PTT before this
+    // PTT-on took effect: PTT is then released again once it has, so it is never left keyed with nothing to release it.
+    private Task<string?> KeyOn(long epoch)
     {
-        lock (_gate) _pttOnAtUtc = _clock.UtcNow;
+        lock (_gate)
+        {
+            if (_haltEpoch != epoch) return Task.FromResult<string?>(HaltedText);
+            _pttOnAtUtc = _clock.UtcNow;
+        }
         var command = SetPttSafe(true);
-        lock (_gate) _pttOn = command;
+        lock (_gate)
+        {
+            if (_haltEpoch == epoch) _pttOn = command;
+        }
+        _ = command.ContinueWith(t =>
+        {
+            // A failed PTT-on has already halted and released PTT itself.
+            if (t.Result is null && HaltEpoch != epoch) _ = SetPttSafe(false);
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         return command;
     }
+
+    // Plays samples unless a Halt has come since epoch was read. A Halt that lands during Play has already stopped the
+    // output before this Play started, so the output is stopped again. False when nothing is left playing.
+    private bool PlayUnlessHalted(float[] samples, long epoch)
+    {
+        lock (_gate)
+        {
+            if (_haltEpoch != epoch) return false;
+        }
+        _output!.Play(samples);
+        lock (_gate)
+        {
+            if (_haltEpoch == epoch) return true;
+        }
+        _output.Stop();
+        return false;
+    }
+
+    private const string HaltedText = "Transmission halted.";
 
     /// <summary>Sets PTT. When asserting fails, halts and returns why (also raised as <see cref="Fault"/>).</summary>
     private async Task<string?> SetPttSafe(bool on)
@@ -613,7 +721,12 @@ public sealed class Transmitter
         // The device's stream has stopped for good: every later transmission would key PTT and send silence.
         _outputFault = why;
         if (Transmitting) _ = AbortAsync($"Audio output fault during transmission: {why}");
-        else Fault?.Invoke(OutputDeadText(why));
+        else
+        {
+            // A transmission prepared before the fault would key PTT into the dead output at its slot.
+            CancelPending();
+            Fault?.Invoke(OutputDeadText(why));
+        }
     }
 
     // Keying the radio with the output muted puts nothing on the air and looks like a broken radio: refuse and say why.

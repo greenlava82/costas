@@ -27,7 +27,8 @@ public sealed class RemoteUsers
     private readonly Func<RemoteOptions> _options;
     private readonly ISecretStore _secrets;
     private readonly IClock _clock;
-    private readonly LoginThrottle _throttle = new();
+    private readonly Func<string?, string, bool> _verify;
+    private readonly LoginThrottle _throttle;
     private readonly ConcurrentDictionary<string, UserSessions> _sessions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, bool> _hasPassword = new(StringComparer.Ordinal);
 
@@ -35,11 +36,16 @@ public sealed class RemoteUsers
     /// <param name="options">The current remote settings.</param>
     /// <param name="secrets">Where password hashes and sign-ins are kept.</param>
     /// <param name="clock">Clock, for the 30-day sign-in lifetime and the guessing limit.</param>
-    public RemoteUsers(Func<RemoteOptions> options, ISecretStore secrets, IClock clock)
+    /// <param name="verify">Checks a password against a stored hash; <see cref="PasswordHash.Verify"/> unless a test replaces it.</param>
+    /// <param name="throttle">The guessing limit; a new <see cref="LoginThrottle"/> unless a test replaces it.</param>
+    public RemoteUsers(Func<RemoteOptions> options, ISecretStore secrets, IClock clock,
+                       Func<string?, string, bool>? verify = null, LoginThrottle? throttle = null)
     {
         _options = options;
         _secrets = secrets;
         _clock = clock;
+        _verify = verify ?? PasswordHash.Verify;
+        _throttle = throttle ?? new LoginThrottle();
     }
 
     /// <summary>True when every device must sign in.</summary>
@@ -70,22 +76,26 @@ public sealed class RemoteUsers
         var now = _clock.UtcNow;
         var name = (username ?? string.Empty).Trim();
         if (name.Length is 0 or > 64) return RemoteLogin.Refused;
-        var wait = _throttle.Wait(name, address, now);
-        if (wait > TimeSpan.Zero)
+        // Reserved before the slow hash, so guesses sent together count against the limit while they are checked.
+        using var attempt = _throttle.TryBegin(name, address, now, out var wait);
+        if (attempt is null)
         {
-            Log.Warning("Remote sign-in for {User} from {Address} refused: too many wrong passwords", name, address);
+            if (wait == LoginThrottle.BusyWait)
+                Log.Debug("Remote sign-in for {User} from {Address} refused: other sign-ins still being checked", name, address);
+            else
+                Log.Warning("Remote sign-in for {User} from {Address} refused: too many wrong passwords", name, address);
             return RemoteLogin.TooMany(wait);
         }
         var user = _options().Users.FirstOrDefault(u => u.Enabled && string.Equals(u.Username.Trim(), name, StringComparison.OrdinalIgnoreCase));
         var stored = user is null ? null : _secrets.Get(SecretNames.RemotePassword(user.Id));
-        var ok = PasswordHash.Verify(password, stored ?? Decoy.Value);
+        var ok = _verify(password, stored ?? Decoy.Value);
         if (user is null || stored is null || !ok)
         {
-            _throttle.Failed(name, address, now);
+            attempt.Failed(now);
             Log.Warning("Remote sign-in for {User} from {Address} refused: wrong username or password", name, address);
             return RemoteLogin.Refused;
         }
-        _throttle.Succeeded(name, address);
+        attempt.Succeeded();
         var s = SessionsFor(user.Id);
         s.Prune(now);
         var token = s.Issue(now);

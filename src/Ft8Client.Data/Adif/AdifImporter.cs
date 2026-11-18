@@ -28,7 +28,4 @@ public static class AdifImporter
         var (inserted, merged) = repo.UpsertMany(rows);
         return new AdifImportResult(inserted, merged, skipped);
     }
-
-    /// <summary>Exports contacts as an ADIF document.</summary>
-    public static string Export(IEnumerable<QsoRecord> qsos, DateTime nowUtc) => AdifWriter.Document(qsos.Select(AdifMapper.ToAdif), nowUtc);
 }

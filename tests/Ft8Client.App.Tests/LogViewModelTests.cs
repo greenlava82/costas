@@ -106,6 +106,70 @@ public class LogViewModelTests
         vm.SyncText.Should().Be("Not synced with QRZ");
     }
 
+    private static LogViewModel NewVm(QsoRepository repo, Action? changed = null) =>
+        new(repo, CountryFile.Parse("United States:  05:  08:  NA:   37.53:    91.67:     5.0:  K:\n    K,W;\n"), () => ("p", "W7LIT"),
+            _ => Task.FromResult(""), () => null, changed ?? (() => { }));
+
+    [Fact]
+    public async Task ImportAsync_MissingFile_ReportsTheErrorWithoutThrowing()
+    {
+        var db = SqliteDatabase.InMemory(out var keep);
+        using var _ = keep;
+        var changed = 0;
+        var vm = NewVm(new QsoRepository(db), () => changed++);
+        var path = Path.Combine(Path.GetTempPath(), $"costas-missing-{Guid.NewGuid():N}.adi");
+
+        await vm.Invoking(v => v.ImportAsync(path)).Should().NotThrowAsync();
+
+        vm.Message.Should().StartWith("Could not import");
+        vm.Syncing.Should().BeFalse();
+        changed.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ImportAsync_ValidFile_ImportsAndRefreshes()
+    {
+        var db = SqliteDatabase.InMemory(out var keep);
+        using var _ = keep;
+        var vm = NewVm(new QsoRepository(db));
+        var path = Path.Combine(Path.GetTempPath(), $"costas-import-{Guid.NewGuid():N}.adi");
+        File.WriteAllText(path, "<EOH>\n<CALL:5>K1ABC <QSO_DATE:8>20261012 <TIME_ON:4>1200 <BAND:3>20m <MODE:3>FT8 <EOR>\n");
+        try
+        {
+            await vm.ImportAsync(path);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+
+        vm.Message.Should().Be("Imported 1, merged 0 duplicates, skipped 0.");
+        vm.ContactsTotal.Should().Be("1");
+        vm.Syncing.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExportAsync_UnwritablePath_ReportsTheErrorWithoutThrowing()
+    {
+        var db = SqliteDatabase.InMemory(out var keep);
+        using var _ = keep;
+        var vm = NewVm(new QsoRepository(db));
+        var path = Path.Combine(Path.GetTempPath(), $"costas-no-such-dir-{Guid.NewGuid():N}", "log.adi");
+
+        await vm.Invoking(v => v.ExportAsync(path)).Should().NotThrowAsync();
+
+        vm.Message.Should().StartWith("Could not export");
+        vm.Syncing.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsFileError_ProgrammingError_IsFalse()
+    {
+        LogViewModel.IsFileError(new InvalidOperationException()).Should().BeFalse();
+        LogViewModel.IsFileError(new NullReferenceException()).Should().BeFalse();
+        LogViewModel.IsFileError(new FileNotFoundException()).Should().BeTrue();
+    }
+
     [Fact]
     public void SelectedItem_DayHeading_KeepsTheSelectedRow()
     {

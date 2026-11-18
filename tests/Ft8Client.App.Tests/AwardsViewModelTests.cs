@@ -159,4 +159,22 @@ public sealed class AwardsViewModelTests : IDisposable
         vm.ClusterSpots.Should().BeEmpty();
         vm.ClusterText.Should().Contain("Settings > Who to call > DX cluster");
     }
+
+    [Theory]
+    [InlineData(ConfirmationSource.Lotw, false, "1 worked · 0 confirmed")]
+    [InlineData(ConfirmationSource.Lotw, true, "1 worked · 1 confirmed")]
+    [InlineData(ConfirmationSource.Any, false, "1 worked · 1 confirmed")]
+    [InlineData(ConfirmationSource.Any, true, "1 worked · 1 confirmed")]
+    public async Task Refresh_ConfirmedBySetting_DxccCountsOnlyThatSource(ConfirmationSource source, bool lotw, string headline)
+    {
+        var history = History();
+        await history.Refresh();
+        // Confirmed but not by LoTW: an eQSL or a paper card.
+        var log = LogIndex.Build([new LogContact("JA1AAA", "20m", "FT8", "PM95", "JA", null, true, Now, LotwConfirmed: lotw)], source);
+        var vm = new AwardsViewModel(() => log, ReferenceData.LoadCountries(), history, () => Now, a => a());
+
+        vm.Refresh();
+
+        vm.Cards[0].Headline.Should().Be(headline);
+    }
 }

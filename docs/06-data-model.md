@@ -14,6 +14,8 @@ Root: `%LOCALAPPDATA%\Costas\` (builds before the rename used `Ft8Client\`; the 
 | `wav\YYMMDD_HHMMSS.wav` | Saved slot audio, per the Files setting, deleted after the retention period |
 | `cache\cty.dat` | Updated country file, if newer than the bundled one |
 | `tmp\` | Per-run `jt9` scratch folders, cleaned at start |
+| `backups\costas-YYYY-MM-DD.db`, `backups\settings-YYYY-MM-DD.json` | Daily copies of the database and settings (`LogBackup`), the newest 14 kept. Not taken in simulation |
+| `backups\costas-log-<CALL>.adi` | ADIF copy of the whole log, one file per station callsign (`AdifLogMirror`, below) |
 
 Secrets (QRZ logbook key per profile, QRZ username and password) are stored through an `ISecretStore`: Windows Credential Manager on Windows.
 
@@ -85,7 +87,7 @@ CREATE INDEX ix_qso_date        ON qso(qso_date_on);
 CREATE TABLE upload_queue (
   id            INTEGER PRIMARY KEY,
   qso_id        INTEGER NOT NULL REFERENCES qso(id) ON DELETE CASCADE,
-  target        TEXT    NOT NULL,             -- 'qrz'
+  target        TEXT    NOT NULL,             -- 'qrz', 'eqsl', 'clublog', 'cloudlog'; only qrz and eqsl have a qso state column
   attempts      INTEGER NOT NULL DEFAULT 0,
   next_try_utc  TEXT    NOT NULL,
   last_error    TEXT
@@ -196,7 +198,26 @@ Writer and reader support ADIF 3.1 text (`<name:len>value`, `<eor>`, header endi
 | `app_qrzlog_logid` | On records fetched from QRZ |
 | `sig`, `sig_info`, `pota_ref` | Park fields. A local contact with a spotted POTA activator gets `sig` = `POTA` and `sig_info` = the park reference. There is no column for them: they are kept in `raw_adif` and copied from it on upload, export and UDP; imported and fetched records keep theirs the same way |
 
+QSL state, in files only (export and the log copy, `AdifMapper.ToFileAdif`); records sent to online services leave these out, as before:
+
+| ADIF field | From |
+| --- | --- |
+| `lotw_qsl_sent`, `lotw_qsl_rcvd` | `Y` when `lotw_upload_state` is `uploaded`, when `lotw_confirmed` |
+| `eqsl_qsl_sent`, `eqsl_qsl_rcvd` | `Y` when `eqsl_upload_state` is `uploaded`, when `eqsl_confirmed` |
+| `qrzcom_qso_upload_status` | `Y` when `upload_state` (QRZ) is `uploaded` |
+| `app_qrzlog_logid` | `qrz_logid` |
+| `qsl_sent`, `qsl_rcvd`, `qslsdate`, `qslrdate`, `qsl_sent_via`, `qsl_rcvd_via`, `qsl_via`, `qslmsg`, `lotw_qslsdate`, `lotw_qslrdate`, `eqsl_qslsdate`, `eqsl_qslrdate`, `clublog_qso_upload_status`, `clublog_qso_upload_date`, `qrzcom_qso_upload_date`, `app_qrzlog_status` | Copied from `raw_adif` when the original record had them (paper QSLs, dates and Club Log have no column). A received field is dropped once `confirmed` is 0, so a withdrawn QRZ confirmation is not written back |
+| `app_costas_confirmed` | `Y` when `confirmed` is 1 and no other field in the record says who confirmed it |
+
+Import reads them all back: `lotw_qsl_sent`, `eqsl_qsl_sent` and `qrzcom_qso_upload_status` `Y` set the matching upload state to `uploaded`, and `app_costas_confirmed` `Y` counts as a confirmation. The profile is the importing one; `station_callsign` comes from the file.
+
 Import must tolerate unknown fields, junk between records and records with no call (skip them and count).
+
+### ADIF files
+
+The Log view's export and the log copy use one writer (`AdifLogExport`): one file per station callsign (upper case), contacts oldest first, a header line naming the callsign, the count and the time written, records separated by a blank line. Profiles with the same callsign share a file. Export with more than one callsign in the log writes `<name>-<CALL>.adi` beside the chosen file. Plain UTF-8 without a byte order mark; lengths count UTF-8 bytes, as every ADIF record Costas writes does, and the reader accepts characters too (`08-open-questions.md` V-ADIF1). Every file is written to `<name>.tmp`, flushed and renamed over the old one (`AtomicFile`).
+
+The log copy (`AdifLogMirror`, driven by `LogCopyService` in App) lives in `backups\`: `costas-log-W7LIT.adi`, a `/` in the call becoming `_`. A file for a callsign no longer in the log is removed; nothing else in the folder is touched. An empty log writes no file.
 
 ## Decode journal
 
@@ -214,7 +235,7 @@ Plain text, one line per event, monthly files. Compatible in spirit with WSJT-X 
   "schema": 1,
   "activeProfile": "home",
   "profiles": [{
-    "id": "home", "name": "Home", "callsign": "W7LIT", "grid": "DN40",
+    "id": "home", "name": "Home", "callsign": "W7LIT", "grid": "DN40", "licenceClass": "general",
     "rig": { "mode": "hamlib", "model": 3073, "port": "COM4", "baud": 115200, "ptt": "cat", "pttPort": null },
     "audio": { "inputId": "...", "outputId": "...", "txGainDb": -6.0 },
     "powerWatts": 25
@@ -234,6 +255,7 @@ Plain text, one line per event, monthly files. Compatible in spirit with WSJT-X 
             "uploadOnComplete": false, "userList": true },
   "hunt": { "targets": [{ "kind": "country", "value": "KL", "band": "40m" }], "watchAllBands": true,
             "nearbyKm": 1000, "sound": true },
+  "notifications": { "enabled": true, "hunt": true, "callers": true, "onlyInBackground": true },
   "qrz": { "logbookEnabled": true, "lookupEnabled": true, "syncMinutes": 15, "uploadOnComplete": true },
   "pskReporter": { "feedEnabled": true, "uploadSpots": false },
   "dxCluster": { "enabled": false, "host": "", "port": 7300 },
@@ -245,6 +267,8 @@ Plain text, one line per event, monthly files. Compatible in spirit with WSJT-X 
 ```
 
 The rig model number shown is an example; always take it from the Hamlib model list.
+
+`licenceClass` is the US licence class whose data segments the transmit guard keeps to: `extra`, `advanced`, `general`, `technician` or `none` (not US: band limits only). It is missing (null) until the operator chooses one; then `operating.usDataSegmentsOnly` decides: true reads as `extra`, false as `none`. It is false on a new install (the check is off by default, owner decision 2026-11-18); earlier builds wrote it as true unless the operator turned it off, so their stations keep the Extra check. Settings writes the class on every Save, so the old switch is only read for profiles never saved since. An unknown value reads as `extra`.
 
 ## Frequency table
 

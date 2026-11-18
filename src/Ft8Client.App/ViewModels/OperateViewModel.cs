@@ -595,7 +595,8 @@ public sealed partial class OperateViewModel : ObservableObject
         RepeatsEmptyText = Repeats.Count > 0 ? string.Empty : $"Nobody you have worked on {band} is on the air right now.";
 
         UnnamedText = ModeInfo.IsSlotted(s.Mode) ? string.Empty : UnnamedSignalsText(s.UnnamedSignals);
-        Summary = s.Summary is null ? null : new SummaryViewModel(s.Summary, s.LogIsEmpty, ModeInfo.IsSlotted(s.Mode) ? null : s.Activity);
+        Summary = s.Summary is null ? null : new SummaryViewModel(s.Summary, s.LogIsEmpty, ModeInfo.IsSlotted(s.Mode) ? null : s.Activity,
+            s.BandAdvice, Units, now);
         Contact = s.Contact is null ? null : ContactPanelViewModel.For(s.Contact, s, now, Units, QrzName?.Invoke(s.Contact.DxCall));
         OnPropertyChanged(nameof(InContact));
         OnPropertyChanged(nameof(ShowStrip));
@@ -858,6 +859,19 @@ public sealed partial class OperateViewModel : ObservableObject
     private void OpenPhoto(StationDetailsViewModel? d)
     {
         if (d?.PhotoUrl is { } url) Services.Browser.Open(url);
+    }
+
+    /// <summary>
+    /// Selects the station <paramref name="call"/> in Next in line, as a click on its row would (a clicked desktop
+    /// notification). Only selects: it never calls. False when the station is not in the list.
+    /// </summary>
+    public bool SelectCall(string call)
+    {
+        var row = Line.FirstOrDefault(r => Callsign.EqualsCall(r.Call, call));
+        if (row is null) return false;
+        _line.Clicked();
+        Select(row);
+        return true;
     }
 
     /// <summary>Moves the selection (Up/Down).</summary>

@@ -49,4 +49,7 @@ public static class ServiceNames
 
     /// <summary>Real-time uploads to Club Log.</summary>
     public const string ClubLog = "clublog";
+
+    /// <summary>The ADIF log copy in the backups folder; shown in the bottom bar only when it cannot be written.</summary>
+    public const string LogCopy = "logcopy";
 }

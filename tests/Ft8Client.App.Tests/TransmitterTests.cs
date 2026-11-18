@@ -160,6 +160,30 @@ public class TransmitterTests
     }
 
     [Fact]
+    public void RaiseFault_IdleWithTransmissionPrepared_CancelsItWithoutKeying()
+    {
+        var r = new Rig();
+        r.Tx.Prepare(new TxPlan(Slot, "CQ W7LIT DN40", null, null), Mode.Ft8, 1500, Guard(), out _).Should().NotBeNull();
+
+        r.Out.RaiseFault("device removed");
+
+        r.Tx.Pending.Should().BeNull();
+        r.Run(TimeSpan.FromSeconds(16));
+        r.Radio.PttLog.Should().BeEmpty("PTT would key the radio into a dead output");
+        r.Out.Played.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void OnAirOutsideBand_PreparedNotYetKeyedDialMovedOffBand_SaysWhy()
+    {
+        var r = new Rig();
+        r.Tx.Prepare(new TxPlan(Slot, "CQ W7LIT DN40", null, null), Mode.Ft8, 1500, Guard(), out _).Should().NotBeNull();
+
+        r.Tx.OnAirOutsideBand("20m", 14_074_000).Should().BeNull();
+        r.Tx.OnAirOutsideBand("20m", 14_349_000).Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task Prepare_OutputMutedInWindows_RefusedWithoutKeying()
     {
         var r = new Rig();

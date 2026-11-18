@@ -33,7 +33,7 @@ public class FrequencyTableTests
     {
         // 850 Hz shift centred 300 Hz below the edge: mark sits 125 Hz past it. The fixed 250 Hz width let it through.
         // Band edges only: the US data segments would refuse 14.348 MHz whatever the width.
-        var table = new FrequencyTable(Table.Entries) { UsDataSegmentsOnly = false };
+        var table = new FrequencyTable(Table.Entries) { Licence = UsLicenceClass.NotUs };
         const long dial = 14_348_000;
         const int offset = 1_700;
         table.TransmitAllowed("20m", Mode.Rtty, dial, offset, out _).Should().BeTrue();
@@ -48,8 +48,9 @@ public class FrequencyTableTests
         // shift does not.
         const long dial = 14_148_000;
         const int offset = 1_700;
-        Table.TransmitAllowed("20m", Mode.Rtty, dial, offset, out _).Should().BeTrue();
-        Table.TransmitAllowed("20m", Mode.Rtty, dial, offset, ModeInfo.RttyBandwidthHz(850, 45.45), out _).Should().BeFalse();
+        var table = new FrequencyTable(Table.Entries) { Licence = UsLicenceClass.AmateurExtra };
+        table.TransmitAllowed("20m", Mode.Rtty, dial, offset, out _).Should().BeTrue();
+        table.TransmitAllowed("20m", Mode.Rtty, dial, offset, ModeInfo.RttyBandwidthHz(850, 45.45), out _).Should().BeFalse();
     }
 
     [Fact]

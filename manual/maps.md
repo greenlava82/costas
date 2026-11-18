@@ -73,7 +73,7 @@ Press **Reach** in the top bar (++ctrl+3++), or **Open reach view** under *Your 
 
 ### Band activity near you
 
-Open **Reach** or the **Band** dropdown to see, before you switch, which bands are open from your area right now. For each band it shows how many PSK Reporter spots stations within 300 miles of you got in the last 15 minutes, which continents heard them (darker means more), and countries hearing them that you still need on that band, for example *You need Brazil +2*. Hover over it for the full list.
+Open **Reach** or the **Band** dropdown to see, before you switch, which bands are open from your area right now. For each band it shows how many PSK Reporter spots stations within 300 miles of you got in the last 15 minutes, which continents heard them (darker means more), and countries hearing them that you still need on that band, for example *You need Brazil +2*. Hover over it for the full list. The same numbers feed the [band advice](operate.md#band-advice) line on the Operate view, which names a band only when the evidence is clear.
 
 On **Reach** this is a compact grid: one row per band with spots, a cell per continent (NA, SA, EU, AF, AS, OC) showing how many spots it gave and shaded by how busy it is, the band's total, and the countries you need there (*Brazil +2*). The band your radio is on is highlighted. Bands with no spots don't get a row; they are listed on one line underneath, such as *No spots on 160 m, 80 m and 60 m.* Hover over a row for where the numbers come from, over a cell for that continent's count, and over the needed countries for the full list.
 

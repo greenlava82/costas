@@ -17,4 +17,7 @@ public sealed class ClubLogOptions
 
     /// <summary>The email address the Club Log account is registered with (not a callsign).</summary>
     public string Email { get; set; } = string.Empty;
+
+    /// <summary>Set while Club Log has refused the login and uploads are stopped; null otherwise.</summary>
+    public ClubLogStop? Stop { get; set; }
 }

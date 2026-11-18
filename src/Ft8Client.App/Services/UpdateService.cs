@@ -344,7 +344,9 @@ public sealed class UpdateService : IDisposable
             return null;
         }
         using var http = HttpFactory.Create(_settings.Current.Profile.Callsign, _handler, TimeSpan.FromMinutes(15));
-        return await new UpdateDownloader(http).DownloadAsync(release, _downloadFolder, progress, ct).ConfigureAwait(false);
+        // Windows checks the installer's Authenticode signature too; elsewhere the update opens the release page instead.
+        var verifier = OperatingSystem.IsWindows() ? new AuthenticodeVerifier() : null;
+        return await new UpdateDownloader(http, verifier).DownloadAsync(release, _downloadFolder, progress, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -452,9 +454,29 @@ public sealed class UpdateService : IDisposable
         Changed?.Invoke();
     }
 
-    // Velopack's downloads (the GitHub feed and the packages) carry the app's User-Agent like every other request.
+    // Velopack's downloads (the GitHub feed and the packages) carry the app's User-Agent like every other request, and
+    // are refused unless they are HTTPS (UpdateUrls), like the classic installer's.
     private sealed class IdentifiedDownloader(Func<string> callsign) : HttpClientFileDownloader
     {
+        public override Task DownloadFile(string url, string targetFile, Action<int> progress, IDictionary<string, string>? headers, double timeout,
+            CancellationToken cancelToken)
+        {
+            UpdateUrls.RequireHttps(url);
+            return base.DownloadFile(url, targetFile, progress, headers, timeout, cancelToken);
+        }
+
+        public override Task<byte[]> DownloadBytes(string url, IDictionary<string, string>? headers, double timeout)
+        {
+            UpdateUrls.RequireHttps(url);
+            return base.DownloadBytes(url, headers, timeout);
+        }
+
+        public override Task<string> DownloadString(string url, IDictionary<string, string>? headers, double timeout)
+        {
+            UpdateUrls.RequireHttps(url);
+            return base.DownloadString(url, headers, timeout);
+        }
+
         protected override HttpClient CreateHttpClient(IDictionary<string, string>? headers, double timeout)
         {
             var client = base.CreateHttpClient(headers, timeout);

@@ -188,7 +188,7 @@ On the other tabs the slot countdown bar sits under the top bar instead (red whi
 | Tab | What it shows |
 |---|---|
 | **Operate** | The tiles above. In PSK and RTTY the macro keys take the place of Resend and Call CQ, and the last lines of the conversation show in the contact tile ([PSK and RTTY](keyboard-modes.md#away-from-the-desk)) |
-| **Stations** | The band summary (stations heard, countries, calling CQ, you need), **Repeats** (stations already in your log on this band and mode) and **Watching** (needed, but not callable right now, and why) |
+| **Stations** | The band summary (stations heard, countries, calling CQ, you need, and the desk's [band advice](operate.md#band-advice) line when there is one), **Repeats** (stations already in your log on this band and mode) and **Watching** (needed, but not callable right now, and why) |
 | **Decodes** | Band activity, newest first. Messages to you are highlighted, CQs are blue and your own transmissions are grey |
 | **Signal** | Who hears you, from PSK Reporter: how many stations and countries in the last 15 minutes, the farthest and best reports, the latest reports, and the last hour of distinct receivers in five-minute intervals (the final interval is incomplete) |
 | **Log** | The contacts you made this session |
@@ -200,6 +200,12 @@ the background or the screen is locked.
 Under the top bar the page also shows the radio's SWR or ALC warning after a transmission that read outside limits,
 a line when QRZ, PSK Reporter or the audio device is not working, and the latest [Hunt list](hunt.md) alert of the
 last 15 minutes.
+
+When nothing has decoded for two slots it also shows the desk's [Why it's quiet](operate.md#why-its-quiet) line, with
+the same **Go to 14.074** button when the fix is a frequency. Tapping it tunes the station to the frequency in the
+desk's own line (the phone cannot pick another one), and takes control, as a band change does.
+
+![The Why it's quiet line on the phone](images/phone-quiet.png){ width="320" }
 
 ### On a tablet
 

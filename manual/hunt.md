@@ -39,5 +39,11 @@ cluster spots are listed on the [Awards](awards.md#spotted-on-the-dx-cluster) vi
 - The [phone page](phone.md) shows it as a banner under the top bar.
 - The chime plays and Costas flashes in the taskbar, unless you turned that off. The chime plays on the computer's
   default speakers, never on the radio's audio device.
+- While Costas is minimized, in mini mode or behind another program, a desktop notification appears too:
+  *VP8PJ on 20 m FT8 · New country Falkland Islands, heard here at -12 dB.* Click it to bring Costas to the front
+  with the station selected in **Next in line** (when it is there). A notification never calls, transmits or changes
+  band. When several stations are heard within a minute they share one notification (*3 Hunt list stations heard*),
+  and a station is not notified again for 10 minutes. Turn them off, or have them show even while Costas is in front,
+  in [Settings › Notifications](settings.md#notifications).
 
 Each entry alerts once per band and then stays quiet on that band for 30 minutes, however often the station is heard.
