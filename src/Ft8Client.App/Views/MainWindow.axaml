@@ -397,10 +397,15 @@
           </Button>
           <!-- A FlexRadio's paired amplifier and tuner (PowerGenius XL, TunerGenius XL), through the radio's own API.
                Shown only when the radio reports one; nothing switches without a click, and never while on the air. -->
-          <Button x:Name="AccessoryButton" Classes="link" AutomationProperties.Name="Amplifier and tuner" VerticalAlignment="Center" IsVisible="{Binding Accessory.Any}"
-                  ToolTip.Tip="The amplifier and tuner paired with your FlexRadio. Click to switch them.">
-            <TextBlock Text="{Binding Accessory.BarText}" Classes="num" TextDecorations="{x:Null}"
-                       Foreground="{Binding Accessory.BarKind, Converter={x:Static v:Converters.KindBrush}}" />
+          <!-- A real button with a menu arrow, like the profile chip, so it reads as the way into the controls rather
+               than a status label. -->
+          <Button x:Name="AccessoryButton" AutomationProperties.Name="Amplifier and tuner" VerticalAlignment="Center" IsVisible="{Binding Accessory.Any}"
+                  ToolTip.Tip="The amplifier and tuner paired with your FlexRadio. Click for Operate, Standby and Bypass.">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="{Binding Accessory.BarText}" Classes="num" VerticalAlignment="Center"
+                         Foreground="{Binding Accessory.BarKind, Converter={x:Static v:Converters.KindBrush}}" />
+              <TextBlock Text="▾" VerticalAlignment="Center" />
+            </StackPanel>
             <Button.Flyout>
               <Flyout>
                 <StackPanel Classes="flyout" Spacing="8" Width="280">

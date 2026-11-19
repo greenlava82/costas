@@ -95,7 +95,8 @@ command on, exactly as when you click in SmartSDR.
 
     ![Settings: FlexRadio amp and tuner, connected](images/settings-flex-amp-tuner.png)
 
-5. The bottom bar now shows **Amp Standby · Tuner Operate** (or whatever they are set to). Click it to open the panel:
+5. The bottom bar now has a button that reads **Amp Standby · Tuner Operate ▾** (or whatever they are set to). Click it
+   to open the panel:
     - **Operate** and **Standby** for the amplifier.
     - **Operate**, **Standby**, **Bypass** and **In line** for the tuner.
 

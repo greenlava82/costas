@@ -70,7 +70,8 @@ public sealed record AccessoryPanel(
             tunerFree && tuner!.Operate && !tuner.Bypass,
             tunerFree && tuner!.Operate && tuner.Bypass,
             string.Join(" · ", parts),
-            amp is null ? TextKind.Secondary : ampKind);
+            // The bar text sits on a button: grey there would read as a disabled button, so quiet states use normal text.
+            ampKind == TextKind.Secondary || amp is null ? TextKind.Normal : ampKind);
     }
 
     private static string AmpText(FlexAmpState s) => s switch

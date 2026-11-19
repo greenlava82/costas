@@ -410,7 +410,8 @@ public sealed class FlexAccessoryServiceTests : IAsyncDisposable
     [InlineData("IDLE", "Amp Operate", TextKind.Caution)]
     [InlineData("TRANSMIT_A", "Amp Transmitting", TextKind.Critical)]
     [InlineData("FAULT", "Amp Fault", TextKind.Critical)]
-    [InlineData("POWERUP", "Amp Starting", TextKind.Secondary)]
+    [InlineData("POWERUP", "Amp Starting", TextKind.Normal)]
+    [InlineData("STANDBY", "Amp Standby", TextKind.Normal)]
     public void Panel_AmpStates_ReadAsText(string state, string text, TextKind kind)
     {
         var p = AccessoryPanel.From(Accessories(PgxlStandby.Replace("STANDBY", state, StringComparison.Ordinal)), canChange: true);
