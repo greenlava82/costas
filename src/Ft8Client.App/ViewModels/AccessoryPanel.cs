@@ -58,8 +58,8 @@ public sealed record AccessoryPanel(
             : tuner.Bypass ? "Bypass" : "Operate";
         var tunerFree = canChange && tuner is { Tuning: false };
         var parts = new List<string>(2);
-        if (amp is not null) parts.Add($"Amp {ampState}");
-        if (tuner is not null) parts.Add($"Tuner {tunerState}");
+        if (amp is not null) parts.Add($"Amp: {ampState}");
+        if (tuner is not null) parts.Add($"Tuner: {tunerState}");
         return new AccessoryPanel(
             amp is not null, amp?.Name ?? string.Empty, ampState, ampKind,
             canChange && amp is { Operate: false } && !starting,
@@ -69,7 +69,7 @@ public sealed record AccessoryPanel(
             tunerFree && tuner!.Operate,
             tunerFree && tuner!.Operate && !tuner.Bypass,
             tunerFree && tuner!.Operate && tuner.Bypass,
-            string.Join(" · ", parts),
+            string.Join("  ", parts),
             // The bar text sits on a button: grey there would read as a disabled button, so quiet states use normal text.
             ampKind == TextKind.Secondary || amp is null ? TextKind.Normal : ampKind);
     }

@@ -66,7 +66,7 @@ public class AccessoryBarLayoutTests
                     // panel from the service, so setting the view model's panel directly would be undone at random.
                     host.Accessories.ShowForTests(Both);
                     Settle(window);
-                    vm.Accessory.BarText.Should().Be("Amp Transmitting · Tuner Tuning");
+                    vm.Accessory.BarText.Should().Be("Amp: Transmitting  Tuner: Tuning");
 
                     button.IsEffectivelyVisible.Should().BeTrue();
                     var halt = window.GetVisualDescendants().OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Halt transmit");

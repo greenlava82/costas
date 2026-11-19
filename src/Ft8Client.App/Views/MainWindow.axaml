@@ -399,12 +399,20 @@
                Shown only when the radio reports one; nothing switches without a click, and never while on the air. -->
           <!-- A real button with a menu arrow, like the profile chip, so it reads as the way into the controls rather
                than a status label. -->
-          <Button x:Name="AccessoryButton" AutomationProperties.Name="Amplifier and tuner" VerticalAlignment="Center" IsVisible="{Binding Accessory.Any}"
+          <Button x:Name="AccessoryButton" AutomationProperties.Name="{Binding Accessory.BarText, StringFormat='Amplifier and tuner: {0}'}" VerticalAlignment="Center" IsVisible="{Binding Accessory.Any}"
                   ToolTip.Tip="The amplifier and tuner paired with your FlexRadio. Click for Operate, Standby and Bypass.">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Text="{Binding Accessory.BarText}" Classes="num" VerticalAlignment="Center"
-                         Foreground="{Binding Accessory.BarKind, Converter={x:Static v:Converters.KindBrush}}" />
-              <TextBlock Text="▾" VerticalAlignment="Center" />
+            <!-- "Amp: Standby  Tuner: Operate": the device as a quiet label, its state in bold (owner, 2026-11-18). -->
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding Accessory.HasAmp}">
+                <TextBlock Text="Amp:" Classes="secondary" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Accessory.AmpState}" FontWeight="SemiBold" VerticalAlignment="Center"
+                           Foreground="{Binding Accessory.BarKind, Converter={x:Static v:Converters.KindBrush}}" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding Accessory.HasTuner}">
+                <TextBlock Text="Tuner:" Classes="secondary" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Accessory.TunerState}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              </StackPanel>
+              <TextBlock Text="▾" VerticalAlignment="Center" Margin="-4,0,0,0" />
             </StackPanel>
             <Button.Flyout>
               <Flyout>

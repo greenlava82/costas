@@ -170,22 +170,22 @@ public sealed class FlexAccessoryServiceTests : IAsyncDisposable
         var changes = 0;
         service.Changed += () => Interlocked.Increment(ref changes);
         await WaitUntil(() => service.Current.Amplifier is not null && service.Current.Tuner is not null);
-        AccessoryPanel.From(service.Current, service.CanChange).BarText.Should().Be("Amp Standby · Tuner Operate");
+        AccessoryPanel.From(service.Current, service.CanChange).BarText.Should().Be("Amp: Standby  Tuner: Operate");
 
         (await service.SetAmpOperateAsync(true)).Should().BeNull();
         await WaitUntil(() => service.Current.Amplifier!.Operate);
         AccessoryPanel.From(service.Current, service.CanChange).Should().Match<AccessoryPanel>(p =>
-            p.BarText == "Amp Operate · Tuner Operate" && !p.CanAmpOperate && p.CanAmpStandby);
+            p.BarText == "Amp: Operate  Tuner: Operate" && !p.CanAmpOperate && p.CanAmpStandby);
 
         (await service.SetTunerBypassAsync(true)).Should().BeNull();
         await WaitUntil(() => service.Current.Tuner!.Bypass);
         AccessoryPanel.From(service.Current, service.CanChange).Should().Match<AccessoryPanel>(p =>
-            p.BarText == "Amp Operate · Tuner Bypass" && p.CanTunerInLine && !p.CanTunerBypass);
+            p.BarText == "Amp: Operate  Tuner: Bypass" && p.CanTunerInLine && !p.CanTunerBypass);
 
         (await service.SetTunerOperateAsync(false)).Should().BeNull();
         await WaitUntil(() => !service.Current.Tuner!.Operate);
         AccessoryPanel.From(service.Current, service.CanChange).Should().Match<AccessoryPanel>(p =>
-            p.BarText == "Amp Operate · Tuner Standby" && !p.CanTunerBypass && !p.CanTunerInLine && p.CanTunerOperate);
+            p.BarText == "Amp: Operate  Tuner: Standby" && !p.CanTunerBypass && !p.CanTunerInLine && p.CanTunerOperate);
 
         (await service.SetAmpOperateAsync(false)).Should().BeNull();
         await WaitUntil(() => !service.Current.Amplifier!.Operate);
@@ -391,7 +391,7 @@ public sealed class FlexAccessoryServiceTests : IAsyncDisposable
 
         var p = AccessoryPanel.From(a, canChange: true);
 
-        p.BarText.Should().Be("Amp Standby · Tuner Operate");
+        p.BarText.Should().Be("Amp: Standby  Tuner: Operate");
         (p.CanAmpOperate, p.CanAmpStandby).Should().Be((true, false));
         (p.CanTunerOperate, p.CanTunerStandby, p.CanTunerBypass, p.CanTunerInLine).Should().Be((false, true, true, false));
         p.AmpName.Should().Be("PowerGenius XL");
@@ -407,11 +407,11 @@ public sealed class FlexAccessoryServiceTests : IAsyncDisposable
     }
 
     [Theory]
-    [InlineData("IDLE", "Amp Operate", TextKind.Caution)]
-    [InlineData("TRANSMIT_A", "Amp Transmitting", TextKind.Critical)]
-    [InlineData("FAULT", "Amp Fault", TextKind.Critical)]
-    [InlineData("POWERUP", "Amp Starting", TextKind.Normal)]
-    [InlineData("STANDBY", "Amp Standby", TextKind.Normal)]
+    [InlineData("IDLE", "Amp: Operate", TextKind.Caution)]
+    [InlineData("TRANSMIT_A", "Amp: Transmitting", TextKind.Critical)]
+    [InlineData("FAULT", "Amp: Fault", TextKind.Critical)]
+    [InlineData("POWERUP", "Amp: Starting", TextKind.Normal)]
+    [InlineData("STANDBY", "Amp: Standby", TextKind.Normal)]
     public void Panel_AmpStates_ReadAsText(string state, string text, TextKind kind)
     {
         var p = AccessoryPanel.From(Accessories(PgxlStandby.Replace("STANDBY", state, StringComparison.Ordinal)), canChange: true);
