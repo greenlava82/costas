@@ -113,6 +113,12 @@ public sealed class QsoRecord
     /// <summary>Last eQSL delivery error (credentials redacted).</summary>
     public string? EqslUploadError { get; set; }
 
+    /// <summary>Wavelog/Cloudlog delivery state, independent of QRZ and eQSL ("uploaded" also when Wavelog already had it).</summary>
+    public string WavelogUploadState { get; set; } = Log.UploadState.None;
+
+    /// <summary>Last Wavelog/Cloudlog delivery error (never contains the key).</summary>
+    public string? WavelogUploadError { get; set; }
+
     /// <summary>The original ADIF record for imported or fetched contacts.</summary>
     public string? RawAdif { get; set; }
 

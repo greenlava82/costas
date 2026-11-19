@@ -89,6 +89,30 @@ public sealed partial class LogViewModel : ObservableObject
     /// <summary>Signs and uploads new contacts to LoTW through TQSL; returns a message.</summary>
     public Func<CancellationToken, Task<string>>? LotwUpload { get; init; }
 
+    /// <summary>Downloads what is new in the Wavelog log now; returns a message. Null when not available.</summary>
+    public Func<CancellationToken, Task<string>>? WavelogDownload { get; init; }
+
+    /// <summary>Sends the contacts waiting for Wavelog/Cloudlog now; returns a message.</summary>
+    public Func<CancellationToken, Task<string>>? WavelogUpload { get; init; }
+
+    /// <summary>The active profile's Wavelog/Cloudlog set-up: set up at all, download on, upload on.</summary>
+    public Func<(bool Configured, bool CanDownload, bool CanUpload)>? WavelogState { get; init; }
+
+    /// <summary>When the Wavelog log was last downloaded, or null.</summary>
+    public Func<DateTime?>? WavelogLastDownload { get; init; }
+
+    /// <summary>True when the active profile uses Wavelog/Cloudlog: the Log view shows its button and column.</summary>
+    [ObservableProperty]
+    public partial bool ShowWavelog { get; set; }
+
+    /// <summary>True when the active profile downloads its Wavelog log.</summary>
+    [ObservableProperty]
+    public partial bool WavelogCanDownload { get; set; }
+
+    /// <summary>True when the active profile uploads to Wavelog/Cloudlog.</summary>
+    [ObservableProperty]
+    public partial bool WavelogCanUpload { get; set; }
+
     /// <summary>Band filter choices: "All bands" then the bands in the log, in band plan order.</summary>
     public ObservableCollection<string> BandChoices { get; } = [AllBands];
 
@@ -261,6 +285,9 @@ public sealed partial class LogViewModel : ObservableObject
         var total = filter == everything ? shown.Contacts : _qsos.Totals(everything).Contacts;
         var last = _lastSync();
         var sync = last is { } t ? $"last synced with QRZ {t:HH:mm} UTC" : "not synced with QRZ";
+        var canDownload = RefreshWavelog();
+        if (canDownload)
+            sync += WavelogLastDownload?.Invoke() is { } w ? $" · last downloaded from Wavelog {w:HH:mm} UTC" : " · not yet downloaded from Wavelog";
         Status = StatusText(shown, total, rows.Count) + " · " + sync;
         var inv = CultureInfo.InvariantCulture;
         ContactsTotal = shown.Contacts.ToString("N0", inv);
@@ -502,6 +529,25 @@ public sealed partial class LogViewModel : ObservableObject
     /// <summary>Signs and uploads contacts LoTW does not have yet, through TQSL.</summary>
     [RelayCommand]
     private Task LotwUploadNowAsync() => RunAsync(LotwUpload, "Signing and uploading to LoTW with TQSL…");
+
+    /// <summary>
+    /// Shows or hides the Wavelog button and column for the active profile's set-up (after Settings changes, without
+    /// reloading the list). Returns whether the download is on.
+    /// </summary>
+    public bool RefreshWavelog()
+    {
+        var (configured, canDownload, canUpload) = WavelogState?.Invoke() ?? (false, false, false);
+        (ShowWavelog, WavelogCanDownload, WavelogCanUpload) = (configured, canDownload, canUpload);
+        return canDownload;
+    }
+
+    /// <summary>Downloads what is new in the Wavelog log now.</summary>
+    [RelayCommand]
+    private Task WavelogDownloadNowAsync() => RunAsync(WavelogDownload, "Downloading new contacts from Wavelog…");
+
+    /// <summary>Sends the contacts waiting for Wavelog/Cloudlog now.</summary>
+    [RelayCommand]
+    private Task WavelogUploadNowAsync() => RunAsync(WavelogUpload, "Uploading waiting contacts to Wavelog…");
 
     private async Task RunAsync(Func<CancellationToken, Task<string>>? action, string busy)
     {

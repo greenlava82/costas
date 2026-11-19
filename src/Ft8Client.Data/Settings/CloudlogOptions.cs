@@ -14,6 +14,12 @@ public sealed class CloudlogOptions
     /// <summary>Upload each newly logged contact. Off until the operator turns it on.</summary>
     public bool UploadOnComplete { get; set; }
 
+    /// <summary>
+    /// Download this station location's Wavelog log into the local log for worked-before (Wavelog v2 tokens only,
+    /// owner request 2026-11-18). Off until the operator turns it on; separate from uploads so a read-only token works.
+    /// </summary>
+    public bool DownloadForWorked { get; set; }
+
     /// <summary>The logbook site's address, as typed ("https://log.example.com").</summary>
     public string Url { get; set; } = string.Empty;
 

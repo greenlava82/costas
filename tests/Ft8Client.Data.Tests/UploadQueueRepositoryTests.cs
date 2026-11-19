@@ -100,4 +100,45 @@ public sealed class UploadQueueRepositoryTests : IDisposable
         q.EqslUploadState.Should().Be(UploadState.Queued);
         q.UploadState.Should().Be(UploadState.None);
     }
+
+    [Fact]
+    public void Enqueue_Cloudlog_MarksOnlyTheWavelogState()
+    {
+        var id = Contact();
+        _qsos.SetWavelogUploadState(id, UploadState.Queued, "old error");
+
+        _queue.Enqueue(id, "cloudlog", Now);
+
+        var q = _qsos.Get(id)!;
+        (q.WavelogUploadState, q.WavelogUploadError).Should().Be((UploadState.Queued, null));
+        q.UploadState.Should().Be(UploadState.None);
+        q.EqslUploadState.Should().Be(UploadState.None);
+    }
+
+    [Fact]
+    public void RetryNow_Target_MakesOnlyThatTargetDue()
+    {
+        var id = Contact();
+        _queue.Enqueue(id, "cloudlog", Now.AddHours(1));
+        _queue.Enqueue(id, "clublog", Now.AddHours(1));
+
+        _queue.RetryNow("cloudlog", Now);
+
+        _queue.All().Single(i => i.Target == "cloudlog").NextTryUtc.Should().Be(Now);
+        _queue.All().Single(i => i.Target == "clublog").NextTryUtc.Should().Be(Now.AddHours(1));
+    }
+
+    [Fact]
+    public void RemoveFor_ContactAndTarget_RemovesOnlyThatTarget()
+    {
+        var id = Contact();
+        var other = Contact();
+        _queue.Enqueue(id, "cloudlog", Now);
+        _queue.Enqueue(id, "clublog", Now);
+        _queue.Enqueue(other, "cloudlog", Now);
+
+        _queue.RemoveFor(id, "cloudlog");
+
+        _queue.All().Select(i => (i.QsoId, i.Target)).Should().BeEquivalentTo([(id, "clublog"), (other, "cloudlog")]);
+    }
 }

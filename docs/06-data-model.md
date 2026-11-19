@@ -71,10 +71,12 @@ CREATE TABLE qso (
   lotw_confirmed   INTEGER NOT NULL DEFAULT 0, -- 1 if LoTW confirmed it (migration 003)
   lotw_upload_state TEXT   NOT NULL DEFAULT 'none', -- none | uploaded (signed through TQSL)
   need_tier        INTEGER,                   -- tier at the time of the contact (local contacts only)
-  source           TEXT    NOT NULL,          -- 'local', 'qrz', 'adif'
+  source           TEXT    NOT NULL,          -- 'local', 'qrz', 'adif', 'lotw', 'wavelog'
   qrz_logid        INTEGER UNIQUE,
   upload_state     TEXT    NOT NULL DEFAULT 'none', -- none, queued, uploaded, failed
   upload_error     TEXT,
+  wavelog_upload_state TEXT NOT NULL DEFAULT 'none', -- none, queued, uploaded (also: Wavelog already has it), failed (migration 006)
+  wavelog_upload_error TEXT,                  -- last Wavelog/Cloudlog refusal, never the key
   raw_adif         TEXT,                      -- original record for imported or fetched contacts
   created_utc      TEXT    NOT NULL,
   modified_utc     TEXT    NOT NULL

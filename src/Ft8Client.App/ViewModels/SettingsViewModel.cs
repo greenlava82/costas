@@ -49,7 +49,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 EqslUser = host.Secrets.Get(SecretNames.EqslUsername(p.Id)) ?? string.Empty,
                 EqslPassword = host.Secrets.Get(SecretNames.EqslPassword(p.Id)) ?? string.Empty,
                 EqslSync = p.Eqsl.SyncEnabled, EqslUpload = p.Eqsl.UploadOnComplete, EqslQth = p.Eqsl.QthNickname,
-                CloudlogUrl = p.Cloudlog.Url, CloudlogStationId = p.Cloudlog.StationId, CloudlogUpload = p.Cloudlog.UploadOnComplete,
+                CloudlogUrl = p.Cloudlog.Url, CloudlogStationId = p.Cloudlog.StationId, CloudlogUpload = p.Cloudlog.UploadOnComplete, CloudlogDownload = p.Cloudlog.DownloadForWorked,
                 CloudlogKey = host.Secrets.Get(SecretNames.CloudlogKey(p.Id)) ?? string.Empty,
                 ClubLogEmail = p.ClubLog.Email, ClubLogUpload = p.ClubLog.UploadOnComplete,
                 ClubLogPassword = host.Secrets.Get(SecretNames.ClubLogPassword(p.Id)) ?? string.Empty,
@@ -348,6 +348,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _shownProfile.CloudlogKey = CloudlogKey;
         _shownProfile.CloudlogStationId = CloudlogStationId;
         _shownProfile.CloudlogUpload = CloudlogUploadOnComplete;
+        _shownProfile.CloudlogDownload = CloudlogDownloadForWorked;
         _shownProfile.ClubLogEmail = ClubLogEmail;
         _shownProfile.ClubLogPassword = ClubLogPassword;
         _shownProfile.ClubLogUpload = ClubLogUploadOnComplete;
@@ -361,7 +362,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private void ShowEqsl(ProfileDraft d)
     {
         (EqslUser, EqslPassword, EqslSyncEnabled, EqslUploadOnComplete, EqslQthNickname) = (d.EqslUser, d.EqslPassword, d.EqslSync, d.EqslUpload, d.EqslQth);
-        (CloudlogUrl, CloudlogKey, CloudlogStationId, CloudlogUploadOnComplete) = (d.CloudlogUrl, d.CloudlogKey, d.CloudlogStationId, d.CloudlogUpload);
+        (CloudlogUrl, CloudlogKey, CloudlogStationId, CloudlogUploadOnComplete, CloudlogDownloadForWorked) = (d.CloudlogUrl, d.CloudlogKey, d.CloudlogStationId, d.CloudlogUpload, d.CloudlogDownload);
         CloudlogStations.Clear();
         CloudlogStatus = string.Empty;
         (ClubLogEmail, ClubLogPassword, ClubLogUploadOnComplete) = (d.ClubLogEmail, d.ClubLogPassword, d.ClubLogUpload);
@@ -406,6 +407,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             p.Cloudlog.Url = d.CloudlogUrl.Trim();
             p.Cloudlog.StationId = d.CloudlogStationId.Trim();
             p.Cloudlog.UploadOnComplete = d.CloudlogUpload;
+            p.Cloudlog.DownloadForWorked = d.CloudlogDownload;
             if (ClubLogStopEnds(p.ClubLog.Stop, d)) p.ClubLog.Stop = null;
             p.ClubLog.Email = d.ClubLogEmail.Trim();
             p.ClubLog.UploadOnComplete = d.ClubLogUpload;
@@ -964,6 +966,26 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial string CloudlogKey { get; set; } = string.Empty;
 
+    /// <summary>Which API the key will be used with, shown under it; empty while no key is typed.</summary>
+    public string CloudlogApiText => string.IsNullOrWhiteSpace(CloudlogKey) ? string.Empty
+        : Ft8Client.Integrations.Cloudlog.CloudlogClient.ApiFor(CloudlogKey) == Ft8Client.Integrations.Cloudlog.WavelogApi.V2
+            ? "Using the Wavelog v2 API (token)."
+            : "Using the v1 API (Wavelog or Cloudlog key).";
+
+    /// <summary>True when the key is a Wavelog v2 token, the only kind the download works with.</summary>
+    public bool CloudlogCanDownload =>
+        Ft8Client.Integrations.Cloudlog.CloudlogClient.ApiFor(CloudlogKey) == Ft8Client.Integrations.Cloudlog.WavelogApi.V2;
+
+    partial void OnCloudlogKeyChanged(string value)
+    {
+        OnPropertyChanged(nameof(CloudlogApiText));
+        OnPropertyChanged(nameof(CloudlogCanDownload));
+    }
+
+    /// <summary>Download the Wavelog log for worked-before (v2 tokens only).</summary>
+    [ObservableProperty]
+    public partial bool CloudlogDownloadForWorked { get; set; }
+
     /// <summary>Wavelog/Cloudlog station location id.</summary>
     [ObservableProperty]
     public partial string CloudlogStationId { get; set; } = string.Empty;
@@ -1026,7 +1048,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private async Task TestCloudlog()
     {
         CloudlogStatus = "Asking the logbook…";
-        var (message, stations) = await _host.Cloudlog.TestAsync(CloudlogUrl, CloudlogKey, CancellationToken.None);
+        var (message, stations) = await _host.Cloudlog.TestAsync(CloudlogUrl, CloudlogKey, CancellationToken.None, CloudlogUploadOnComplete, CloudlogDownloadForWorked);
         CloudlogStatus = message;
         CloudlogStations.Clear();
         foreach (var st in stations) CloudlogStations.Add(new CloudlogStationChoice(st.Id, st.Name, st.Callsign, st.Active));

@@ -51,12 +51,16 @@ public sealed class CloudlogUploadService(CloudlogClient client, QsoRepository q
             if (result.Accepted)
             {
                 queue.Remove(item.Id);
+                qsos.SetWavelogUploadState(q.Id, UploadState.Uploaded, null);
                 Status = new(ServiceHealth.Ok, $"Uploaded {q.Call} to {site.Host}", clock.UtcNow);
                 done++;
                 continue;
             }
-            var next = clock.UtcNow + (result.Permanent ? PermanentRetry : _backoff.DelayFor(item.Attempts + 1));
+            var retryIn = result.Permanent ? PermanentRetry : _backoff.DelayFor(item.Attempts + 1);
+            if (result.RetryAfter is { } asked && asked > retryIn) retryIn = asked;
+            var next = clock.UtcNow + retryIn;
             queue.Retry(item.Id, result.Error ?? "Upload failed", next);
+            qsos.SetWavelogUploadState(q.Id, UploadState.Queued, result.Error ?? "Upload failed");
             Status = new(result.Permanent ? ServiceHealth.Down : ServiceHealth.Degraded, result.Error ?? "Waiting to retry", clock.UtcNow);
             break;
         }

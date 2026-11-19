@@ -16,8 +16,8 @@ public sealed class UploadQueueRepository(SqliteDatabase db)
 {
     /// <summary>
     /// Queues a contact for upload to <paramref name="target"/> and marks that target's own state queued: QRZ in
-    /// <c>upload_state</c>, eQSL in <c>eqsl_upload_state</c>. Club Log and Wavelog/Cloudlog have no per-contact column
-    /// (the queue is their record), so the contact itself is left alone.
+    /// <c>upload_state</c>, eQSL in <c>eqsl_upload_state</c>, Wavelog/Cloudlog in <c>wavelog_upload_state</c>. Club Log has no
+    /// per-contact column (the queue is its record), so the contact itself is left alone.
     /// </summary>
     public long Enqueue(long qsoId, string target, DateTime nowUtc)
     {
@@ -32,6 +32,8 @@ public sealed class UploadQueueRepository(SqliteDatabase db)
             c.Execute("UPDATE qso SET upload_state='queued', upload_error=NULL WHERE id=@qsoId", new { qsoId }, tx);
         else if (target == "eqsl")
             c.Execute("UPDATE qso SET eqsl_upload_state='queued', eqsl_upload_error=NULL WHERE id=@qsoId", new { qsoId }, tx);
+        else if (target == "cloudlog")
+            c.Execute("UPDATE qso SET wavelog_upload_state='queued', wavelog_upload_error=NULL WHERE id=@qsoId", new { qsoId }, tx);
         tx.Commit();
         return id;
     }
@@ -72,6 +74,13 @@ public sealed class UploadQueueRepository(SqliteDatabase db)
         c.Execute("DELETE FROM upload_queue WHERE id=@id", new { id });
     }
 
+    /// <summary>Removes a contact's waiting upload to one target (the contact is already there).</summary>
+    public void RemoveFor(long qsoId, string target)
+    {
+        using var c = db.Open();
+        c.Execute("DELETE FROM upload_queue WHERE qso_id=@qsoId AND target=@target", new { qsoId, target });
+    }
+
     /// <summary>
     /// Moves a contact's first upload (every target) to <paramref name="nextTryUtc"/>: later while the operator may still
     /// edit it, or now when they are done. Items already tried keep their back-off.
@@ -87,5 +96,12 @@ public sealed class UploadQueueRepository(SqliteDatabase db)
     {
         using var c = db.Open();
         c.Execute("UPDATE upload_queue SET next_try_utc=@nowUtc", new { nowUtc });
+    }
+
+    /// <summary>Makes every item for <paramref name="target"/> due now (the operator asked to upload now).</summary>
+    public void RetryNow(string target, DateTime nowUtc)
+    {
+        using var c = db.Open();
+        c.Execute("UPDATE upload_queue SET next_try_utc=@nowUtc WHERE target=@target", new { target, nowUtc });
     }
 }

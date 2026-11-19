@@ -5,7 +5,7 @@ Press **Log** in the top bar or ++ctrl+4++.
 ![The Log view](images/log.png)
 
 Every contact, newest first: date, time (UTC), call, band, mode, report sent and received, grid, country, name, the
-need tag it had when you worked it, and its LoTW, QRZ and eQSL status.
+need tag it had when you worked it, and its LoTW, QRZ and eQSL status (and Wavelog, when your profile uses Wavelog or Cloudlog).
 
 - Contacts are grouped by UTC day. Each day opens with a heading such as "Today · Sun 1 Nov  ·  4 contacts  ·
   4 countries  ·  1 confirmed  ·  20m".
@@ -13,7 +13,10 @@ need tag it had when you worked it, and its LoTW, QRZ and eQSL status.
   While a filter is on, the contacts tile reads, for example, "120 of 3,400 contacts".
 - The need tag shows as a coloured tag, as in the station list. A LoTW confirmation is a green **✓ Confirmed** tag.
   A QRZ upload that is waiting (amber) or failed (red) is a tag too, so it stands out; everything else stays quiet.
-- The line at the bottom says when the log was last synced with QRZ.
+  The Wavelog column works the same way: *From Wavelog* (downloaded), *In Wavelog*, or a *Waiting to upload* or
+  *Retrying: reason* tag.
+- The line at the bottom says when the log was last synced with QRZ, and, if you download your Wavelog log, when it
+  was last downloaded.
 
 ## Filters
 
@@ -39,6 +42,8 @@ The search text is kept. The list shows the newest 5,000 matching contacts; the 
 | **Import ADIF** | Reads an `.adi` file (from WSJT-X, another logger, or a QRZ export). Duplicates are merged, not added twice; Costas reports how many were imported, merged and skipped |
 | **Export ADIF** | Writes your station's contacts to an `.adi` file, or every station's when the Station filter is All stations, with each contact's LoTW, eQSL and QRZ sent and received state (and the paper QSL and Club Log fields of contacts you imported). An export with more than one station callsign is written as one file per callsign, named after the one you chose (`log-W7LIT.adi`, `log-VE3_W7LIT.adi`), so each can be uploaded to that callsign's logbook |
 | **Sync with QRZ now** | Reads your QRZ logbook and uploads anything waiting |
+| **LoTW ▾** | Downloads new LoTW confirmations, or signs and uploads new contacts with TQSL (see [LoTW](#lotw)) |
+| **Wavelog ▾** | Shown only when your profile uses Wavelog or Cloudlog. **Download new contacts** fetches what is new in your Wavelog log now instead of waiting for the 15-minute check (needs the download switched on, see [Using Wavelog as your logbook](settings.md#using-wavelog-as-your-logbook-for-worked-before)). **Upload waiting contacts now** sends contacts that are waiting or retrying without waiting for their retry time |
 
 ## What Costas logs
 

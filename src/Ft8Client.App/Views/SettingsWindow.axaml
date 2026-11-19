@@ -742,8 +742,9 @@
                 <Grid Classes="field" ColumnDefinitions="210,*">
                   <TextBlock Classes="label" Text="API key" />
                   <StackPanel Grid.Column="1" Spacing="6">
-                    <TextBox Text="{Binding CloudlogKey}" Width="360" HorizontalAlignment="Left" PasswordChar="•" PlaceholderText="API key with read and write" />
-                    <TextBlock Classes="help" Text="Make one in your logbook under your account's API keys, with read and write access." />
+                    <TextBox Text="{Binding CloudlogKey}" Width="360" HorizontalAlignment="Left" PasswordChar="•" PlaceholderText="API key, or a wl2_ token (Wavelog 3.1+)" />
+                    <TextBlock Classes="help" Text="Make one in your logbook under your account's API keys, with read and write access. On Wavelog 3.1 or later you can use a v2 token (it starts wl2_) instead: give it the qso:write scope to upload, and station:read so Test can list your station locations." />
+                    <TextBlock Classes="help" Text="{Binding CloudlogApiText}" IsVisible="{Binding CloudlogApiText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                   </StackPanel>
                 </Grid>
                 <Grid Classes="field" ColumnDefinitions="210,*">
@@ -757,6 +758,8 @@
                   </StackPanel>
                 </Grid>
                 <CheckBox Content="Upload each new contact as soon as it is logged" IsChecked="{Binding CloudlogUploadOnComplete}" />
+                <CheckBox Content="Download my Wavelog log for worked-before" IsChecked="{Binding CloudlogDownloadForWorked}" IsEnabled="{Binding CloudlogCanDownload}" />
+                <TextBlock Classes="help" Text="Brings this station location's Wavelog contacts into Costas, so callers you have worked show as Worked. It needs a Wavelog v2 token (it starts wl2_) with the qso:read scope; read-only is enough. Costas checks for new contacts every 15 minutes, and never sends a downloaded contact back." />
                 <TextBlock Classes="help" Text="Save to apply. A contact already in that logbook is left as it is. Simulation never contacts the site." />
               </StackPanel>
             </Expander>

@@ -264,15 +264,40 @@ there as soon as it is logged. In **Settings › Logbooks › Wavelog / Cloudlog
    https: the API key goes with every upload.
 2. In your logbook, make an API key with read and write access (under your account's API keys) and paste it into
    **API key**. It stays in the system credential store, not in the settings file.
+   On Wavelog 3.1 or later you can paste a v2 API token instead (it starts `wl2_`). Costas sees the `wl2_` and
+   uses Wavelog's v2 API for it; any other key uses the original API, which Cloudlog and every Wavelog version
+   have. The line under the key says which one. Give a v2 token the **qso:write** scope so it can upload, and
+   **station:read** so Test can list your station locations.
 3. Press **Test and list station locations**. Costas asks the logbook which station locations the key can use and
    picks the one whose callsign matches this profile. Choose another from the list, or type its id, if needed. The
-   logbook only takes contacts for a location with this profile's callsign.
+   logbook only takes contacts for a location with this profile's callsign. With a v2 token, Test first says what
+   the token may do (read contacts, upload them, or both, and until when it works), and warns if uploads are on
+   but the token cannot upload. A token without station:read cannot list locations: type the station's number
+   from Wavelog's Station Locations page.
 4. Tick **Upload each new contact as soon as it is logged** and save.
 
 Contacts queue locally and retry when the site is down, even after restarting Costas. A contact already in that
 logbook is left alone and counts as sent. A wrong key or station id waits an hour before the next try; the
 **Wavelog/Cloudlog** indicator in the bottom bar (shown once this is set up) says what the logbook answered. Each
 station profile has its own settings. Off by default. Simulation never contacts the site.
+
+#### Using Wavelog as your logbook for worked-before
+
+With a Wavelog v2 token you can also tick **Download my Wavelog log for worked-before**. Costas then brings that
+station location's Wavelog contacts into its own log, so a caller you have worked shows as Worked, and a new country,
+band or grid shows as new, just as with the QRZ logbook. The first download reads the whole log. After that Costas
+asks only for contacts added since, every 15 minutes, and at once when you change the profile or its Wavelog
+settings.
+
+- The token needs the **qso:read** scope. A read-only token is enough, and it is the safest choice for another
+  operator: Costas cannot change their Wavelog log with it. Upload and download are separate switches, so you can
+  use either or both. A v1 key cannot download: the box stays unavailable until you enter a `wl2_` token.
+- Downloaded contacts show "From Wavelog" in the Log tab and are never sent back to Wavelog. If a contact you logged
+  in Costas is still waiting to upload when the download finds it already in Wavelog, Costas does not send it again.
+- A contact you delete in Costas stays deleted; the next download does not bring it back. A contact you edited keeps
+  your edits.
+- The **Wavelog/Cloudlog** indicator shows the download's result, such as "Downloaded 1,204 contacts from
+  log.example.com" or "log.example.com log up to date". A refused token waits an hour before the next try.
 
 ### Club Log {#club-log}
 
