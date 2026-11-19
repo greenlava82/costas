@@ -58,7 +58,10 @@ public class ProfileChipTests
         vm.SwitchProfileCommand.Execute("home");
 
         host.Settings.Current.Profile.Callsign.Should().Be("K1UTA");
-        vm.StatusText.Should().Be("The station profile cannot change while calling CQ as K1UTA. Try again when the station is idle.");
+        // CQ runs on the real clock: near a slot start it is already transmitting, which is refused with its own reason.
+        vm.StatusText.Should().BeOneOf(
+            "The station profile cannot change while calling CQ as K1UTA. Try again when the station is idle.",
+            "The station profile cannot change while transmitting as K1UTA. Try again when the station is idle.");
         host.Session.ToggleCq();
     });
 
