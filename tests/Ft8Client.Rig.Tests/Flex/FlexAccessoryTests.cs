@@ -248,11 +248,15 @@ public class FlexAccessoryTests
         await using var client = new FlexAccessoryClient("127.0.0.1", radio.Port, pingEvery: TimeSpan.FromMinutes(1),
             backoff: new Backoff(TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(50)));
         client.StatusChanged += s => { lock (statuses) statuses.Add(s.Health); };
+        // The devices are forgotten only for the moment between the drop and the reconnect (50 ms here), too brief to
+        // catch by polling on a busy runner, so the event records it.
+        var forgotten = 0;
+        client.Changed += a => { if (a.Amplifier is null) Interlocked.Exchange(ref forgotten, 1); };
         client.Start();
         await WaitUntil(() => client.Current.Amplifier is not null);
 
         radio.Drop();
-        await WaitUntil(() => client.Current.Amplifier is null);
+        await WaitUntil(() => Volatile.Read(ref forgotten) == 1);
         await WaitUntil(() => radio.Connections >= 2 && client.Current.Amplifier is not null);
 
         lock (statuses) statuses.Should().Contain(ServiceHealth.Degraded).And.Contain(ServiceHealth.Ok);
