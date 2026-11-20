@@ -20,6 +20,7 @@ namespace Ft8Client.Audio.Tests;
 /// is the default source) and captured back decodes through jt9 to the same text, with a small DT. Runs only when
 /// COSTAS_AUDIO_LOOPBACK names the device id to use for both directions, e.g. "ALSA:pulse".
 /// </summary>
+[Collection("Sound server")]
 public class PortAudioLoopbackTests
 {
     [Theory]

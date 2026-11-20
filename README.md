@@ -89,10 +89,11 @@ your log and settings; an update downloads only what changed, usually a few MB.
 
 ### Linux (preview)
 
-1. Install the decoder, radio control and audio library from your distribution:
-   `sudo apt install wsjtx libhamlib-utils libportaudio2 libsecret-tools` (Debian and Ubuntu names).
-2. Download `Costas-<version>-linux-x64.tar.gz` from the
-   [latest release](https://github.com/somedudenamedtony/costas/releases/latest), unpack it and run `./Costas`.
+- **Debian, Ubuntu, Mint**: download `costas_<version>_amd64.deb` from the
+  [latest release](https://github.com/somedudenamedtony/costas/releases/latest) and open it, or run
+  `sudo apt install ./costas_*_amd64.deb`. apt installs the decoder, radio control and audio library with it.
+- **Other distributions**: install `jt9` (wsjtx), Hamlib's `rigctld` and PortAudio from your distribution, then
+  download `Costas-<version>-linux-x64.tar.gz` from the same release, unpack it and run `./Costas`.
 
 The Linux version receives and transmits FT8, FT4, PSK31, PSK63 and RTTY. It is still a preview because it has
 not yet been used with a real radio on Linux: check your transmit audio level and ALC on your first contacts.

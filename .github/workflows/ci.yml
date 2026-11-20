@@ -23,6 +23,11 @@ jobs:
           pactl set-default-sink costas
           pactl set-default-source costas.monitor
           echo "COSTAS_AUDIO_LOOPBACK=ALSA:pulse" >> "$GITHUB_ENV"
+          # Virtual devices named like RimuDAX's (a FlexRadio client on Linux): a sink and a source fed by it, away
+          # from the defaults, so a test checks that picking them by name sends the audio there and not to the default.
+          pactl load-module module-null-sink sink_name=rimu.dax.tx
+          pactl load-module module-remap-source master=rimu.dax.tx.monitor source_name=rimu.dax.rx1
+          echo "COSTAS_PULSE_ROUTE=rimu.dax.tx|rimu.dax.rx1" >> "$GITHUB_ENV"
       - run: scripts/ci.sh
       - name: Build the Linux package
         env:
@@ -44,6 +49,8 @@ jobs:
           path: |
             artifacts/Costas-*-linux-x64.tar.gz
             artifacts/Costas-*-linux-x64.tar.gz.sha256
+            artifacts/costas_*_amd64.deb
+            artifacts/costas_*_amd64.deb.sha256
           if-no-files-found: error
   windows:
     runs-on: windows-latest
@@ -180,9 +187,10 @@ jobs:
           fi
           sha256sum "$f" | cut -d' ' -f1 > "$f.sha256"
           linux="Costas-$v-linux-x64.tar.gz"
+          deb="costas_${v}_amd64.deb"
           gh release delete dev --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes 2>/dev/null || true
           # The app reads the version from this title (UpdateChecker.Parse).
-          gh release create dev "$f" "$f.sha256" "$linux" "$linux.sha256" ../velopack/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+          gh release create dev "$f" "$f.sha256" "$linux" "$linux.sha256" "$deb" "$deb.sha256" ../velopack/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --prerelease --latest=false --title "Costas $v (development build)" \
             --notes "Development build of main at $GITHUB_SHA, replaced by each green push to main. Not a release: for testers who turn on development builds in Settings, Developer. Turn that off to go back to the latest release."
   release:
@@ -217,9 +225,14 @@ jobs:
           v=${v%.exe}
           sha256sum "$f" | cut -d' ' -f1 > "$f.sha256"
           linux="Costas-$v-linux-x64.tar.gz"
+          deb="costas_${v}_amd64.deb"
+          # Copies under names without the version, so the website and README can link straight to the latest Linux
+          # build (releases/latest/download/<name>) without asking GitHub's API which version that is.
+          cp "$linux" Costas-linux-x64.tar.gz
+          cp "$deb" costas_amd64.deb
           # Velopack's files (installer, this version's full package and delta, and the feed the app reads) sit beside the
           # classic installer, which builds from before Velopack still update through.
           # Notes count from the previous release, never from the "dev" development prerelease.
           prev=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || true)
-          gh release create "v$v" "$f" "$f.sha256" "$linux" "$linux.sha256" ../velopack/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+          gh release create "v$v" "$f" "$f.sha256" "$linux" "$linux.sha256" "$deb" "$deb.sha256" Costas-linux-x64.tar.gz costas_amd64.deb ../velopack/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Costas $v" --generate-notes ${prev:+--notes-start-tag "$prev"}

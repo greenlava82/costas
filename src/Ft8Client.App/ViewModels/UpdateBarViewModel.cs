@@ -86,7 +86,9 @@ public sealed partial class UpdateBarViewModel : ObservableObject
         if (!OperatingSystem.IsWindows())
         {
             if (_updates.Available is { PageUrl: { Length: > 0 } page }) Browser.Open(page);
-            Detail = "Download the Linux build from the release page and unpack it; it makes a new folder, so run Costas from there.";
+            Detail = AppContext.BaseDirectory.StartsWith("/opt/costas", StringComparison.Ordinal)
+                ? "Download the .deb from the release page and open it; it installs over this version and keeps your log and settings."
+                : "Download the Linux build from the release page and unpack it; it makes a new folder, so run Costas from there.";
             return;
         }
         if (_busyOnAir())
