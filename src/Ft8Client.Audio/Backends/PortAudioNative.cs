@@ -105,6 +105,12 @@ internal static unsafe partial class PortAudioNative
     [LibraryImport(Library, EntryPoint = "Pa_WriteStream")]
     public static partial int WriteStream(IntPtr stream, float* buffer, CULong frames);
 
+    [LibraryImport("libc", EntryPoint = "setenv", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial int SetEnv(string name, string value, int overwrite);
+
+    [LibraryImport("libc", EntryPoint = "unsetenv", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial int UnsetEnv(string name);
+
     /// <summary>PortAudio's text for an error code.</summary>
     public static string ErrorText(int error) => Marshal.PtrToStringUTF8(GetErrorText(error)) ?? $"PortAudio error {error}";
 

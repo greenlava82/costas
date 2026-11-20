@@ -51,6 +51,19 @@ model connects only over the network, to a TCP port set up in SmartSDR CAT, so C
 instead of a COM port. The **SmartSDR Slice A** to **H** models talk to the radio itself: enter the radio's IP address
 with port `4992`.
 
+FlexRadio on Linux, with RimuSDR instead of SmartSDR: RimuSDR's helpers give Costas the same two things SmartSDR CAT
+and DAX give it on Windows, a control port and audio devices.
+
+1. In RimuSDR, put the slice you operate on DAX channel **1** and turn its **DAX** button on.
+2. In RimuDAX, choose **DAX** mode (not TCI) with **TX** and **RX1** enabled. Its audio devices exist only in DAX mode.
+3. In RimuCAT, add a port with protocol **Hamlib** (it listens on TCP port `4532`) for that slice.
+4. In Costas, choose **Hamlib › NET rigctl** with **Server (host:port)** `127.0.0.1:4532`, and leave **Transmit (PTT)**
+   on **CAT command**.
+5. In the audio step, choose **rimu.dax.rx1 (PulseAudio)** as **Input** and **rimu.dax.tx (PulseAudio)** as
+   **Output**. With the default devices, Costas transmits into your speakers while the radio, keyed, sends silence.
+
+Costas does not speak TCI, so the "TCI Client" choice other programs offer for RimuDAX's TCI mode is not used.
+
 A PowerGenius XL amplifier or TunerGenius XL tuner paired with the radio works with any of these: after setup, type the
 radio's IP address in **Settings › Station › FlexRadio amp and tuner**
 ([how](settings.md#flexradio-amp-and-tuner)).
@@ -97,6 +110,11 @@ frequency, and keys the radio by VOX. Set the radio to the right frequency yours
 
 Choose the radio's device, not the computer's speakers or microphone. Costas never picks the Windows default
 device by itself.
+
+On Linux the list also has every PulseAudio or PipeWire device by name, marked **(PulseAudio)**: the radio's sound
+card when PipeWire or PulseAudio holds it, and virtual devices other programs make, such as an SDR program's DAX
+channels. **pulse**, **pipewire** and **default** mean "whatever the desktop's default is", usually the speakers, so
+avoid them for the output.
 
 Once you choose an input, the **Input level** meter moves. Aim for the shaded band (about -40 to -10 dBFS) with the
 radio on a busy FT8 frequency. The text beside it tells you what it sees:

@@ -75,31 +75,55 @@ Uninstalling removes the program but keeps your data folder, so a reinstall pick
 
 ## Linux (preview) {#linux-preview}
 
-Each release also has a Linux build, `Costas-<version>-linux-x64.tar.gz`. It does everything the Windows
-version does, transmit included, but it is still a **preview**: it has been tested end to end with recordings and
-Hamlib's test radio, not yet with a real radio on Linux. On your first contacts, run the transmit test in Setup and
-watch the radio's ALC and power, as you would on Windows.
+Each release also has Linux builds: a Debian package, `costas_<version>_amd64.deb`, for Debian, Ubuntu, Mint and
+other Debian-based systems, and a tarball, `Costas-<version>-linux-x64.tar.gz`, for everything else. They do everything
+the Windows version does, transmit included, but Linux is still a **preview**: it has had little time with real radios.
+On your first contacts, run the transmit test in Setup and watch the radio's ALC and power, as you would on Windows.
 
-1. Install what Costas uses from your distribution. On Debian and Ubuntu:
+### Debian, Ubuntu and Mint
 
-        sudo apt install wsjtx libhamlib-utils libportaudio2 libsecret-tools
+1. Download the `.deb` from the [download page](index.md#download) or the
+   [Releases page](https://github.com/somedudenamedtony/costas/releases/latest).
+2. Open it (double-click) to install it with your software installer, or in a terminal in the download folder:
 
-    `wsjtx` provides the `jt9` decoder, `libhamlib-utils` provides `rigctld` for radio control, `libportaudio2` is
-    the audio library, and `libsecret-tools` lets Costas keep your QRZ key in the desktop keyring (without it, the
-    key is asked for again each time Costas starts). The keyring itself comes with GNOME and KDE (GNOME Keyring,
-    KWallet); on a desktop without one, Setup and Settings say the key could not be kept and everything else is saved.
+        sudo apt install ./costas_*_amd64.deb
+
+    apt also installs what Costas uses: `wsjtx` for the `jt9` decoder, `libhamlib-utils` for `rigctld`, and the
+    PortAudio audio library. Costas goes in `/opt/costas`, with a **Costas** entry in your desktop's menu and a
+    `costas` command.
+3. For a USB CAT cable, add yourself to the `dialout` group (`sudo usermod -aG dialout $USER`), then log out and in.
+
+### Other distributions
+
+1. Install what Costas uses from your distribution: the `jt9` decoder (usually in the `wsjtx` package), Hamlib's
+   `rigctld`, PortAudio, and optionally `secret-tool` (libsecret) and `pactl`. On Debian and Ubuntu these are
+   `sudo apt install wsjtx libhamlib-utils libportaudio2 libsecret-tools pulseaudio-utils`.
+
+    `secret-tool` lets Costas keep your QRZ key in the desktop keyring (without it, the key is asked for again each
+    time Costas starts). `pactl` lets Costas list PulseAudio and PipeWire devices by name.
 2. For a USB CAT cable, add yourself to the `dialout` group (`sudo usermod -aG dialout $USER`), then log out and in.
 3. Download the tarball from the [Releases page](https://github.com/somedudenamedtony/costas/releases/latest),
    unpack it and run `./Costas`. `README.txt` inside says how to add it to your desktop's menu.
 
-In Setup's audio step, pick the radio's USB sound card (often *USB Audio CODEC*). If it is busy because PipeWire or
-PulseAudio holds it, pick **pulse** or **pipewire** and choose the radio's sound card in your desktop's sound
-settings instead.
+### Audio on Linux
 
-Updates: the update bar works the same, but **Update** opens the release page; download the new tarball and unpack
-it. It unpacks into a new folder named for its version: run `./Costas` from there and delete the old folder. If you
-added Costas to your desktop's menu, point `Exec=` in its `costas.desktop` at the new folder. Your log and settings live
-in `~/.local/share/Costas/` and are kept.
+In Setup's audio step, pick the radio's USB sound card (often *USB Audio CODEC*). If it is busy because PipeWire or
+PulseAudio holds it, pick the same card from the devices marked **(PulseAudio)**. Those also include virtual devices
+other programs make: with a FlexRadio and RimuSDR, use RimuDAX's **rimu.dax.rx1** and **rimu.dax.tx**
+([FlexRadio on Linux](setup.md#2-radio-cat-and-ptt)).
+
+### Updates
+
+Costas checks for updates on Linux as on Windows, and the update bar tells you when a new version is out, but it
+cannot install it by itself: **Update** opens the release page.
+
+- **.deb**: download the new `.deb` and open it, or `sudo apt install ./costas_*_amd64.deb`. It replaces the old
+  version.
+- **Tarball**: download the new tarball and unpack it. It unpacks into a new folder named for its version: run
+  `./Costas` from there and delete the old folder. If you added Costas to your desktop's menu, point `Exec=` in its
+  `costas.desktop` at the new folder.
+
+Either way, your log and settings live in `~/.local/share/Costas/` and are kept.
 
 ## Next
 

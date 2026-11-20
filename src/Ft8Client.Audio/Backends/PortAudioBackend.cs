@@ -16,7 +16,8 @@ namespace Ft8Client.Audio.Backends;
 /// <summary>
 /// Linux audio through PortAudio (ALSA, which also reaches PulseAudio and PipeWire through their "pulse" and
 /// "pipewire" devices). Devices are opened by id ("host API:device name"); the default device is never used
-/// implicitly. Each open device has its own thread doing blocking reads or writes: capture mixes to mono and writes a
+/// implicitly. Each PulseAudio sink and source is offered too (<see cref="PulseDevices"/>), and opened through ALSA's
+/// "pulse" (or "pipewire") device pointed at it. Each open device has its own thread doing blocking reads or writes: capture mixes to mono and writes a
 /// lock-free ring buffer, playback keeps the stream open and plays silence between transmissions. Those threads do
 /// not allocate, lock or log.
 /// </summary>
@@ -115,6 +116,7 @@ public sealed class PortAudioBackend : IAudioBackend
                 if (info is null || (input ? info->MaxInputChannels : info->MaxOutputChannels) <= 0) continue;
                 list.Add(Describe(i));
             }
+            if (PulseRoute(list.Select(d => d.Id).ToList()) >= 0) list.AddRange(PulseDevices.List(input));
             return list;
         }
     }
@@ -135,16 +137,51 @@ public sealed class PortAudioBackend : IAudioBackend
         _initialized = true;
     }
 
-    private static unsafe IntPtr Open(string deviceId, int sampleRate, bool input, out int rate, out int channels)
+    // The ALSA device that reaches the sound server: "pulse" (PulseAudio, or PipeWire's PulseAudio service), else
+    // "pipewire". -1 when there is neither.
+    private static int PulseRoute(IReadOnlyList<string> ids)
+    {
+        var i = AlsaDeviceIds.Find(ids, "ALSA:pulse");
+        return i >= 0 ? i : AlsaDeviceIds.Find(ids, "ALSA:pipewire");
+    }
+
+    private static IntPtr Open(string deviceId, int sampleRate, bool input, out int rate, out int channels)
+    {
+        if (PulseDevices.NameOf(deviceId) is not { } pulseName) return OpenDevice(deviceId, null, sampleRate, input, out rate, out channels);
+
+        // ALSA's pulse and pipewire plugins connect to the device these variables name when the stream opens, so
+        // they are set only while it opens (under Gate, so input and output never see each other's).
+        var variable = input ? "PULSE_SOURCE" : "PULSE_SINK";
+        _ = SetEnv(variable, pulseName, 1);
+        _ = SetEnv("PIPEWIRE_NODE", pulseName, 1);
+        try
+        {
+            return OpenDevice(null, deviceId, sampleRate, input, out rate, out channels);
+        }
+        finally
+        {
+            _ = UnsetEnv(variable);
+            _ = UnsetEnv("PIPEWIRE_NODE");
+        }
+    }
+
+    // Opens deviceId, or (deviceId null) the ALSA device that reaches the sound server for the PulseAudio device pulseId.
+    private static unsafe IntPtr OpenDevice(string? deviceId, string? pulseId, int sampleRate, bool input, out int rate, out int channels)
     {
         var n = GetDeviceCount();
         var ids = new List<string>(n);
         for (var i = 0; i < n; i++) ids.Add(Describe(i).Id);
-        var index = AlsaDeviceIds.Find(ids, deviceId);
-        if (index < 0) throw new InvalidOperationException($"The configured {(input ? "input" : "output")} device is missing.");
+        var index = deviceId is null ? PulseRoute(ids) : AlsaDeviceIds.Find(ids, deviceId);
+        if (index < 0)
+        {
+            throw new InvalidOperationException(pulseId is null
+                ? $"The configured {(input ? "input" : "output")} device is missing."
+                : $"\"{pulseId}\" needs ALSA's pulse or pipewire device, which is missing (install pipewire-alsa or libasound2-plugins).");
+        }
+        var shown = PulseDevices.NameOf(pulseId ?? string.Empty) ?? ids[index];
         var info = GetDeviceInfo(index);
         var max = input ? info->MaxInputChannels : info->MaxOutputChannels;
-        if (max <= 0) throw new InvalidOperationException($"\"{ids[index]}\" has no {(input ? "input" : "output")} channels.");
+        if (max <= 0) throw new InvalidOperationException($"\"{shown}\" has no {(input ? "input" : "output")} channels.");
 
         // Stereo when the device has it (radios' USB codecs usually do; capture mixes it to mono), at the asked
         // rate, else the device's own.
@@ -164,7 +201,7 @@ public sealed class PortAudioBackend : IAudioBackend
         var err = input
             ? OpenStream(out var stream, &p, null, rate, frames, new CULong((nuint)ClipOff), IntPtr.Zero, IntPtr.Zero)
             : OpenStream(out stream, null, &p, rate, frames, new CULong((nuint)ClipOff), IntPtr.Zero, IntPtr.Zero);
-        Check(err, $"\"{ids[index]}\" could not be opened");
+        Check(err, $"\"{shown}\" could not be opened");
         channels = p.ChannelCount;
         _openStreams++;
         return stream;

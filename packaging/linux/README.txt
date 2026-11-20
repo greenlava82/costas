@@ -20,8 +20,11 @@ Start Costas by running ./Costas in this folder. To add it to your desktop's men
 path of Costas.
 
 In Setup's audio step, pick your radio's USB sound card (often "USB Audio CODEC"). If the device is busy because
-PipeWire or PulseAudio holds it, pick "pulse" or "pipewire" instead and choose the radio's sound card in your
-desktop's sound settings.
+PipeWire or PulseAudio holds it, pick the same sound card from the devices ending in "(PulseAudio)" instead. Those
+also include other programs' virtual audio devices, such as an SDR program's DAX channels.
+
+On Debian and Ubuntu the .deb from the same release page is easier: open it to install Costas with what it needs, a
+menu entry and a costas command.
 
 Updates: Costas tells you when a newer build is out and opens the release page; download the new tarball and unpack
 it. It unpacks into a new folder named for its version: run ./Costas from there, then delete this folder. If you added

@@ -144,11 +144,13 @@
         <span class="dl__detail">10 or 11, 64-bit · <span data-version-short>latest</span></span>
         <span class="dl__go">Download installer</span>
       </a>
-      <a class="dl dl--plain" data-linux href="{{ releases }}">
+      <a class="dl dl--plain" data-linux-deb href="{{ releases }}">
         <span class="dl__os">Linux preview</span>
-        <span class="dl__detail">x64 · receive and transmit · not yet tried on a real radio</span>
-        <span class="dl__go">Download .tar.gz</span>
+        <span class="dl__detail">Debian, Ubuntu, Mint · x64 · <span data-version-short>latest</span></span>
+        <span class="dl__go">Download .deb</span>
       </a>
+      <p class="download__after">Other Linux distributions: <a data-linux href="{{ releases }}">download the .tar.gz</a>
+        and see <a href="{{ 'install/#linux-preview' | url }}">Install</a>.</p>
       <p class="download__after">Costas is young. FT8 and FT4 are in daily use at the author's station on one radio
         (a Yaesu FT-710); other radios, PSK, RTTY and the Linux build have had far less time on the air, so watch
         your first contacts.</p>
@@ -169,8 +171,8 @@
 {% endblock %}
 {% block scripts %}
 <script>
-  // Fill in the latest version and the Linux download from GitHub. If this fails the links keep pointing at the
-  // Releases page, which always works.
+  // Fill in the latest version and the Linux downloads from the latest release on GitHub, so they never go stale. If
+  // this fails, or the release has no .deb, the links keep pointing at the latest release's page, which always works.
   (function () {
     if (!window.fetch) return;
     fetch('https://api.github.com/repos/somedudenamedtony/costas/releases/latest')
@@ -180,8 +182,13 @@
         var v = (release.tag_name || '').replace(/^v/, '');
         document.querySelectorAll('[data-version]').forEach(function (el) { el.textContent = 'Version ' + v; });
         document.querySelectorAll('[data-version-short]').forEach(function (el) { el.textContent = 'v' + v; });
-        var linux = (release.assets || []).find(function (a) { return /-linux-x64\.tar\.gz$/.test(a.name); });
-        if (linux) document.querySelector('[data-linux]').href = linux.browser_download_url;
+        // Prefer the versioned file names, so the download says which version it is.
+        var assets = release.assets || [];
+        var pick = function (re) { return assets.find(function (a) { return re.test(a.name); }); };
+        var tar = pick(/^Costas-\d.*-linux-x64\.tar\.gz$/) || pick(/linux-x64\.tar\.gz$/);
+        var deb = pick(/^costas_\d.*_amd64\.deb$/) || pick(/amd64\.deb$/);
+        if (tar) document.querySelector('[data-linux]').href = tar.browser_download_url;
+        if (deb) document.querySelector('[data-linux-deb]').href = deb.browser_download_url;
       })
       .catch(function () {});
   })();

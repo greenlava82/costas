@@ -1,0 +1,17 @@
+Package: costas
+Version: @VERSION@
+Architecture: amd64
+Maintainer: Costas contributors <https://github.com/somedudenamedtony/costas/issues>
+Installed-Size: @SIZE@
+Depends: wsjtx, libhamlib-utils, libportaudio2, libfontconfig1, libx11-6, libice6, libsm6, ca-certificates
+Recommends: libsecret-tools, pulseaudio-utils
+Section: hamradio
+Priority: optional
+Homepage: https://somedudenamedtony.github.io/costas/
+Description: station-centric digital modes client for amateur radio
+ Costas operates FT8, FT4, PSK31, PSK63 and RTTY. It decodes FT8 and FT4 with
+ the jt9 decoder from WSJT-X and controls the radio through Hamlib's rigctld,
+ then shows one line per station: who you still need, who is free to call and
+ who can hear you.
+ .
+ This is a preview of the Linux version.
