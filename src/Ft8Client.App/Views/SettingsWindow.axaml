@@ -149,6 +149,17 @@
                 <TextBlock Classes="help" Text="Leave empty to use what Hamlib reports. Type your radio's most power, such as 100, when the power box at the top shows the wrong range (for example 1 to 200 W on a 100 W radio, so 100 W gives 50 W)." />
               </StackPanel>
             </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="FlexRadio amp and tuner" />
+              <StackPanel Grid.Column="1">
+                <TextBox Text="{Binding FlexAddress}" Width="200" HorizontalAlignment="Left" PlaceholderText="{Binding FlexPlaceholder}"
+                         AutomationProperties.Name="FlexRadio address for the amplifier and tuner" />
+                <TextBlock Text="{Binding FlexStatus}" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Foreground="{Binding FlexStatusKind, Converter={x:Static v:Converters.KindBrush}}"
+                           IsVisible="{Binding FlexStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <TextBlock Classes="help" Text="For a PowerGenius XL amplifier or TunerGenius XL tuner paired with a FlexRadio: type the radio's IP address (SmartSDR shows it under Settings › Radio Setup › Network; your router's device list has it too) and save. Operate, Standby and Bypass then appear in the bottom bar. It works however the radio is connected in Station setup. Leave empty if you have neither." />
+              </StackPanel>
+            </Grid>
             <TextBlock Classes="help" Text="Radio, audio devices and the transmit test are in Station setup (menu ☰)." />
           </StackPanel>
         </ScrollViewer>

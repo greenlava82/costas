@@ -45,6 +45,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 Id = p.Id, Name = p.Name, Callsign = p.Callsign, Grid = p.Grid, Licence = SettingsMapper.Licence(p, s.Operating), Power = p.PowerWatts.ToString(CultureInfo.InvariantCulture),
                 OperatorName = p.OperatorName, Qth = p.Qth, RigDescription = p.RigDescription, Antenna = p.Antenna,
                 MaxPower = p.Rig.MaxPowerWatts?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                FlexAddress = p.Rig.FlexAddress ?? string.Empty,
                 LogbookKey = host.Secrets.Get(SecretNames.QrzLogbookKey(p.Id)) ?? string.Empty,
                 EqslUser = host.Secrets.Get(SecretNames.EqslUsername(p.Id)) ?? string.Empty,
                 EqslPassword = host.Secrets.Get(SecretNames.EqslPassword(p.Id)) ?? string.Empty,
@@ -63,6 +64,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _loadedProfile = s.Profile.Id;
         var active = Profiles.First(d => d.Id == s.Profile.Id);
         (Callsign, Grid, Power, MaxPower, LogbookKey) = (active.Callsign, active.Grid, active.Power, active.MaxPower, active.LogbookKey);
+        FlexAddress = active.FlexAddress;
         LicenceChoice = LicenceName(active.Licence);
         _shownProfile = active;
         SelectedProfile = active;
@@ -152,6 +154,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         RefreshRemote();
         host.Remote.Changed += OnRemoteChanged;
         _remoteLoaded = true;
+        host.Accessories.Changed += OnFlexChanged;
+        RefreshFlex();
         if (host.LogCopy is { } copy) copy.StatusChanged += OnLogCopyChanged;
         RefreshLogCopy();
         SaveWav = s.Files.SaveWav;
@@ -254,10 +258,12 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (value is null || ReferenceEquals(value, _shownProfile)) return;
         StoreFields();
         (Callsign, Grid, Power, MaxPower, LogbookKey) = (value.Callsign, value.Grid, value.Power, value.MaxPower, value.LogbookKey);
+        FlexAddress = value.FlexAddress;
         LicenceChoice = LicenceName(value.Licence);
         ShowEqsl(value);
         KeyStatus = string.Empty;
         _shownProfile = value;
+        RefreshFlex();
     }
 
     /// <summary>Adds a profile, a copy of the one shown (same radio and audio), and shows it.</summary>
@@ -269,7 +275,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         var draft = new ProfileDraft
         {
             Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, Name = NewProfileName(Profiles.Select(p => p.Name)),
-            Callsign = from.Callsign, Grid = from.Grid, Licence = from.Licence, Power = from.Power, MaxPower = from.MaxPower,
+            Callsign = from.Callsign, Grid = from.Grid, Licence = from.Licence, Power = from.Power, MaxPower = from.MaxPower, FlexAddress = from.FlexAddress,
             OperatorName = from.OperatorName, Qth = from.Qth, RigDescription = from.RigDescription, Antenna = from.Antenna,
         };
         Profiles.Add(draft);
@@ -293,7 +299,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Name = NewProfileName(Profiles.Select(p => p.Name), "Operator"),
             // Their licence class is theirs to choose: the check stays off until they pick one.
             Licence = UsLicenceClass.NotUs,
-            Grid = from.Grid, Power = from.Power, MaxPower = from.MaxPower,
+            Grid = from.Grid, Power = from.Power, MaxPower = from.MaxPower, FlexAddress = from.FlexAddress,
             Qth = from.Qth, RigDescription = from.RigDescription, Antenna = from.Antenna,
         };
         Profiles.Add(draft);
@@ -334,6 +340,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _shownProfile.Licence = LicenceOf(LicenceChoice);
         _shownProfile.Power = Power;
         _shownProfile.MaxPower = MaxPower;
+        _shownProfile.FlexAddress = FlexAddress;
         _shownProfile.OperatorName = OperatorName;
         _shownProfile.Qth = Qth;
         _shownProfile.RigDescription = RigDescription;
@@ -401,6 +408,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             p.LicenceClass = SettingsMapper.LicenceKey(d.Licence);
             p.PowerWatts = Watts(d.Power, p.PowerWatts);
             p.Rig.MaxPowerWatts = string.IsNullOrWhiteSpace(d.MaxPower) ? null : Watts(d.MaxPower, p.Rig.MaxPowerWatts ?? 100);
+            p.Rig.FlexAddress = string.IsNullOrWhiteSpace(d.FlexAddress) ? null : d.FlexAddress.Trim();
             p.Eqsl.SyncEnabled = d.EqslSync;
             p.Eqsl.UploadOnComplete = d.EqslUpload;
             p.Eqsl.QthNickname = d.EqslQth.Trim();
@@ -448,6 +456,22 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>The radio's top power in watts; empty to use what Hamlib reports.</summary>
     [ObservableProperty]
     public partial string MaxPower { get; set; }
+
+    /// <summary>The FlexRadio's address for its amplifier and tuner; empty for none.</summary>
+    [ObservableProperty]
+    public partial string FlexAddress { get; set; } = string.Empty;
+
+    /// <summary>What the box shows when empty: the SmartSDR Slice model's address when that is used, else an example.</summary>
+    [ObservableProperty]
+    public partial string FlexPlaceholder { get; set; } = "Not set, for example 192.168.1.20";
+
+    /// <summary>The amp and tuner connection now, for the profile in use: "Connected: PowerGenius XL and TunerGenius XL found."</summary>
+    [ObservableProperty]
+    public partial string FlexStatus { get; set; } = string.Empty;
+
+    /// <summary>Colour of <see cref="FlexStatus"/>.</summary>
+    [ObservableProperty]
+    public partial TextKind FlexStatusKind { get; set; }
 
     /// <summary>Tx gain dBFS on the current band.</summary>
     [ObservableProperty]
@@ -1353,6 +1377,24 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         _host.Remote.Changed -= OnRemoteChanged;
         if (_host.LogCopy is { } copy) copy.StatusChanged -= OnLogCopyChanged;
+        _host.Accessories.Changed -= OnFlexChanged;
+    }
+
+    private void OnFlexChanged() => MainViewModel.Dispatch(RefreshFlex);
+
+    // The status is the connection's for the profile in use; another profile shown only gets its placeholder.
+    private void RefreshFlex()
+    {
+        var shown = _host.Settings.Current.Profiles.FirstOrDefault(p => p.Id == (_shownProfile?.Id ?? _loadedProfile));
+        var slice = shown is null ? null : FlexAccessoryService.RadioAddress(new RigSettings
+            { Mode = shown.Rig.Mode, Model = shown.Rig.Model, Port = shown.Rig.Port });
+        FlexPlaceholder = slice is { } a ? $"Using {a.Host} from Station setup" : "Not set, for example 192.168.1.20";
+        if (shown?.Id != _host.Settings.Current.Profile.Id)
+        {
+            FlexStatus = string.Empty;
+            return;
+        }
+        (FlexStatus, FlexStatusKind) = FlexStatusText.For(_host.Accessories.Status, _host.Accessories.Current);
     }
 
     /// <summary>The backups folder, which holds the daily copies and the ADIF log copy.</summary>

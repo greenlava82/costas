@@ -47,6 +47,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ft8Client.UpdateSplash", "s
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ft8Client.UpdateSplash.Tests", "tests\Ft8Client.UpdateSplash.Tests\Ft8Client.UpdateSplash.Tests.csproj", "{93E689D4-A256-4EBF-BB9C-6B5B94BE7434}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ft8Client.FakeFlex", "tools\Ft8Client.FakeFlex\Ft8Client.FakeFlex.csproj", "{F817BC33-6464-428D-8B0E-FF1FC53E4A88}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -285,6 +287,18 @@ Global
 		{93E689D4-A256-4EBF-BB9C-6B5B94BE7434}.Release|x64.Build.0 = Release|Any CPU
 		{93E689D4-A256-4EBF-BB9C-6B5B94BE7434}.Release|x86.ActiveCfg = Release|Any CPU
 		{93E689D4-A256-4EBF-BB9C-6B5B94BE7434}.Release|x86.Build.0 = Release|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Debug|x64.Build.0 = Debug|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Debug|x86.Build.0 = Debug|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Release|x64.ActiveCfg = Release|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Release|x64.Build.0 = Release|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Release|x86.ActiveCfg = Release|Any CPU
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -309,5 +323,6 @@ Global
 		{363F2574-10BE-41CE-B87A-9D69C81AC44D} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{7BAA0C18-AB88-4321-8F07-19D5458938D1} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{93E689D4-A256-4EBF-BB9C-6B5B94BE7434} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{F817BC33-6464-428D-8B0E-FF1FC53E4A88} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 	EndGlobalSection
 EndGlobal

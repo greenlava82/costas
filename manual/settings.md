@@ -71,6 +71,50 @@ Radio, audio devices and the transmit test are not here: they are in **☰ › S
   the power box at the top shows the wrong range, for example 1 to 200 W on a 100 W FTDX10 so that asking for 100 W
   gives 50 W, type the radio's real top power here (100). Costas then reads and sets the power as a share of it. Each
   profile keeps its own.
+- **FlexRadio amp and tuner**: for a 4O3A **PowerGenius XL** amplifier or **TunerGenius XL** tuner paired with a
+  FlexRadio. Type the radio's IP address and press Save; see [FlexRadio amplifier and tuner](#flexradio-amp-and-tuner)
+  below. Empty by default. Each profile keeps its own.
+
+### FlexRadio amplifier and tuner {#flexradio-amp-and-tuner}
+
+With a FlexRadio and a PowerGenius XL (PGXL) or TunerGenius XL (TGXL) paired with it, Costas can switch them the way
+SmartSDR's amplifier and tuner panels do. Costas talks to the radio, not to the amplifier: the radio passes the
+command on, exactly as when you click in SmartSDR.
+
+1. Check that the amplifier and tuner show in SmartSDR and switch from there. If they don't, they aren't paired with the
+   radio yet, and Costas won't see them either.
+2. Find the radio's IP address: SmartSDR shows it under **Settings › Radio Setup › Network**, and your router's list of
+   devices has it too. Giving the radio a fixed (reserved) address in the router saves retyping it later.
+3. In Costas, open **Settings › Station**, type the address in **FlexRadio amp and tuner** (for example
+   `192.168.1.20`) and press **Save** or **Apply**.
+4. The line under the box says what happened, within a few seconds:
+    - *Connected. Found PowerGenius XL and TunerGenius XL* means you're done.
+    - *Connected to the radio, but it reports no amplifier or tuner*: go back to step 1.
+    - *Could not reach the radio at …*: the address is wrong, the radio is off, or the computer and the radio are
+      on different networks (a guest Wi-Fi, a VPN).
+
+    ![Settings: FlexRadio amp and tuner, connected](images/settings-flex-amp-tuner.png)
+
+5. The bottom bar now has a button that reads **Amp: Standby  Tuner: Operate ▾** (or whatever they are set to). Click it
+   to open the panel:
+    - **Operate** and **Standby** for the amplifier.
+    - **Operate**, **Standby**, **Bypass** and **In line** for the tuner.
+
+    ![The amplifier and tuner panel, opened from the bottom bar](images/flex-amp-tuner-panel.png)
+
+It works however the radio itself is set up in Station setup: **Kenwood › TS-2000** through SmartSDR CAT, **FlexRadio ›
+6xxx**, or the **SmartSDR Slice** models. With a SmartSDR Slice model the box can stay empty: Costas uses the address
+from Station setup, and the box shows which.
+
+What Costas will and won't do:
+
+- It changes them only when you click. Not when it starts, not on a band change, not when you press Tune.
+- The buttons are greyed out while anything is on the air, while the tuner is tuning, and while the amplifier is still
+  powering up. A refused click says why under the buttons.
+- The bottom bar always shows what the radio reports, not what was clicked. If a click doesn't change the label, the
+  radio didn't make the change.
+- If the connection drops, the button disappears until it comes back. Transmitting isn't affected: the radio keys the
+  amplifier, not Costas.
 
 ## Transmitting
 

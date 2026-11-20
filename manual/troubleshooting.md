@@ -110,6 +110,22 @@ fault in versions before 0.1.0.336 that sometimes read the SWR meter as ALC. Lat
 they start; you can also type your usual level (for example -6) there and press Save. If the level looks normal, check the
 audio output device in Station setup and that the radio takes its transmit audio from USB in data mode.
 
+### The FlexRadio amplifier or tuner button doesn't appear
+
+Open **Settings › Station** and read the line under **FlexRadio amp and tuner**; it says what is wrong. The usual causes:
+
+- **Nothing under the box:** no address is set. Type the radio's IP address and press Save
+  ([FlexRadio amplifier and tuner](settings.md#flexradio-amp-and-tuner)).
+- **Could not reach the radio:** check the address against SmartSDR (**Settings › Radio Setup › Network**). The
+  radio's address may have changed if the router hands out addresses; reserve one for it. The computer and the radio
+  must be on the same network (not a guest Wi-Fi, and not through a VPN).
+- **Connected, but it reports no amplifier or tuner:** they aren't paired with the radio. Pair them in SmartSDR first;
+  Costas sees what SmartSDR sees.
+- **Not while replaying recordings:** Costas was started with `--simulate`, which never connects.
+
+If the button is there but a click does nothing, look under the buttons for the reason, then save a diagnostics bundle
+(**☰ › Diagnostics**) and send it with a problem report. The log in it has what the radio said.
+
 ### After a band change the dial is a few hundred hertz off
 
 Some radios, such as the FTDX10, move the dial when the mode changes to DATA-U, so a band change could land on

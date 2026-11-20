@@ -49,6 +49,9 @@ public sealed partial class ProfileDraft : ObservableObject
     /// <summary>The radio's top power in watts as typed; empty to use what Hamlib reports.</summary>
     public string MaxPower { get; set; } = string.Empty;
 
+    /// <summary>The FlexRadio's address for its amplifier and tuner, as typed; empty for none.</summary>
+    public string FlexAddress { get; set; } = string.Empty;
+
     /// <summary>The operator's first name as typed, for <c>{MYNAME}</c>.</summary>
     public string OperatorName { get; set; } = string.Empty;
 

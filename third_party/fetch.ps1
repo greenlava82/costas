@@ -80,13 +80,25 @@ Move-Item (Join-Path $tmp "hamlib-w64-$HamlibVersion") $hamDir
 # cty.dat changes every few weeks, so it cannot be pinned. It is not shipped from here either: the app embeds the copy
 # committed in src/Ft8Client.Data/Resources (and checks any newer download with CountryFile.Parse). This copy is only
 # checked for being a country file rather than an error page.
+# The site sometimes answers a CI runner with something else (CI on PR #188 got a page with no entities), so it is tried
+# three times and a bad answer only warns, as fetch.sh does: nothing in the build uses this copy.
 $cty = Join-Path $tmp 'cty.dat'
-Invoke-WebRequest -Uri 'https://www.country-files.com/cty/cty.dat' -OutFile $cty
-$ctyText = Get-Content -Raw $cty
-$entities = ([regex]::Matches($ctyText, '(?m)^[^\s:][^:]*:\s*\d+:\s*\d+:\s*[A-Z]{2}:')).Count
-if ((Get-Item $cty).Length -lt 20KB -or (Get-Item $cty).Length -gt 5MB -or $ctyText -match '<' -or $entities -lt 300) {
-    Remove-Item $cty
-    throw "cty.dat download is not a country file ($entities entities)"
+$entities = 0
+foreach ($try in 1..3) {
+    try {
+        Invoke-WebRequest -Uri 'https://www.country-files.com/cty/cty.dat' -OutFile $cty
+        $ctyText = Get-Content -Raw $cty
+        $entities = ([regex]::Matches($ctyText, '(?m)^[^\s:][^:]*:\s*\d+:\s*\d+:\s*[A-Z]{2}:')).Count
+        if ((Get-Item $cty).Length -ge 20KB -and (Get-Item $cty).Length -le 5MB -and $ctyText -notmatch '<' -and $entities -ge 300) {
+            Move-Item $cty (Join-Path $root 'cty.dat') -Force
+            break
+        }
+    }
+    catch {
+        Write-Host "cty.dat download failed: $($_.Exception.Message)"
+    }
+    Remove-Item $cty -ErrorAction SilentlyContinue
+    if ($try -lt 3) { Start-Sleep -Seconds (5 * $try) }
+    else { Write-Warning "cty.dat download is not a country file ($entities entities); kept the old one. The app uses its embedded copy." }
 }
-Move-Item $cty (Join-Path $root 'cty.dat') -Force
 Write-Host "Done. jt9: $wsjtxDir\bin\jt9.exe  rigctld: $hamDir\bin\rigctld.exe"

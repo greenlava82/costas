@@ -50,6 +50,9 @@ public static class ServiceNames
     /// <summary>Real-time uploads to Club Log.</summary>
     public const string ClubLog = "clublog";
 
+    /// <summary>The connection to a FlexRadio's API for its paired amplifier and tuner.</summary>
+    public const string Accessories = "accessories";
+
     /// <summary>The ADIF log copy in the backups folder; shown in the bottom bar only when it cannot be written.</summary>
     public const string LogCopy = "logcopy";
 }
