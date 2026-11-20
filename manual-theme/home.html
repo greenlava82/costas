@@ -144,13 +144,14 @@
         <span class="dl__detail">10 or 11, 64-bit · <span data-version-short>latest</span></span>
         <span class="dl__go">Download installer</span>
       </a>
-      <a class="dl dl--plain" data-linux-deb href="{{ releases }}">
+      <a class="dl dl--plain" data-linux-appimage data-fallback="{{ releases }}" href="{{ releases ~ '/download/CostasApp.AppImage' }}">
         <span class="dl__os">Linux preview</span>
-        <span class="dl__detail">Debian, Ubuntu, Mint · x64 · <span data-version-short>latest</span></span>
-        <span class="dl__go">Download .deb</span>
+        <span class="dl__detail">AppImage, x64 · updates itself · <span data-version-short>latest</span></span>
+        <span class="dl__go">Download AppImage</span>
       </a>
-      <p class="download__after">Other Linux distributions: <a data-linux href="{{ releases }}">download the .tar.gz</a>
-        and see <a href="{{ 'install/#linux-preview' | url }}">Install</a>.</p>
+      <p class="download__after">Linux also comes as a <a data-linux-deb href="{{ releases }}">.deb</a> for Debian, Ubuntu
+        and Mint, or a <a data-linux href="{{ releases }}">.tar.gz</a>; those you update by hand. See
+        <a href="{{ 'install/#linux-preview' | url }}">Install</a> for what to set up first.</p>
       <p class="download__after">Costas is young. FT8 and FT4 are in daily use at the author's station on one radio
         (a Yaesu FT-710); other radios, PSK, RTTY and the Linux build have had far less time on the air, so watch
         your first contacts.</p>
@@ -189,6 +190,9 @@
         var deb = pick(/^costas_\d.*_amd64\.deb$/) || pick(/amd64\.deb$/);
         if (tar) document.querySelector('[data-linux]').href = tar.browser_download_url;
         if (deb) document.querySelector('[data-linux-deb]').href = deb.browser_download_url;
+        // The AppImage keeps one name, so its link needs no lookup; a release from before it had none goes to the page.
+        var appimage = document.querySelector('[data-linux-appimage]');
+        if (!pick(/^CostasApp\.AppImage$/)) appimage.href = appimage.getAttribute('data-fallback');
       })
       .catch(function () {});
   })();

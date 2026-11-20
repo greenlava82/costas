@@ -75,10 +75,33 @@ Uninstalling removes the program but keeps your data folder, so a reinstall pick
 
 ## Linux (preview) {#linux-preview}
 
-Each release also has Linux builds: a Debian package, `costas_<version>_amd64.deb`, for Debian, Ubuntu, Mint and
-other Debian-based systems, and a tarball, `Costas-<version>-linux-x64.tar.gz`, for everything else. They do everything
-the Windows version does, transmit included, but Linux is still a **preview**: it has had little time with real radios.
-On your first contacts, run the transmit test in Setup and watch the radio's ALC and power, as you would on Windows.
+Each release also has three Linux builds of the same program:
+
+| Build | For | Updates |
+| --- | --- | --- |
+| **AppImage**, `CostasApp.AppImage` | Any 64-bit Linux | Itself, like Windows: **Update** downloads only what changed and restarts Costas |
+| **.deb**, `costas_<version>_amd64.deb` | Debian, Ubuntu, Mint | By hand: download and open the new `.deb` |
+| **Tarball**, `Costas-<version>-linux-x64.tar.gz` | Any 64-bit Linux | By hand: download and unpack the new tarball |
+
+They do everything the Windows version does, transmit included, but Linux is still a **preview**: it has had little time
+with real radios. On your first contacts, run the transmit test in Setup and watch the radio's ALC and power, as you
+would on Windows.
+
+### AppImage (updates itself)
+
+1. Install what Costas uses from your distribution: the `jt9` decoder, Hamlib's `rigctld` and PortAudio. On Debian,
+   Ubuntu and Mint:
+
+        sudo apt install wsjtx libhamlib-utils libportaudio2 libsecret-tools pulseaudio-utils
+
+2. Download `CostasApp.AppImage` from the [download page](index.md#download) and put it where you keep programs,
+   for example `~/Applications`. Keep it in a folder you own: Costas replaces the file when it updates.
+3. Make it executable (in its file properties, or `chmod +x CostasApp.AppImage`) and double-click it.
+4. For a USB CAT cable, add yourself to the `dialout` group (`sudo usermod -aG dialout $USER`), then log out and in.
+
+If it does not start and says FUSE is missing, install `libfuse2` (`sudo apt install libfuse2t64` on Debian 13 and
+Ubuntu 24.04, `libfuse2` on older ones). An AppImage adds no menu entry by itself; a helper such as Gear Lever or
+AppImageLauncher can add one.
 
 ### Debian, Ubuntu and Mint
 
@@ -114,16 +137,19 @@ other programs make: with a FlexRadio and RimuSDR, use RimuDAX's **rimu.dax.rx1*
 
 ### Updates
 
-Costas checks for updates on Linux as on Windows, and the update bar tells you when a new version is out, but it
-cannot install it by itself: **Update** opens the release page.
+Costas checks for updates on Linux as on Windows, and the update bar tells you when a new version is out.
 
+- **AppImage**: press **Update**. Costas downloads only what changed, closes, replaces its AppImage file and starts
+  again, as on Windows.
 - **.deb**: download the new `.deb` and open it, or `sudo apt install ./costas_*_amd64.deb`. It replaces the old
   version.
 - **Tarball**: download the new tarball and unpack it. It unpacks into a new folder named for its version: run
   `./Costas` from there and delete the old folder. If you added Costas to your desktop's menu, point `Exec=` in its
   `costas.desktop` at the new folder.
 
-Either way, your log and settings live in `~/.local/share/Costas/` and are kept.
+Whichever you use, your log and settings live in `~/.local/share/Costas/` and are kept. To move from the .deb or the
+tarball to the AppImage, download the AppImage and start it; it finds the same log and settings (remove the .deb with
+`sudo apt remove costas`, or delete the tarball's folder).
 
 ## Next
 
