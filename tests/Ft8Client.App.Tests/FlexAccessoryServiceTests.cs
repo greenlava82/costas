@@ -221,7 +221,9 @@ public sealed class FlexAccessoryServiceTests : IAsyncDisposable
         await WaitUntil(() => !AccessoryPanel.From(service.Current, service.CanChange).Any);
         await WaitUntil(() => AccessoryPanel.From(service.Current, service.CanChange).Any);
 
-        session.Snapshot.Services[ServiceNames.Accessories].Health.Should().Be(ServiceHealth.Ok);
+        // The reconnected client can report the accessories a moment before it reports itself connected, so the
+        // status is waited for rather than read straight after the button returns.
+        await WaitUntil(() => session.Snapshot.Services[ServiceNames.Accessories].Health == ServiceHealth.Ok);
     }
 
     [Theory]
