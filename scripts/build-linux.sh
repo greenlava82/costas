@@ -5,7 +5,9 @@
 # Builds the Linux preview: publishes the app self-contained for linux-x64 and packs it as a tarball and as a Debian
 # package. jt9, rigctld and PortAudio come from the distribution (wsjtx, libhamlib-utils, libportaudio2); the app finds
 # them on the PATH, and the .deb names them as dependencies so apt installs them too.
-# Output: artifacts/Costas-<version>-linux-x64.tar.gz, artifacts/costas_<version>_amd64.deb and a .sha256 for each
+# Output: artifacts/Costas-<version>-linux-x64.tar.gz, artifacts/costas_<version>_amd64.deb and a .sha256 for each, and
+# Velopack's AppImage (CostasApp.AppImage), package and feed in artifacts/velopack-linux (velopack-linux-dev for the
+# development channel).
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
@@ -50,3 +52,32 @@ dpkg-deb --root-owner-group -Zxz --build "$root" "$art/$deb" > /dev/null
 rm -rf "$root"
 (cd "$art" && sha256sum "$deb" | cut -d' ' -f1 > "$deb.sha256")
 echo "$art/$deb"
+
+# AppImage through Velopack, the same updater as on Windows: Costas updates itself in place (Update, then it restarts),
+# downloading only what changed when the previous release's package is there to make a delta from. Pack id CostasApp
+# as on Windows; Linux uses Velopack's "linux" channel (releases.linux.json), so the two feeds never mix. Needs
+# mksquashfs (squashfs-tools).
+if command -v mksquashfs > /dev/null; then
+  vp="$art/velopack-linux"
+  rm -rf "$vp" "$art/velopack-linux-dev"
+  mkdir -p "$vp"
+  dotnet tool restore > /dev/null
+  if [ "${VELOPACK_PREVIOUS:-}" = 1 ]; then
+    # The first Linux Velopack release has nothing to download; it ships without a delta.
+    dotnet vpk download github --repoUrl https://github.com/somedudenamedtony/costas --channel linux --outputDir "$vp" ||
+      echo "::warning::No earlier Linux Velopack release to make a delta from"
+  fi
+  vpk=(dotnet vpk pack --packId CostasApp --packVersion "$version" --packDir "$stage" --mainExe Costas --packTitle Costas
+    --packAuthors 'Costas contributors' --icon src/Ft8Client.App/Assets/costas-256.png --runtime linux-x64)
+  "${vpk[@]}" --outputDir "$vp"
+  # Only this version's packages are published; an earlier one downloaded for the delta is already on its own release.
+  find "$vp" -name '*.nupkg' ! -name "*-$version-*" -delete
+  # Development builds are packed again in their own channel (releases.linux-dev.json), for installs that follow them.
+  if [ "${COSTAS_CHANNEL:-}" = dev ]; then
+    mkdir -p "$art/velopack-linux-dev"
+    "${vpk[@]}" --channel linux-dev --outputDir "$art/velopack-linux-dev"
+  fi
+  ls -la "$vp"
+else
+  echo "mksquashfs is missing (squashfs-tools): no AppImage" >&2
+fi

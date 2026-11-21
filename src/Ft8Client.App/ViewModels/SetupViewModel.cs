@@ -18,6 +18,7 @@ using Ft8Client.Core.Messages;
 using Ft8Client.Data.Secrets;
 using Ft8Client.Data.Settings;
 using Ft8Client.Rig;
+using Ft8Client.Rig.Flex;
 
 namespace Ft8Client.App.ViewModels;
 
@@ -71,6 +72,110 @@ public sealed partial class SetupViewModel : ObservableObject
         UploadSpots = s.PskReporter.UploadSpots;
         _ = LoadModelsAsync(s.Profile.Rig.Model);
         Track("setup_opened", "first_time", s.SetupComplete ? "no" : "yes");
+        if (!host.Simulating) _ = SearchFlexAsync();
+    }
+
+    // FlexRadio ---------------------------------------------------------------
+
+    /// <summary>FlexRadios heard on the network, each offered with a "Use this radio" button.</summary>
+    public ObservableCollection<FlexFoundRadio> FoundRadios { get; } = [];
+
+    /// <summary>A FlexRadio was found.</summary>
+    public bool HasFoundRadios => FoundRadios.Count > 0;
+
+    /// <summary>What setting up a found FlexRadio did, or what is missing.</summary>
+    [ObservableProperty]
+    public partial string FlexNote { get; set; } = string.Empty;
+
+    private bool _searchingFlex;
+
+    /// <summary>
+    /// Listens for FlexRadio discovery broadcasts for a few seconds. Nothing is shown unless a radio answers, so
+    /// stations without one never see it.
+    /// </summary>
+    [RelayCommand]
+    private async Task SearchFlexAsync()
+    {
+        if (_searchingFlex) return;
+        _searchingFlex = true;
+        try
+        {
+            var radios = await FlexDiscovery.ListenAsync(TimeSpan.FromSeconds(4), CancellationToken.None);
+            foreach (var r in radios)
+            {
+                if (!FoundRadios.Any(f => f.Info.Ip == r.Ip)) FoundRadios.Add(new FlexFoundRadio(r));
+            }
+            OnPropertyChanged(nameof(HasFoundRadios));
+        }
+        finally
+        {
+            _searchingFlex = false;
+        }
+    }
+
+    /// <summary>
+    /// Sets Costas up for a found FlexRadio in one go: Hamlib's SmartSDR Slice model for the slice being operated (the
+    /// transmit slice, as the radio reports it), the radio's address, CAT keying, and its DAX audio devices when they are
+    /// there. Then it tests the connection. Nothing is transmitted.
+    /// </summary>
+    [RelayCommand]
+    private async Task UseFlexRadioAsync(FlexFoundRadio? radio)
+    {
+        if (radio is null || Busy) return;
+        AudioOnly = false;
+        FlexNote = $"Asking the {radio.Info.Model} which slice you operate…";
+        var slices = await FlexSliceProbe.ProbeAsync(radio.Info.Ip, radio.Info.Port, CancellationToken.None);
+        if (ApplyFlex(radio, FlexSlice.Pick(slices))) await ScanAsync();
+    }
+
+    /// <summary>Fills in the radio and audio for <paramref name="radio"/> operated on <paramref name="slice"/>; false when Hamlib cannot.</summary>
+    internal bool ApplyFlex(FlexFoundRadio radio, FlexSlice? slice)
+    {
+        var index = slice?.Index ?? 0;
+        var model = _allModels.FirstOrDefault(m => m.Number == HamlibModel.SmartSdrSliceA + index);
+        if (model is null)
+        {
+            FlexNote = "This computer's Hamlib has no SmartSDR Slice models, which talk to the radio directly; they need Hamlib 4.6 or newer."
+                + (OperatingSystem.IsLinux() ? " Update your distribution's Hamlib (libhamlib-utils), then come back." : " Use SmartSDR CAT with Kenwood › TS-2000 instead (see the manual).");
+            return false;
+        }
+        Manufacturer = model.Manufacturer;
+        Model = model;
+        NetworkAddress = radio.Info.Address;
+        Ptt = "cat";
+        OnPropertyChanged(nameof(PttChoice));
+        OnPropertyChanged(nameof(UsesPttLine));
+
+        RefreshAudioDevices();
+        var channel = slice is { DaxChannel: > 0 } ? slice.DaxChannel : 1;
+        var input = AudioDeviceMatch.SuggestFlex(Inputs, transmit: false, channel);
+        var output = AudioDeviceMatch.SuggestFlex(Outputs, transmit: true);
+        if (input is not null) Input = input;
+        if (output is not null) Output = output;
+        var sliceText = slice is null ? "slice A (the radio did not say which slice is open)" : $"slice {(slice.Letter.Length > 0 ? slice.Letter : model.Model[^1..])}";
+        var audioText = input is not null && output is not null
+            ? $"Audio: {input.Name} in, {output.Name} out."
+            : OperatingSystem.IsLinux()
+                ? "Its audio devices were not found: in RimuDAX choose DAX mode with TX and RX1 on (and turn on DAX on the slice in RimuSDR), then pick rimu.dax.rx1 and rimu.dax.tx on the Audio step."
+                : "Its audio devices were not found: start SmartSDR DAX, then pick DAX Audio RX and DAX Audio TX on the Audio step.";
+        FlexNote = $"Set up for the {radio.Info.Model} at {radio.Info.Address}, {sliceText}, keyed by CAT. {audioText}";
+        return true;
+    }
+
+    /// <summary>Replaces the radio list Hamlib gave, for tests.</summary>
+    internal void UseModelsForTests(IReadOnlyList<HamlibModel> models) => _allModels = models;
+
+    // Lists the audio devices again, keeping the chosen ones: an SDR program's virtual devices can appear after Setup opened.
+    private void RefreshAudioDevices()
+    {
+        var input = Input;
+        var output = Output;
+        Inputs.Clear();
+        foreach (var d in _host.AudioBackend.ListInputs()) Inputs.Add(d);
+        Outputs.Clear();
+        foreach (var d in _host.AudioBackend.ListOutputs()) Outputs.Add(d);
+        Input = input is null ? null : AudioDeviceMatch.Find(Inputs, input.Id, input.Name);
+        Output = output is null ? null : AudioDeviceMatch.Find(Outputs, output.Id, output.Name);
     }
 
     // Usage statistics for the wizard: which steps are reached and how the radio and transmit tests go. Choices and
@@ -241,6 +346,54 @@ public sealed partial class SetupViewModel : ObservableObject
     /// <summary>Existing rigctld, flrig or other server, in host:port form.</summary>
     [ObservableProperty]
     public partial string NetworkAddress { get; set; } = "127.0.0.1:4532";
+
+    /// <summary>
+    /// What Test connection says when a network model's server does not work. <paramref name="reachable"/> is whether a
+    /// plain TCP connection to <paramref name="address"/> got through: when it did not, nothing listens there (the program
+    /// that should provide it is not running, or uses another port); when it did, the program is there but did not answer
+    /// Hamlib. For NET rigctl it names the usual providers and points FlexRadio owners at the SmartSDR Slice models, which
+    /// reach the radio with no helper program.
+    /// </summary>
+    internal static string NetworkProblemText(int model, string serverName, string address, bool reachable, string? problem)
+    {
+        var text = reachable
+            ? $"{address} accepted the connection, but the radio did not answer through it. {problem} The program there may not answer the commands Hamlib starts with, or may not be connected to the radio."
+            : $"Nothing is listening at {address}: the program that should run the {serverName} server is not running, or listens on another address or port.";
+        if (model == 2)
+        {
+            text += reachable
+                ? " Check the program's own window for errors and which radio or slice its port is for."
+                : " Start it first: rigctld, Hamlib Launcher, or the Hamlib port of an SDR program's CAT helper (such as RimuCAT), and keep it running.";
+            text += " A FlexRadio can also be reached directly, with nothing else running: choose FlexRadio › SmartSDR Slice A (the slice you operate) and the radio's IP address with port 4992.";
+        }
+        else if (reachable)
+        {
+            text += $" Check that {serverName} is connected to the radio.";
+        }
+        return text;
+    }
+
+    // Whether a TCP connection to host:port gets through within 3 s.
+    private static async Task<bool> CanConnectAsync(string address, CancellationToken ct)
+    {
+        if (!Uri.TryCreate("tcp://" + address, UriKind.Absolute, out var uri)) return false;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(3));
+        try
+        {
+            using var tcp = new System.Net.Sockets.TcpClient();
+            await tcp.ConnectAsync(uri.IdnHost, uri.Port, timeout.Token);
+            return true;
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+            return false;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Whether an address contains a host and a valid TCP port.</summary>
     public static bool IsNetworkAddress(string? address) =>
@@ -569,13 +722,23 @@ public sealed partial class SetupViewModel : ObservableObject
             if (IsNetwork)
             {
                 Message = $"Connecting to {ServerName} at {NetworkAddress.Trim()}…";
+                // Costas reaches the server through its own rigctld, whose errors are about that hop; a plain connection
+                // first tells "nothing there" apart from "there, but not answering".
+                var reachable = await CanConnectAsync(NetworkAddress.Trim(), ct);
+                if (!reachable)
+                {
+                    Message = string.Empty;
+                    Check(false, NetworkProblemText(Model?.Number ?? 0, ServerName, NetworkAddress.Trim(), reachable: false, null));
+                    return;
+                }
+                Message = $"Connected to {NetworkAddress.Trim()}; waiting for the radio to answer through it (up to 40 s)…";
                 await ApplyDevicesAsync();
                 var (networkState, networkProblem) = await _host.CheckRigAsync(ct);
                 Message = string.Empty;
                 Track("setup_radio_test", RadioTestProps(networkState is null ? "no_answer" : "ok"));
                 if (networkState is null)
                 {
-                    Check(false, $"The {ServerName} server at {NetworkAddress.Trim()} did not answer. {networkProblem} Check that {ServerName} is running and its listening address and TCP port match.");
+                    Check(false, NetworkProblemText(Model?.Number ?? 0, ServerName, NetworkAddress.Trim(), reachable: true, networkProblem));
                     return;
                 }
                 Readback = $"{MainViewModel.FormatFrequency(networkState.FrequencyHz)} MHz {networkState.Mode}";

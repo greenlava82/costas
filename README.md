@@ -89,6 +89,9 @@ your log and settings; an update downloads only what changed, usually a few MB.
 
 ### Linux (preview)
 
+- **AppImage (updates itself)**: install `jt9` (wsjtx), Hamlib's `rigctld` and PortAudio from your distribution, then
+  download `CostasApp.AppImage` from the
+  [latest release](https://github.com/somedudenamedtony/costas/releases/latest), make it executable and run it.
 - **Debian, Ubuntu, Mint**: download `costas_<version>_amd64.deb` from the
   [latest release](https://github.com/somedudenamedtony/costas/releases/latest) and open it, or run
   `sudo apt install ./costas_*_amd64.deb`. apt installs the decoder, radio control and audio library with it.

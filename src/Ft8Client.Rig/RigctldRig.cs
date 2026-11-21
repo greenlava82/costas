@@ -668,7 +668,10 @@ public sealed class RigctldRig : IRig
         _client = new RigctldClient("127.0.0.1", _port);
         if (_meters is not null) await _meters.DisposeAsync().ConfigureAwait(false);
         _meters = new RigctldClient("127.0.0.1", _port, TimeSpan.FromSeconds(1));
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+        // rigctld listens only once it has opened the radio. A network model opens another program's server first, and
+        // Hamlib waits 10 s for each start-up command that server leaves unanswered (\get_powerstat, \chk_vfo,
+        // \dump_state), so give those up to 40 s before calling the server silent.
+        var deadline = DateTime.UtcNow + (HamlibModel.IsNetworkModel(_options.Model) ? TimeSpan.FromSeconds(40) : TimeSpan.FromSeconds(3));
         while (true)
         {
             try

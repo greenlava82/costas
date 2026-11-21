@@ -40,4 +40,23 @@ public static class AudioDeviceMatch
         var codecs = devices.Where(d => d.Name.Contains(RadioCodecName, StringComparison.OrdinalIgnoreCase)).ToList();
         return codecs.Count == 1 ? codecs[0] : null;
     }
+
+    /// <summary>
+    /// A FlexRadio's DAX device to offer once the radio is chosen: on Linux RimuDAX's <c>rimu.dax.tx</c> and
+    /// <c>rimu.dax.rx&lt;n&gt;</c> (PulseAudio), on Windows SmartSDR DAX's "DAX Audio TX" and "DAX Audio RX &lt;n&gt;". Null
+    /// when there is no such device, or more than one would fit.
+    /// </summary>
+    /// <param name="devices">Inputs, or outputs.</param>
+    /// <param name="transmit">True for the transmit device (an output), false for a receive device (an input).</param>
+    /// <param name="channel">The DAX receive channel, 1 to 8; ignored for transmit.</param>
+    public static AudioDevice? SuggestFlex(IReadOnlyList<AudioDevice> devices, bool transmit, int channel = 1)
+    {
+        ArgumentNullException.ThrowIfNull(devices);
+        var rimu = transmit ? "PulseAudio:rimu.dax.tx" : $"PulseAudio:rimu.dax.rx{channel}";
+        if (devices.FirstOrDefault(d => string.Equals(d.Id, rimu, StringComparison.Ordinal)) is { } r) return r;
+        var dax = transmit ? "DAX Audio TX" : $"DAX Audio RX {channel}";
+        var matches = devices.Where(d => d.Name.StartsWith(dax, StringComparison.OrdinalIgnoreCase)
+                                         && (d.Name.Length == dax.Length || !char.IsDigit(d.Name[dax.Length]))).ToList();
+        return matches.Count == 1 ? matches[0] : null;
+    }
 }

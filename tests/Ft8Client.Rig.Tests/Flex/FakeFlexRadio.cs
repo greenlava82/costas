@@ -77,7 +77,9 @@ internal sealed class FakeFlexRadio : IAsyncDisposable
                 _ = Task.Run(() => ServeAsync(tcp));
             }
         }
-        catch (Exception ex) when (ex is OperationCanceledException or SocketException or ObjectDisposedException)
+        // InvalidOperationException ("Not listening"): DisposeAsync stopped the listener after the loop checked the token
+        // but before it reached AcceptTcpClientAsync.
+        catch (Exception ex) when (ex is OperationCanceledException or SocketException or ObjectDisposedException or InvalidOperationException)
         {
         }
     }

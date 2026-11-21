@@ -70,6 +70,7 @@ public sealed class AppHost : IAsyncDisposable
     private DesktopNotifications? _notifications;
     private SlotLoop? _loop;
     private WorkQueue? _work;
+    private WorkQueue? _stats;
     private IRig _rig;
     private string? _rigKey;
     // Costas's own retunes running, and how many have finished: a poll that read the radio before or during one of them
@@ -466,7 +467,16 @@ public sealed class AppHost : IAsyncDisposable
         TxMeters.Measured += r => Session.SetTxMeters(TxLevel.OnMeasured(r));
         TxMeters.Read += Session.SetTxMetersLive;
         if (partner is not null) Session.Transmitting += partner.OnTransmitted;
-        Session.SlotDecoded += (slot, mode, decodes) => BandStats.Add(slot, Settings.Current.Operating.Band, ModeInfo.Name(mode), decodes.Count);
+        // The per-slot decode count is a statistic: it is saved on its own thread, so a busy database delays only it (not
+        // the decode, the late transmit plan, or a contact waiting to be logged), and a save that still fails is logged
+        // and skipped instead of escaping the decode task (Sentry COSTAS-6).
+        _stats = new WorkQueue("BandStats", ex => Log.Warning(ex, "Band activity statistic not saved"));
+        Session.SlotDecoded += (slot, mode, decodes) =>
+        {
+            var band = Settings.Current.Operating.Band;
+            var count = decodes.Count;
+            _stats.Post(() => BandStats.Add(slot, band, ModeInfo.Name(mode), count));
+        };
         Session.SetLogIndex(LogIndexBuilder.Build(Qsos, config.MyCall, Countries, SettingsMapper.ConfirmationSource(s)));
         Session.SetService(ServiceNames.Decoder, Jt9Path is null
             ? new ServiceStatus(ServiceHealth.Down, "jt9 not found", Clock.UtcNow)
@@ -685,9 +695,9 @@ public sealed class AppHost : IAsyncDisposable
             if (_usageThrottle.Allow($"svc:{name}:{h}", Clock.UtcNow))
                 Usage.Track("service_status", new Dictionary<string, object> { ["service"] = name, ["health"] = h });
         };
-        Session.FullDecodeFinished += (mode, count, elapsed, ok) =>
+        Session.FullDecodeFinished += (mode, count, elapsed) =>
         {
-            if (_decodeHealth.Add(ModeInfo.Name(mode), count, elapsed, ok) is { } report) Usage.Track("decode_health", report);
+            if (_decodeHealth.Add(ModeInfo.Name(mode), count, elapsed ?? TimeSpan.Zero, elapsed is not null) is { } report) Usage.Track("decode_health", report);
         };
     }
 
@@ -1685,6 +1695,7 @@ public sealed class AppHost : IAsyncDisposable
         _loop?.Dispose();
         // After the slot thread has stopped posting: a contact still waiting to be written reaches the log.
         _work?.Dispose();
+        _stats?.Dispose();
         _pump?.Dispose();
         _keyboardSim?.Dispose();
         Keyboard?.Dispose();

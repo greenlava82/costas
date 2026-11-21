@@ -21,9 +21,10 @@ namespace Ft8Client.App.Services;
 /// on request. Failures are logged and otherwise ignored: updates are optional.
 /// </summary>
 /// <remarks>
-/// A Velopack install (Windows, since the move to delta updates) downloads only what changed and lets Velopack swap the
-/// files once the app has closed. A classic Inno Setup install downloads a full installer: Velopack's, which moves it to
-/// a Velopack install, or (for releases from before the move) the classic one. Linux opens the release page instead.
+/// A Velopack install (Windows, since the move to delta updates, and the Linux AppImage) downloads only what changed and
+/// lets Velopack swap the files once the app has closed. A classic Inno Setup install downloads a full installer: Velopack's, which moves it to
+/// a Velopack install, or (for releases from before the move) the classic one. The Linux .deb and tarball open the release
+/// page instead.
 /// <para>
 /// With development builds on (Settings, Developer) the check follows the development release that CI replaces with each
 /// green build of main (Velopack's <c>dev</c> channel). Turning them off offers the latest release even though it is
@@ -60,7 +61,7 @@ public sealed class UpdateService : IDisposable
         _apiBase = apiBase;
         _timer = new Timer(_ => _ = CheckAsync(CancellationToken.None));
         // Tests replace the network (handler); Velopack has its own downloads, so they use the classic path.
-        if (OperatingSystem.IsWindows() && handler is null)
+        if ((OperatingSystem.IsWindows() || OperatingSystem.IsLinux()) && handler is null)
         {
             try
             {
@@ -92,19 +93,27 @@ public sealed class UpdateService : IDisposable
     /// <summary>Installed by Velopack, so updates download only what changed.</summary>
     public bool DeltaUpdates => _velopack is not null;
 
-    /// <summary>Velopack's channel for development builds (<c>vpk pack --channel dev</c> in scripts/build-installer.ps1).</summary>
+    /// <summary>
+    /// The development channel: the UpdateChannel a development build carries, and Velopack's channel for Windows
+    /// development builds (<c>vpk pack --channel dev</c> in scripts/build-installer.ps1).
+    /// </summary>
     public const string DevelopmentChannel = "dev";
 
-    // Velopack's default channel on Windows, which releases are packed in.
-    private const string ReleaseChannel = "win";
+    /// <summary>Velopack's channel for Linux development builds (<c>vpk pack --channel linux-dev</c> in scripts/build-linux.sh).</summary>
+    public const string LinuxDevelopmentChannel = "linux-dev";
+
+    // Velopack's channels on this system: releases are packed in its default channel ("win" or "linux").
+    private static string VelopackDevelopmentChannel => OperatingSystem.IsLinux() ? LinuxDevelopmentChannel : DevelopmentChannel;
+
+    private static string ReleaseChannel => OperatingSystem.IsLinux() ? "linux" : "win";
 
     /// <summary>
     /// The running build is a development build: a Velopack install from the dev channel, or a build CI made from a push
     /// to main (<c>COSTAS_CHANNEL=dev</c>, for classic and Linux installs).
     /// </summary>
     public bool RunningDevelopmentBuild =>
-        _velopack is not null && OperatingSystem.IsWindows()
-            ? string.Equals(VelopackChannel(), DevelopmentChannel, StringComparison.OrdinalIgnoreCase)
+        _velopack is not null
+            ? string.Equals(VelopackChannel(), VelopackDevelopmentChannel, StringComparison.OrdinalIgnoreCase)
             : BuiltAsDevelopment;
 
     /// <summary>CI made this build from a push to main, as a development build.</summary>
@@ -312,7 +321,7 @@ public sealed class UpdateService : IDisposable
         new(new GithubSource($"https://github.com/{UpdateChecker.DefaultRepository}", null, development, _downloader),
             new global::Velopack.UpdateOptions
             {
-                ExplicitChannel = development ? DevelopmentChannel : ReleaseChannel,
+                ExplicitChannel = development ? VelopackDevelopmentChannel : ReleaseChannel,
                 AllowVersionDowngrade = allowDowngrade,
             });
 
