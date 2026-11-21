@@ -37,7 +37,10 @@ public sealed record HamlibModel(int Number, string Manufacturer, string Model, 
     /// Hamlib's SmartSDR Slice A to H models (<c>RIG_MODEL_SMARTSDR_A</c> .. <c>_H</c>), which talk to a FlexRadio's own
     /// API over the network.
     /// </summary>
-    public static bool IsSmartSdrSlice(int number) => number is >= 23005 and <= 23012;
+    public static bool IsSmartSdrSlice(int number) => number is >= SmartSdrSliceA and <= SmartSdrSliceA + 7;
+
+    /// <summary>Hamlib's SmartSDR Slice A model; Slice B to H follow it.</summary>
+    public const int SmartSdrSliceA = 23005;
 
     /// <summary>
     /// Whether a Hamlib model number connects over TCP rather than a serial port. Besides the programs with a known

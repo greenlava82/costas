@@ -29,6 +29,26 @@
           <TextBlock Text="Your radio" FontSize="20" FontWeight="SemiBold" />
           <TextBlock Classes="secondary" TextWrapping="Wrap"
                      Text="Choose your radio so the app can set its frequency and key it for transmit. Not connected yet? Press Next and come back from ☰ › Station setup." />
+          <Border IsVisible="{Binding HasFoundRadios}" BorderBrush="{DynamicResource AccentTextBrush}" BorderThickness="1"
+                  CornerRadius="6" Padding="12,10">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Found on your network" FontWeight="SemiBold" />
+              <ItemsControl ItemsSource="{Binding FoundRadios}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:FlexFoundRadio">
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                      <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                      <Button Grid.Column="1" Content="Use this radio" Classes="accent" Margin="12,0,0,0"
+                              Command="{Binding $parent[Window].((vm:SetupViewModel)DataContext).UseFlexRadioCommand}"
+                              CommandParameter="{Binding}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="{Binding FlexNote}" IsVisible="{Binding FlexNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                         TextWrapping="Wrap" Classes="secondary" />
+            </StackPanel>
+          </Border>
           <CheckBox Content="My radio has no CAT control: use audio and VOX only" IsChecked="{Binding AudioOnly}" />
           <TextBlock Text="{Binding ModelListProblem}" IsVisible="{Binding ModelListProblem, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                      TextWrapping="Wrap" Foreground="{DynamicResource AccentTextBrush}" />
