@@ -15,6 +15,13 @@ namespace Ft8Client.Data.Database;
 /// <summary>Opens connections to the app database and applies numbered migrations (<c>PRAGMA user_version</c>).</summary>
 public sealed class SqliteDatabase
 {
+    /// <summary>
+    /// How long a statement waits for another connection's write to finish before it gives up with
+    /// <c>SQLITE_BUSY</c> ("database is locked"). Every connection gets it, as SQLite's own busy timeout and as
+    /// Microsoft.Data.Sqlite's command timeout, so no write fails just because another one is in progress.
+    /// </summary>
+    public static readonly TimeSpan BusyTimeout = TimeSpan.FromSeconds(30);
+
     private static readonly object InitLock = new();
     private static bool _dapperConfigured;
     private readonly string _connectionString;
@@ -25,7 +32,9 @@ public sealed class SqliteDatabase
         ConfigureDapper();
         var dir = Path.GetDirectoryName(Path.GetFullPath(path));
         if (dir is not null) Directory.CreateDirectory(dir);
-        _connectionString = new SqliteConnectionStringBuilder { DataSource = path, Pooling = true, ForeignKeys = true }.ToString();
+        _connectionString = new SqliteConnectionStringBuilder { DataSource = path, Pooling = true, ForeignKeys = true,
+            DefaultTimeout = (int)BusyTimeout.TotalSeconds,
+        }.ToString();
         using var c = Open();
         c.Execute("PRAGMA journal_mode=WAL;");
         Migrate(c);
@@ -41,7 +50,9 @@ public sealed class SqliteDatabase
     public static SqliteDatabase InMemory(out SqliteConnection keepAlive)
     {
         var name = "mem" + Guid.NewGuid().ToString("N");
-        var cs = new SqliteConnectionStringBuilder { DataSource = name, Mode = SqliteOpenMode.Memory, Cache = SqliteCacheMode.Shared, ForeignKeys = true }.ToString();
+        var cs = new SqliteConnectionStringBuilder { DataSource = name, Mode = SqliteOpenMode.Memory, Cache = SqliteCacheMode.Shared, ForeignKeys = true,
+            DefaultTimeout = (int)BusyTimeout.TotalSeconds,
+        }.ToString();
         keepAlive = new SqliteConnection(cs);
         keepAlive.Open();
         var db = new SqliteDatabase(cs, true);
@@ -52,11 +63,16 @@ public sealed class SqliteDatabase
     /// <summary>Highest migration number available.</summary>
     public static int LatestVersion => Scripts().Max(s => s.Version);
 
-    /// <summary>Opens a connection.</summary>
+    /// <summary>
+    /// Opens a connection that waits up to <see cref="BusyTimeout"/> for another writer (the decode thread, a log sync,
+    /// a contact being logged) instead of failing at once. In WAL mode readers never wait for writers.
+    /// </summary>
     public SqliteConnection Open()
     {
         var c = new SqliteConnection(_connectionString);
         c.Open();
+        // Per connection, not per file: a pooled connection keeps it, but setting it again costs nothing.
+        c.Execute($"PRAGMA busy_timeout = {(int)BusyTimeout.TotalMilliseconds};");
         return c;
     }
 

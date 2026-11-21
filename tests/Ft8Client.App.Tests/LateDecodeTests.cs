@@ -109,6 +109,44 @@ public class LateDecodeTests
     }
 
     [Fact]
+    public async Task Reply_SlotDecodedListenerThrows_StillSendsAndOtherListenersHearTheSlot()
+    {
+        // Sentry COSTAS-6: the band statistic listener met a locked database. Its exception skipped the late transmit
+        // plan, the screen and every later listener, then surfaced as an unobserved task exception.
+        var unobserved = new List<Exception>();
+        void OnUnobserved(object? _, UnobservedTaskExceptionEventArgs e)
+        {
+            if (e.Exception.InnerExceptions.Any(x => x.Message.Contains("COSTAS-6 test", StringComparison.Ordinal))) unobserved.Add(e.Exception);
+        }
+        TaskScheduler.UnobservedTaskException += OnUnobserved;
+        try
+        {
+            var r = new Rig();
+            var heard = new List<DateTime>();
+            var audioHeard = 0;
+            r.Session.SlotDecoded += (_, _, _) => throw new Microsoft.Data.Sqlite.SqliteException("SQLite Error 5: 'database is locked'. COSTAS-6 test", 5);
+            r.Session.SlotDecoded += (slot, _, _) => heard.Add(slot);
+            r.Session.SlotAudioDecoded += (_, _) => audioHeard++;
+            await r.CallN8wcrAsync();
+            r.Decoder.Script(ReportSlot, TimeSpan.FromSeconds(2.3), "W7LIT N8WCR -16");
+
+            await r.RunUntilAsync(MySecondSlot.AddSeconds(3));
+
+            r.Sent.Last().Message.Should().Be("N8WCR W7LIT R-09", "the late plan after the decode still runs");
+            heard.Should().Contain([CqSlot, ReportSlot], "a listener after the one that threw still hears every slot");
+            audioHeard.Should().BeGreaterThanOrEqualTo(2);
+            r.Session.Snapshot.RawDecodes.Should().Contain(l => l.Decode.Text == "W7LIT N8WCR -16");
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            unobserved.Should().BeEmpty("no decode task ends with an exception nobody observes");
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= OnUnobserved;
+        }
+    }
+
+    [Fact]
     public async Task Reply_RogerByeDecodedAfterMySlotBegan_Sends73NotRReportAgain()
     {
         var r = new Rig();
