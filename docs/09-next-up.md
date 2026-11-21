@@ -49,6 +49,7 @@ Ordered by value to an FT8 operator against effort. Anything that changes what g
 | C10 | ~~Linux transmit~~ (turned on 2026-10-31, D17); a Linux user checking it with a real radio | Ends the preview label | S |
 | C11 | ~~Desktop notifications for Hunt alerts and callers~~ Done 2026-11-18 (owner request): Windows toasts and Linux D-Bus, merged and rate-limited, background only by default; the Windows toast still to be checked by hand | Hunt alerts reach the operator while another program is in front | M |
 | C12 | ~~Licence-class transmit lockout~~ Done 2026-11-18 (owner request): a US licence class per station profile, and Transmit, Tune and CQ refused outside its data segments | A General or Technician could be let through onto frequencies their licence does not allow | S |
+| C13 | Home Assistant integration (owner request 2026-11-21): Costas publishes an on-air session, transmitting, band, mode and dial to Home Assistant over MQTT discovery, and accepts Halt TX and Inhibit TX back (never commands that start transmission). Phase 1 is the pump interlock; then a pre-TX interlock, then telemetry and QSO/alert events. Spec: https://claude.ai/artifact/4WPuoyHDmfMrKVYVujES2u. Build plan: https://claude.ai/artifact/CECv5wm95A4EafE9b63Pee | RF from the shack trips household loads (the owner's fish pump); Home Assistant can switch them off for exactly the length of an operating session, not every FT8 over | L |
 
 ## Reliability and finishing
 
