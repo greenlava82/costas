@@ -62,7 +62,9 @@ radio.
       **Transmit (PTT)** on **CAT command**. These models need Hamlib 4.6 or newer (Debian 13 and Ubuntu 25.04 have it).
     - **Through RimuCAT**: in RimuCAT, add a port with protocol **Hamlib** (TCP port `4532`) for that slice and keep
       RimuCAT running. In Costas, choose **Hamlib › NET rigctl** with `127.0.0.1:4532` and **CAT command**. If Test
-      connection says *Nothing is listening*, that port is not set up or RimuCAT is not running.
+      connection says *Nothing is listening*, that port is not set up or RimuCAT is not running. If it says the address
+      *accepted the connection* but the radio did not answer, RimuCAT is there but not answering Hamlib: use the
+      direct route above.
 4. In the audio step, choose **rimu.dax.rx1 (PulseAudio)** as **Input** and **rimu.dax.tx (PulseAudio)** as
    **Output**. With the default devices, Costas transmits into your speakers while the radio, keyed, sends silence.
 

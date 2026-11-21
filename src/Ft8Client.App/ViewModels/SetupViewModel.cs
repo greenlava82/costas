@@ -230,22 +230,51 @@ public sealed partial class SetupViewModel : ObservableObject
     public partial string NetworkAddress { get; set; } = "127.0.0.1:4532";
 
     /// <summary>
-    /// What Test connection says when a network model's server does not answer. "Connection refused" means nothing listens
-    /// at that address at all: the program that should provide it is not running, or uses another port. For NET rigctl it
-    /// names the usual providers, and points FlexRadio owners at the SmartSDR Slice models, which need no helper program.
+    /// What Test connection says when a network model's server does not work. <paramref name="reachable"/> is whether a
+    /// plain TCP connection to <paramref name="address"/> got through: when it did not, nothing listens there (the program
+    /// that should provide it is not running, or uses another port); when it did, the program is there but did not answer
+    /// Hamlib. For NET rigctl it names the usual providers and points FlexRadio owners at the SmartSDR Slice models, which
+    /// reach the radio with no helper program.
     /// </summary>
-    internal static string NetworkProblemText(int model, string serverName, string address, string? problem)
+    internal static string NetworkProblemText(int model, string serverName, string address, bool reachable, string? problem)
     {
-        var refused = problem is not null && problem.Contains("refused", StringComparison.OrdinalIgnoreCase);
-        if (!refused)
-            return $"The {serverName} server at {address} did not answer. {problem} Check that {serverName} is running and its listening address and TCP port match.";
-        var text = $"Nothing is listening at {address} (connection refused): the program that should run the {serverName} server is not running, or listens on another address or port.";
+        var text = reachable
+            ? $"{address} accepted the connection, but the radio did not answer through it. {problem} The program there may not answer the commands Hamlib starts with, or may not be connected to the radio."
+            : $"Nothing is listening at {address}: the program that should run the {serverName} server is not running, or listens on another address or port.";
         if (model == 2)
         {
-            text += " Start it first: rigctld, Hamlib Launcher, or the Hamlib port of an SDR program's CAT helper (such as RimuCAT), and keep it running."
-                + " A FlexRadio can also be reached directly, with nothing else running: choose FlexRadio › SmartSDR Slice A (the slice you operate) and the radio's IP address with port 4992.";
+            text += reachable
+                ? " Check the program's own window for errors and which radio or slice its port is for."
+                : " Start it first: rigctld, Hamlib Launcher, or the Hamlib port of an SDR program's CAT helper (such as RimuCAT), and keep it running.";
+            text += " A FlexRadio can also be reached directly, with nothing else running: choose FlexRadio › SmartSDR Slice A (the slice you operate) and the radio's IP address with port 4992.";
+        }
+        else if (reachable)
+        {
+            text += $" Check that {serverName} is connected to the radio.";
         }
         return text;
+    }
+
+    // Whether a TCP connection to host:port gets through within 3 s.
+    private static async Task<bool> CanConnectAsync(string address, CancellationToken ct)
+    {
+        if (!Uri.TryCreate("tcp://" + address, UriKind.Absolute, out var uri)) return false;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(3));
+        try
+        {
+            using var tcp = new System.Net.Sockets.TcpClient();
+            await tcp.ConnectAsync(uri.IdnHost, uri.Port, timeout.Token);
+            return true;
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+            return false;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return false;
+        }
     }
 
     /// <summary>Whether an address contains a host and a valid TCP port.</summary>
@@ -564,12 +593,22 @@ public sealed partial class SetupViewModel : ObservableObject
             if (IsNetwork)
             {
                 Message = $"Connecting to {ServerName} at {NetworkAddress.Trim()}…";
+                // Costas reaches the server through its own rigctld, whose errors are about that hop; a plain connection
+                // first tells "nothing there" apart from "there, but not answering".
+                var reachable = await CanConnectAsync(NetworkAddress.Trim(), ct);
+                if (!reachable)
+                {
+                    Message = string.Empty;
+                    Check(false, NetworkProblemText(Model?.Number ?? 0, ServerName, NetworkAddress.Trim(), reachable: false, null));
+                    return;
+                }
+                Message = $"Connected to {NetworkAddress.Trim()}; waiting for the radio to answer through it (up to 40 s)…";
                 await ApplyDevicesAsync();
                 var (networkState, networkProblem) = await _host.CheckRigAsync(ct);
                 Message = string.Empty;
                 if (networkState is null)
                 {
-                    Check(false, NetworkProblemText(Model?.Number ?? 0, ServerName, NetworkAddress.Trim(), networkProblem));
+                    Check(false, NetworkProblemText(Model?.Number ?? 0, ServerName, NetworkAddress.Trim(), reachable: true, networkProblem));
                     return;
                 }
                 Readback = $"{MainViewModel.FormatFrequency(networkState.FrequencyHz)} MHz {networkState.Mode}";
