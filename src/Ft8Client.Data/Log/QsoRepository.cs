@@ -147,32 +147,25 @@ public sealed class QsoRepository(SqliteDatabase db)
     }
 
     /// <summary>
-    /// Upserts many contacts in one transaction and says what became of each, in order: the id kept and whether it was
+    /// Upserts many contacts, <see cref="BatchSize"/> to a transaction, and says what became of each, in order: the id kept and whether it was
     /// new. Id 0 means a sync record for a contact the operator deleted, which was skipped.
     /// </summary>
     public IReadOnlyList<(long Id, bool Inserted)> UpsertEach(IEnumerable<QsoRecord> records)
     {
-        using var c = db.Open();
-        using var tx = c.BeginTransaction();
-        var results = records.Select(q => Upsert(c, tx, q)).ToList();
-        tx.Commit();
-        if (results.Count > 0) Changed?.Invoke();
+        var results = new List<(long Id, bool Inserted)>();
+        InBatches(records, (c, tx, q) => results.Add(Upsert(c, tx, q)));
         return results;
     }
 
-    /// <summary>Upserts many contacts in one transaction. Returns (inserted, merged).</summary>
+    /// <summary>Upserts many contacts, <see cref="BatchSize"/> to a transaction. Returns (inserted, merged).</summary>
     public (int Inserted, int Merged) UpsertMany(IEnumerable<QsoRecord> records)
     {
-        using var c = db.Open();
-        using var tx = c.BeginTransaction();
         int inserted = 0, merged = 0;
-        foreach (var q in records)
+        InBatches(records, (c, tx, q) =>
         {
             if (Upsert(c, tx, q).Inserted) inserted++;
             else merged++;
-        }
-        tx.Commit();
-        if (inserted + merged > 0) Changed?.Invoke();
+        });
         return (inserted, merged);
     }
 
@@ -197,12 +190,8 @@ public sealed class QsoRepository(SqliteDatabase db)
     /// <summary>Sets the LoTW upload state of contacts.</summary>
     public void SetLotwUploadState(IEnumerable<long> ids, string state)
     {
-        using var c = db.Open();
-        using var tx = c.BeginTransaction();
         var now = DateTime.UtcNow;
-        foreach (var id in ids) c.Execute("UPDATE qso SET lotw_upload_state=@state, modified_utc=@now WHERE id=@id", new { id, state, now }, tx);
-        tx.Commit();
-        Changed?.Invoke();
+        InBatches(ids, (c, tx, id) => c.Execute("UPDATE qso SET lotw_upload_state=@state, modified_utc=@now WHERE id=@id", new { id, state, now }, tx));
     }
 
     /// <summary>
@@ -212,19 +201,15 @@ public sealed class QsoRepository(SqliteDatabase db)
     /// </summary>
     public (int Matched, int Added) ApplyLotwConfirmations(IEnumerable<QsoRecord> confirmations)
     {
-        using var c = db.Open();
-        using var tx = c.BeginTransaction();
         int matched = 0, added = 0;
-        foreach (var q in confirmations)
+        InBatches(confirmations, (c, tx, q) =>
         {
             q.LotwConfirmed = true;
             q.Confirmed = true;
             q.LotwUploadState = Log.UploadState.Uploaded;
             if (Upsert(c, tx, q).Inserted) added++;
             else matched++;
-        }
-        tx.Commit();
-        if (matched + added > 0) Changed?.Invoke();
+        });
         return (matched, added);
     }
 
@@ -272,6 +257,37 @@ public sealed class QsoRepository(SqliteDatabase db)
     /// <summary>Maps a row to the index form.</summary>
     public static LogContact ToLogContact(QsoRecord q) =>
         new(q.Call, q.Band, LogModeKey.Of(q.Mode, q.Submode), q.Gridsquare, q.EntityKey, q.State, q.Confirmed, q.QsoDateOn, q.LotwConfirmed);
+
+    /// <summary>
+    /// Records per transaction in the batch methods (imports, syncs, LoTW). Each batch commits before the next begins, so
+    /// a large import gives the write lock back many times a second and a contact being logged, or a decode's band
+    /// statistic, never waits behind the whole import (Sentry COSTAS-6). Every record is an upsert, so an import cut
+    /// short by an error leaves no duplicates when it runs again.
+    /// </summary>
+    public const int BatchSize = 200;
+
+    // The next batch is read before its transaction begins: an enumerable that does slow work (parsing, a lookup) never
+    // does it while the write lock is held.
+    private void InBatches<T>(IEnumerable<T> items, Action<SqliteConnection, SqliteTransaction, T> each)
+    {
+        var committed = false;
+        try
+        {
+            using var c = db.Open();
+            foreach (var batch in items.Chunk(BatchSize))
+            {
+                using var tx = c.BeginTransaction();
+                foreach (var item in batch) each(c, tx, item);
+                tx.Commit();
+                committed = true;
+            }
+        }
+        finally
+        {
+            // Also when a later batch failed: the batches before it are in the log, and the screen should show them.
+            if (committed) Changed?.Invoke();
+        }
+    }
 
     private static long Insert(SqliteConnection c, SqliteTransaction? tx, QsoRecord q)
     {

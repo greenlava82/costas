@@ -569,7 +569,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         {
             result = new DecodeResult([], TimeSpan.Zero, DecodeStatus.Failed, ex.Message);
         }
-        if (ApplyDecodes(audio.SlotStartUtc, audio.Mode, result)) SlotAudioDecoded?.Invoke(audio, result.Decodes.Count);
+        if (ApplyDecodes(audio.SlotStartUtc, audio.Mode, result)) Listeners.Raise(SlotAudioDecoded, audio, result.Decodes.Count, nameof(SlotAudioDecoded));
     }
 
     /// <summary>A dial move of more than this re-tunes the receiver: a slot recorded across it is not used (evaluation B7).</summary>
@@ -623,7 +623,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
 
             _hearsMe.Prune(now);
         }
-        SlotDecoded?.Invoke(slot, mode, result.Decodes);
+        Listeners.Raise(SlotDecoded, slot, mode, result.Decodes, nameof(SlotDecoded));
         // Decodes that arrive after the next slot has begun may still change (or start) its transmission
         // while its audio has not started, up to the late-start limit.
         PlanFor(SlotMath.SlotStart(_clock.UtcNow, mode), mode, late: true);
@@ -660,7 +660,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             TrimRaw();
         }
         Publish();
-        if (heard.Count > 0) KeyboardHeard?.Invoke(mode, heard);
+        if (heard.Count > 0) Listeners.Raise(KeyboardHeard, mode, heard, nameof(KeyboardHeard));
     }
 
     // Raw decode lines, each message of a slot once: the early pass shows its decodes before the full decode lists them again.
@@ -801,7 +801,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         // On the slot thread, which also releases PTT: the journal, the other listeners and the screen wait their turn.
         Defer(() =>
         {
-            Transmitting?.Invoke(tx, startedUtc);
+            Listeners.Raise(Transmitting, tx, startedUtc, nameof(Transmitting));
             Publish();
         });
     }
@@ -1306,7 +1306,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         _tx.CancelPending();
         if (_keys.Active || _tx.Transmitting) _ = _tx.HaltAsync();
         _keys.EndIfNotOnAir();
-        BandChanged?.Invoke();
+        Listeners.Raise(BandChanged, nameof(BandChanged));
         Publish();
     }
 
@@ -1764,6 +1764,6 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             };
             _snapshot = snap;
         }
-        Changed?.Invoke(snap);
+        Listeners.Raise(Changed, snap, nameof(Changed));
     }
 }
