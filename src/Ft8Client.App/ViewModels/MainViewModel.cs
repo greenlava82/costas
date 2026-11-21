@@ -109,7 +109,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         };
         _ = heard.Refresh();
         Update = new UpdateBarViewModel(host.Updates, () => host.Session.Snapshot.Transmitting || host.Session.Snapshot.Contact is { Outcome: ContactOutcome.InProgress },
-            () => Shutdown(), version => ShowUpdateSplash(version));
+            () => Shutdown(), version => ShowUpdateSplash(version), (name, props) => host.Usage?.Track(name, props));
         Logged = new LoggedNoticeViewModel(() => host.Clock.UtcNow, new LoggedContactStore(host.Qsos, host.Countries, host.LogHold, host.RebuildLogIndex));
         Mini = new MiniViewModel(Operate, this, () => HaltCommand.Execute(null));
         Mini.HuntDismissed += () => HuntDismissCommand.Execute(null);
@@ -1063,6 +1063,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         Activity();
         _escArmed = false;
         _host.Session.SendMacro(key);
+        _host.Usage.Track("macro_sent", new Dictionary<string, object> { ["mode"] = SelectedMode, ["key"] = key });
     }
 
     /// <inheritdoc />

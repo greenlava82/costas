@@ -17,7 +17,7 @@ namespace Ft8Client.App.Services;
 public static class UsageEvents
 {
     /// <summary>"app_started": how the station is set up and which optional features are on.</summary>
-    public static Dictionary<string, object> Started(AppSettings s, bool decoderFound)
+    public static Dictionary<string, object> Started(AppSettings s, bool decoderFound, StartFacts? facts = null)
     {
         var rig = s.Profile.Rig;
         var p = new Dictionary<string, object>
@@ -42,7 +42,18 @@ public static class UsageEvents
             ["remote"] = OnOff(s.Remote.Enabled),
             ["hunt_entries"] = s.Hunt.Targets.Count,
             ["auto_update"] = OnOff(s.Updates.CheckEnabled),
+            ["layout"] = s.Appearance.Layout,
+            ["profiles"] = s.Profiles.Count,
+            ["remote_sign_in"] = OnOff(s.Remote.Enabled && s.Remote.RequireSignIn),
         };
+        if (facts is not null)
+        {
+            p["install"] = facts.Install;
+            p["channel"] = facts.Channel;
+            p["install_age"] = UsageHistory.AgeBucket(facts.AgeDays);
+            p["active_days_30"] = facts.ActiveDays30;
+            p["features_tried"] = facts.FeaturesTried;
+        }
         // The Hamlib model number says which radios Costas is used with; it is the same for every owner of that model.
         if (rig.Mode == RigModes.Hamlib && rig.Model is { } model) p["rig_model"] = model.ToString(CultureInfo.InvariantCulture);
         return p;
@@ -54,6 +65,35 @@ public static class UsageEvents
         ["band"] = band,
         ["mode"] = mode,
     };
+
+    /// <summary>How long a run lasted, as a range such as "30-60m".</summary>
+    public static string RunLength(TimeSpan t) => t.TotalMinutes switch
+    {
+        < 5 => "<5m",
+        < 30 => "5-30m",
+        < 60 => "30-60m",
+        < 120 => "1-2h",
+        < 240 => "2-4h",
+        < 480 => "4-8h",
+        < 1440 => "8-24h",
+        _ => "24h+",
+    };
+
+    /// <summary>A count capped at <paramref name="max"/>, so a rare large number cannot single out a station.</summary>
+    public static int Capped(int n, int max = 100) => Math.Clamp(n, 0, max);
+
+    /// <summary>
+    /// The kind of device a remote page runs on, from its browser's User-Agent: phone, tablet or computer (an iPad that
+    /// asks for desktop pages reads as a computer). Only the kind is kept, never the string.
+    /// </summary>
+    public static string DeviceKind(string? userAgent)
+    {
+        var ua = userAgent ?? string.Empty;
+        bool Has(string s) => ua.Contains(s, StringComparison.OrdinalIgnoreCase);
+        if (Has("iPad") || Has("Tablet") || (Has("Android") && !Has("Mobile"))) return "tablet";
+        if (Has("iPhone") || Has("Mobile") || Has("Android")) return "phone";
+        return "computer";
+    }
 
     private static string OnOff(bool on) => on ? "on" : "off";
 }

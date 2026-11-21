@@ -456,15 +456,35 @@ What is sent:
 - the band and mode you are on, and whether your radio is connected through Hamlib, VOX or not at all, with the Hamlib
   model number (the same number for every owner of that radio);
 - which optional features are switched on (QRZ logbook, LoTW, eQSL, PSK Reporter, POTA spots, other programs, the
-  phone remote) and how many entries your Hunt list has;
-- which views and windows you open, and when you call CQ, call or answer a station, use Tune or a Hunt list alert,
-  and log a contact (band and mode only).
+  phone remote), your Operate layout, how many station profiles you have and how many entries your Hunt list has;
+- how Costas was installed (installer, .deb, AppImage or an unpacked folder) and whether it is a release or a
+  development build;
+- which views and windows you open, and when you call CQ, call or answer a station, use Tune, a macro key (its number
+  only), auto-call, contest mode or a Hunt list alert, and log a contact (band and mode only);
+- how Station setup goes: which steps you reach or skip, whether the radio test found the radio (or why not, such as no
+  ports or a port in use) and whether the test tone was sent;
+- whether the radio connected when Costas opened it, or the kind of reason it did not;
+- when a transmission is refused, the kind of reason (clock off, outside the band, audio output muted, radio fault),
+  and when the SWR stop ends one;
+- whether an update installed or failed, and when an online service (QRZ, LoTW, eQSL, Club Log, Wavelog/Cloudlog, PSK
+  Reporter and the spot feeds) stops or starts working;
+- once an hour of decoding, how many slots were decoded, how many decodes they had on average and how long a decode
+  took (rounded to a tenth of a second);
+- when the phone remote connects, whether it is a phone, tablet or computer and whether it came over your home network
+  or Tailscale, and which of its buttons are used;
+- when you close Costas, roughly how long it was open (such as "1-2h") and how many contacts it logged (up to 100);
+- roughly how long ago Costas was first used with statistics on (such as "8-30 days"), on how many of the last 30
+  days it was used, and the first time each feature is used on this computer.
 
 What is never sent: your callsign, grid, name, frequencies, serial ports or network addresses, the stations you hear or
 work, or anything from your log. There is no account and no tracking id; each run of Costas is a separate anonymous
 session.
 
-Nothing is sent while your computer is offline. Counts wait in memory (never on disk) and go out when the network is
+To work out the install age, the active days and "first time a feature is used", Costas keeps a small file,
+`usage-history.json`, next to your log. It holds only dates (the first day and the days Costas ran in the last 60)
+and the names of the features used; it is never sent as it is, and it is only updated while statistics are on.
+
+Nothing is sent while your computer is offline. Counts wait in memory and go out when the network is
 back; anything still waiting when you close Costas is dropped. Statistics are never sent in simulation, and builds you
 make yourself from the source send nothing at all.
 

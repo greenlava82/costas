@@ -66,6 +66,9 @@ public sealed class UsageReporter : IAsyncDisposable
     /// <summary>True when this build can send at all (it was built with an Aptabase app key).</summary>
     public bool Available => _client is not null;
 
+    /// <summary>True while statistics may be recorded (switched on, not simulating).</summary>
+    public bool Allowed => _allowed();
+
     /// <summary>Events waiting to be sent.</summary>
     public int Queued => _queue.Count;
 

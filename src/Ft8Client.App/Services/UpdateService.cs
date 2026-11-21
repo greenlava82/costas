@@ -152,6 +152,22 @@ public sealed class UpdateService : IDisposable
     public string? FailedUpdate { get; private set; }
 
     /// <summary>
+    /// Set at start when Costas closed for an update last time: "installed" when this is the version it was updating to,
+    /// "failed" when it is not. Null when there was no update. Read for the usage statistics.
+    /// </summary>
+    public string? LastUpdateResult { get; private set; }
+
+    /// <summary>How this copy was installed: velopack, classic (Inno Setup), deb, appimage, or folder (unpacked).</summary>
+    public string InstallKind =>
+        OperatingSystem.IsWindows() ? (_velopack is not null ? "velopack" : "classic")
+        : AppContext.BaseDirectory.StartsWith("/opt/costas", StringComparison.Ordinal) ? "deb"
+        : !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("APPIMAGE")) ? "appimage"
+        : "folder";
+
+    /// <summary>"dev" for a development build, otherwise "release".</summary>
+    public string ChannelName => RunningDevelopmentBuild ? "dev" : "release";
+
+    /// <summary>
     /// What to say when Costas closed to install <paramref name="pendingVersion"/> and <paramref name="running"/> is what
     /// started afterwards; null when there was no update, or it took.
     /// </summary>
@@ -174,6 +190,7 @@ public sealed class UpdateService : IDisposable
         var pending = _settings.Current.Updates.PendingVersion;
         if (pending is null) return;
         FailedUpdate = FailedUpdateText(pending, AppInfo.Version);
+        LastUpdateResult = FailedUpdate is null ? "installed" : "failed";
         if (FailedUpdate is not null) Log.Warning("Update to {Wanted} did not install; still running {Version}", pending, AppInfo.Version);
         TrySave(s => s.Updates.PendingVersion = null);
     }

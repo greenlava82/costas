@@ -70,7 +70,20 @@ public sealed partial class SetupViewModel : ObservableObject
         QrzPassword = host.Secrets.Get(SecretNames.QrzPassword) ?? string.Empty;
         UploadSpots = s.PskReporter.UploadSpots;
         _ = LoadModelsAsync(s.Profile.Rig.Model);
+        Track("setup_opened", "first_time", s.SetupComplete ? "no" : "yes");
     }
+
+    // Usage statistics for the wizard: which steps are reached and how the radio and transmit tests go. Choices and
+    // results only; never the callsign, grid, port, address or QRZ details.
+    private int _furthest;
+    private bool _skipping;
+    private bool _finished;
+
+    private void Track(string name, string key, string value) => _host.Usage?.Track(name, key, value);
+
+    private void Track(string name, Dictionary<string, object> props) => _host.Usage?.Track(name, props);
+
+    private string RadioKind => AudioOnly ? "vox" : Model is null ? "none" : IsNetwork ? "network" : "serial";
 
     /// <summary>Raised when the wizard closes.</summary>
     public event Action? Close;
@@ -439,6 +452,11 @@ public sealed partial class SetupViewModel : ObservableObject
 
     partial void OnStepChanged(int value)
     {
+        if (value > _furthest && value < StepNames.Count)
+        {
+            _furthest = value;
+            Track("setup_step", new Dictionary<string, object> { ["step"] = StepNames[value], ["skipped"] = _skipping ? "yes" : "no" });
+        }
         Message = string.Empty;
         if (value == 2) StartMonitor();
         else StopMonitor();
@@ -497,8 +515,14 @@ public sealed partial class SetupViewModel : ObservableObject
     private async Task SkipAsync()
     {
         if (Busy) return;
-        if (Step == 5) await FinishAsync();
-        else Step++;
+        if (Step == 5)
+        {
+            await FinishAsync();
+            return;
+        }
+        _skipping = true;
+        Step++;
+        _skipping = false;
     }
 
     /// <summary>
@@ -548,6 +572,7 @@ public sealed partial class SetupViewModel : ObservableObject
                 await ApplyDevicesAsync();
                 var (networkState, networkProblem) = await _host.CheckRigAsync(ct);
                 Message = string.Empty;
+                Track("setup_radio_test", RadioTestProps(networkState is null ? "no_answer" : "ok"));
                 if (networkState is null)
                 {
                     Check(false, $"The {ServerName} server at {NetworkAddress.Trim()} did not answer. {networkProblem} Check that {ServerName} is running and its listening address and TCP port match.");
@@ -594,6 +619,7 @@ public sealed partial class SetupViewModel : ObservableObject
                 Message = string.Empty;
                 if (hit is not { } h)
                 {
+                    Track("setup_radio_test", RadioTestProps(ports.Count == 0 && busy.Count == 0 ? "no_ports" : busy.Count > 0 ? "port_busy" : "not_found"));
                     await ApplyDevicesAsync();
                     if (busy.Count > 0)
                         Check(false, $"{string.Join(", ", busy)} {(busy.Count == 1 ? "is" : "are")} in use by another program. Close WSJT-X, JTDX, Flrig, OmniRig or the radio's own software, then test again.");
@@ -609,6 +635,7 @@ public sealed partial class SetupViewModel : ObservableObject
             await ApplyDevicesAsync();
             var (state, problem) = await _host.CheckRigAsync(ct);
             Message = string.Empty;
+            Track("setup_radio_test", RadioTestProps(state is null ? "no_answer" : "ok"));
             if (state is null)
             {
                 Check(false, $"The radio did not answer on {Port} at {Baud} baud. {problem} {NoAnswerAdvice}");
@@ -621,6 +648,7 @@ public sealed partial class SetupViewModel : ObservableObject
         catch (OperationCanceledException)
         {
             Message = string.Empty;
+            Track("setup_radio_test", RadioTestProps("stopped"));
             Check(false, "Test stopped.");
             await ApplyDevicesAsync();
         }
@@ -630,6 +658,13 @@ public sealed partial class SetupViewModel : ObservableObject
             scan.Dispose();
             Busy = false;
         }
+    }
+
+    private Dictionary<string, object> RadioTestProps(string result)
+    {
+        var p = new Dictionary<string, object> { ["result"] = result, ["link"] = RadioKind };
+        if (Model is not null) p["rig_model"] = Model.Number.ToString(CultureInfo.InvariantCulture);
+        return p;
     }
 
     /// <summary>Stops a running connection test.</summary>
@@ -722,12 +757,14 @@ public sealed partial class SetupViewModel : ObservableObject
             var why = await _host.Transmitter.TuneAsync(1500, 2.0, new Engine.TxGuardInput(band, dial, s.ClockOffsetSeconds, 100, rigFault, true));
             if (why is not null)
             {
+                Track("setup_tone", "result", "refused");
                 Message = "No tone was sent. " + why;
                 return;
             }
             Message = "Sending a 2-second tone at 1500 Hz…";
             await Task.Delay(500);
             var ptt = await _host.Rig.ReadPttAsync(CancellationToken.None);
+            Track("setup_tone", new Dictionary<string, object> { ["result"] = "sent", ["ptt"] = ptt switch { true => "on", false => "off", null => "unknown" } });
             var keyed = ptt switch
             {
                 true => "The radio reported transmit during the tone.",
@@ -876,12 +913,24 @@ public sealed partial class SetupViewModel : ObservableObject
             _host.Qrz.SyncProgress += n => MainViewModel.Dispatch(() => SyncProgress = $"{n} contacts fetched");
             Message = await _host.Qrz.SyncNowAsync(CancellationToken.None);
         }
+        _finished = true;
+        Track("setup_finished", new Dictionary<string, object>
+        {
+            ["radio"] = RadioKind,
+            ["tone_confirmed"] = ToneConfirmed ? "yes" : "no",
+            ["qrz_logbook"] = string.IsNullOrWhiteSpace(LogbookKey) ? "off" : "on",
+            ["qrz_lookup"] = string.IsNullOrWhiteSpace(QrzUser) ? "off" : "on",
+        });
         StopMonitor();
         Close?.Invoke();
     }
 
     /// <summary>Stops the input meter; called when the window closes by any route.</summary>
-    public void Closed() => StopMonitor();
+    public void Closed()
+    {
+        StopMonitor();
+        if (!_finished) Track("setup_closed", "step", StepNames[Math.Clamp(Step, 0, StepNames.Count - 1)]);
+    }
 
     /// <summary>
     /// Plays one second of silence to the chosen output and checks the device consumed it. Silence, so it cannot trip

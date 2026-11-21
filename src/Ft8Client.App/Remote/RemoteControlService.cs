@@ -73,6 +73,9 @@ public sealed class RemoteControlService : IAsyncDisposable
     /// <summary>Raised when the server starts or stops, a phone connects, or control changes hands.</summary>
     public event Action? Changed;
 
+    /// <summary>Usage events from the remote page (see <see cref="RemoteServer.Usage"/>).</summary>
+    public event Action<string, IReadOnlyDictionary<string, object>?>? Usage;
+
     /// <summary>The rules: pairing, control and commands.</summary>
     public RemoteControl Control { get; }
 
@@ -164,6 +167,7 @@ public sealed class RemoteControlService : IAsyncDisposable
                 var server = new RemoteServer(Control, StateFor,
                     () => System.Net.IPAddress.TryParse(_settings.Current.Remote.TrustedProxy?.Trim(), out var a) ? a : null);
                 server.LoopbackNoticed += () => Changed?.Invoke();
+                server.Usage += (name, props) => Usage?.Invoke(name, props);
                 try
                 {
                     await server.StartAsync(o.Port).ConfigureAwait(false);

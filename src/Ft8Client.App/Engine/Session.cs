@@ -569,6 +569,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         {
             result = new DecodeResult([], TimeSpan.Zero, DecodeStatus.Failed, ex.Message);
         }
+        if (result.Status != DecodeStatus.Cancelled) FullDecodeFinished?.Invoke(audio.Mode, result.Decodes.Count, result.Elapsed, result.Succeeded);
         if (ApplyDecodes(audio.SlotStartUtc, audio.Mode, result)) SlotAudioDecoded?.Invoke(audio, result.Decodes.Count);
     }
 
@@ -1445,9 +1446,24 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// <summary>Sets a service status.</summary>
     public void SetService(string name, ServiceStatus status)
     {
-        lock (_gate) _services[name] = status;
+        bool changed;
+        lock (_gate)
+        {
+            changed = !_services.TryGetValue(name, out var was) || was.Health != status.Health;
+            _services[name] = status;
+        }
         Publish();
+        if (changed) ServiceHealthChanged?.Invoke(name, status.Health);
     }
+
+    /// <summary>Raised after <see cref="SetService"/> changes a service's health (for the usage statistics).</summary>
+    public event Action<string, ServiceHealth>? ServiceHealthChanged;
+
+    /// <summary>
+    /// Raised after each full FT8/FT4 decode with the mode, the number of decodes, how long it took and whether it
+    /// succeeded (for the usage statistics).
+    /// </summary>
+    public event Action<Mode, int, TimeSpan, bool>? FullDecodeFinished;
 
     /// <summary>
     /// Clears the fault line when it is about <paramref name="cause"/> (a device that has come back). Any other fault stays.

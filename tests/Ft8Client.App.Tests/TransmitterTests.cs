@@ -233,6 +233,31 @@ public class TransmitterTests
         r.Out.Played.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Refused_DisabledAndOutOfBand_RaisesTheKindOfReason()
+    {
+        var r = new Rig();
+        var kinds = new List<string>();
+        r.Tx.Refused += kinds.Add;
+
+        r.Tx.Prepare(new TxPlan(Slot, "CQ W7LIT DN40", null, null), Mode.Ft8, 1500, Guard(band: "20m", dial: 14_349_000), out _).Should().BeNull();
+        r.Tx.DisabledReason = "receive-only preview";
+        await r.Tx.TuneAsync(1500, 2.0, Guard());
+
+        kinds.Should().Equal("band_edge", "disabled");
+    }
+
+    [Fact]
+    public void Refused_ClockOff_RaisesClock()
+    {
+        var r = new Rig();
+        var kinds = new List<string>();
+        r.Tx.Refused += kinds.Add;
+        r.Tx.Prepare(new TxPlan(Slot, "CQ W7LIT DN40", null, null), Mode.Ft8, 1500, Guard(clockOffset: 3.5), out var why).Should().BeNull();
+        why.Should().NotBeNull();
+        kinds.Should().Equal("clock");
+    }
+
     [Theory]
     [InlineData("30m", 10_148_000L, 2000, "outside")]
     [InlineData("20m", 14_349_000L, 1500, "outside")]
