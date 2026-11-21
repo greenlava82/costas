@@ -63,6 +63,18 @@ public sealed class RemoteServer : IAsyncDisposable
     /// <summary>Raised the first time <see cref="LoopbackSeen"/> becomes true.</summary>
     public event Action? LoopbackNoticed;
 
+    /// <summary>
+    /// Usage events: "remote_connected" (device kind, home network or Tailscale or proxy, signed in or paired) and
+    /// "remote_action" (which button). Never an address, device id, username or callsign.
+    /// </summary>
+    public event Action<string, IReadOnlyDictionary<string, object>?>? Usage;
+
+    // Commands that are an operator's action worth counting; pings, offset drags and page navigation are not.
+    private static readonly HashSet<string> CountedCommands = new(StringComparer.Ordinal)
+    {
+        "halt", "abandon", "call", "answer", "answerAfter", "dismiss", "cq", "cqStop", "resend", "macro", "logNow", "band", "power", "tune", "radio",
+    };
+
     /// <summary>Starts listening on <paramref name="port"/> on every interface. Throws IOException when the port is taken.</summary>
     public async Task StartAsync(int port)
     {
@@ -283,6 +295,14 @@ public sealed class RemoteServer : IAsyncDisposable
             return;
         }
         var deviceId = identity.DeviceId;
+        var proxyHeaders = (ProxyHeaders)ctx.Items[ProxyKey]!;
+        Usage?.Invoke("remote_connected", new Dictionary<string, object>
+        {
+            ["device"] = Services.UsageEvents.DeviceKind(ctx.Request.Headers.UserAgent.ToString()),
+            ["via"] = LocalNetwork.IsTailscale(ctx.Connection.RemoteIpAddress) || LocalNetwork.IsTailscale(ctx.Connection.LocalIpAddress) ? "tailscale"
+                : proxyHeaders.Proxied ? "proxy" : "lan",
+            ["signed_in"] = identity.Username is null ? "no" : "yes",
+        });
         var client = new Client(socket, deviceId, token!);
         var id = Guid.NewGuid();
         _clients[id] = client;
@@ -311,6 +331,7 @@ public sealed class RemoteServer : IAsyncDisposable
                 try
                 {
                     note = await _control.HandleAsync(deviceId, cmd).ConfigureAwait(false);
+                    if (CountedCommands.Contains(cmd.Type)) Usage?.Invoke("remote_action", new Dictionary<string, object> { ["action"] = cmd.Type });
                     if (cmd.Type != "ping") state = _state(deviceId);
                 }
                 catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)

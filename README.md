@@ -128,7 +128,8 @@ Its source is in [`manual/`](manual/) if you prefer to read it here.
 
 Costas sends anonymous usage statistics to [Aptabase](https://aptabase.com) so its developer can see how many people
 use it and which features matter. It sends the Costas version, Windows or Linux, the band and mode, the kind of radio
-connection and Hamlib model number, which optional features are on, and which views and actions you use. It never
+connection and Hamlib model number, which optional features are on, which views and actions you use, how setup,
+the radio connection, updates and the online services go, and coarse figures such as how long a run lasted. It never
 sends your callsign, grid, name, frequencies, the stations you hear or work, or anything from your log, and there is no
 account or tracking id. Nothing is sent while you are offline, in simulation, or from a build you make yourself.
 

@@ -365,7 +365,32 @@ Privacy. Owner decision 2026-10-15.
   back off up to 30 minutes; whatever is waiting at exit gets one 3-second attempt and is then dropped.
 - Events: `app_started` (settings snapshot, see `UsageEvents`), `app_running` (once a UTC day for long runs),
   `band_changed`, `view_opened`, `window_opened`, `cq_started`, `station_called`, `caller_answered`, `caller_dismissed`, `call_when_free`, `auto_call_started`, `tune`,
-  `hunt_go`, `cluster_go`, `hunt_added`, `contact_logged`. Never a callsign, grid, name, frequency, port, address or log content.
+  `hunt_go`, `cluster_go`, `hunt_added`, `contact_logged`, `contest_start`, `contest_export`. Never a callsign, grid, name, frequency, port, address or log content.
+- Added 2026-11-21 (owner request: evaluate what each feature is worth):
+  - `app_started` also carries `install` (velopack, classic, deb, appimage, folder), `channel` (release, dev), `layout`,
+    `profiles`, `remote_sign_in`, `install_age` (range: 0d, 1-7d, 8-30d, 31-90d, 91-365d, 365d+), `active_days_30` and
+    `features_tried`.
+  - Setup wizard: `setup_opened` (`first_time`), `setup_step` (`step`, `skipped`), `setup_radio_test` (`result`: ok,
+    no_answer, not_found, no_ports, port_busy, stopped; `link`; `rig_model`), `setup_tone` (`result`, `ptt`),
+    `setup_finished` (`radio`, `tone_confirmed`, `qrz_logbook`, `qrz_lookup`), `setup_closed` (`step`).
+  - `radio_connect` (`rig`, `rig_model`, `result`: ok, failed, recovered, not_set_up, rigctld_missing, no_model, no_port,
+    wrong_port_type), once per open, not per retry.
+  - `tx_refused` (`reason`: disabled, no_audio, output_dead, output_muted, radio_fault, clock, band_edge, message;
+    `mode`), at most once an hour per reason; `tx_stopped` (`reason` swr).
+  - `update_result` (`result` installed or failed, at the next start), `update_started` (`kind` delta, full or page),
+    `update_failed` (`stage` download or apply), each with `install` and `channel`.
+  - `service_status` (`service`, `health` ok, degraded or down) for the logbooks and online feeds, on a change, at most
+    once an hour per service and health.
+  - `decode_health` per mode every 240 full decodes: `slots`, `failed_pct`, `avg_decodes`, `median_decode_ms` (to 100 ms).
+  - `remote_connected` (`device` phone, tablet or computer from the User-Agent; `via` lan, tailscale or proxy;
+    `signed_in`) and `remote_action` (`action`, the command name; no pings, offsets or navigation).
+  - `macro_sent` (`mode`, `key` number only).
+  - `app_closed` (`length` range, `contacts` capped at 100), in the last 3-second send at exit, so some are lost.
+  - `feature_first_use` (`feature`, `install_age`): the first time each tracked event (views and windows by name,
+    logged contacts by mode) happens on this computer.
+  - Install age, active days and first use come from `<data>/usage-history.json` (first day, the UTC days run in the last
+    60, feature names), written only while statistics are on and never sent as it is. It is not an id: nothing in it
+    is unique to the computer.
 
 ## 10b. Problem reports (Formspree)
 

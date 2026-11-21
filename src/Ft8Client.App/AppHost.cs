@@ -81,6 +81,28 @@ public sealed class AppHost : IAsyncDisposable
     private string? _outputId;
     private string? _audioProblem;
     private DateTime _usageDay;
+    private DateTime _usageStartedUtc;
+    private int _usageContacts;
+    private UsageHistory? _usageHistory;
+    private Dictionary<string, object>? _pendingRadioUsage;
+    private readonly UsageThrottle _usageThrottle = new(TimeSpan.FromHours(1));
+    private readonly DecodeHealthStats _decodeHealth = new();
+
+    // Usage events whose first use on this computer is reported once ("feature_first_use"), to see how many installs
+    // ever try each feature. Views and windows count by name, logged contacts by mode.
+    private static readonly HashSet<string> TrackedFeatures = new(StringComparer.Ordinal)
+    {
+        "station_called", "cq_started", "caller_answered", "caller_dismissed", "call_when_free", "auto_call_started", "hunt_added",
+        "hunt_go", "cluster_go", "tune", "contest_start", "contest_export", "macro_sent", "remote_connected", "remote_action", "view_opened",
+        "window_opened", "contact_logged",
+    };
+
+    // Services whose health changes are counted: the logbooks and the online feeds.
+    private static readonly HashSet<string> TrackedServices = new(StringComparer.Ordinal)
+    {
+        ServiceNames.Qrz, ServiceNames.Lotw, ServiceNames.Eqsl, ServiceNames.ClubLog, ServiceNames.Cloudlog, ServiceNames.Psk,
+        ServiceNames.Rbn, ServiceNames.Cluster, ServiceNames.Pota, ServiceNames.Dxpeditions, ServiceNames.LogCopy,
+    };
     private TaskCompletionSource _clockRecheck = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private AppHost(CommandLine args, AppPaths paths, AppSettingsAccessor settings)
@@ -565,6 +587,7 @@ public sealed class AppHost : IAsyncDisposable
             Bands = Frequencies.Bands,
             Hunt = () => this.Hunt.Recent().FirstOrDefault() is { } h ? Core.Hunting.HuntText.Alert(h, Countries, SettingsMapper.Units(Settings.Current)) : null,
         }, RadioPower, RadioControls, SwitchProfileForRemoteUser);
+        Remote.Usage += (name, props) => Usage?.Track(name, props);
         Remote.Start();
 
         if (!Simulating)
@@ -640,15 +663,100 @@ public sealed class AppHost : IAsyncDisposable
             _disposables.Add(http);
             client = new AptabaseClient(http, key);
         }
-        Usage = new UsageReporter(client, () => !Simulating && Settings.Current.Usage.Enabled, () => Clock.UtcNow, mirror: CrashReporter.Count);
+        Usage = new UsageReporter(client, () => !Simulating && Settings.Current.Usage.Enabled, () => Clock.UtcNow, mirror: (name, props) =>
+        {
+            CrashReporter.Count(name, props);
+            NoteFirstUse(name, props);
+        });
         Usage.Start();
         _usageDay = Clock.UtcNow.Date;
+        _usageStartedUtc = Clock.UtcNow;
         TrackStarted();
-        log.Stored += q => Usage.Track("contact_logged", UsageEvents.BandMode(q.Band, q.Mode));
+        if (Updates.LastUpdateResult is { } updated)
+            Usage.Track("update_result", new Dictionary<string, object> { ["result"] = updated, ["install"] = Updates.InstallKind, ["channel"] = Updates.ChannelName });
+        if (_pendingRadioUsage is { } radio) Usage.Track("radio_connect", radio);
+        _pendingRadioUsage = null;
+        log.Stored += q =>
+        {
+            Interlocked.Increment(ref _usageContacts);
+            Usage.Track("contact_logged", UsageEvents.BandMode(q.Band, q.Mode));
+        };
+        // A guard refusing every slot, or a service going up and down, counts once an hour.
+        Transmitter.Refused += reason =>
+        {
+            if (_usageThrottle.Allow("tx:" + reason, Clock.UtcNow))
+                Usage.Track("tx_refused", new Dictionary<string, object> { ["reason"] = reason, ["mode"] = Settings.Current.Operating.Mode });
+        };
+        TxMeters.SwrTripped += _ => Usage.Track("tx_stopped", new Dictionary<string, object> { ["reason"] = "swr", ["mode"] = Settings.Current.Operating.Mode });
+        Session.ServiceHealthChanged += (name, health) =>
+        {
+            if (!TrackedServices.Contains(name) || health == ServiceHealth.Off) return;
+            var h = health.ToString().ToLowerInvariant();
+            if (_usageThrottle.Allow($"svc:{name}:{h}", Clock.UtcNow))
+                Usage.Track("service_status", new Dictionary<string, object> { ["service"] = name, ["health"] = h });
+        };
+        Session.FullDecodeFinished += (mode, count, elapsed) =>
+        {
+            if (_decodeHealth.Add(ModeInfo.Name(mode), count, elapsed ?? TimeSpan.Zero, elapsed is not null) is { } report) Usage.Track("decode_health", report);
+        };
     }
 
-    /// <summary>Records the start of this run.</summary>
-    private void TrackStarted() => Usage.Track("app_started", UsageEvents.Started(Settings.Current, Jt9Path is not null));
+    /// <summary>Records the start of this run, with the install facts and adoption figures kept on this computer.</summary>
+    private void TrackStarted()
+    {
+        StartFacts? facts = null;
+        if (Usage.Allowed)
+        {
+            var history = UsageHistoryFile();
+            lock (history)
+            {
+                if (history.Touch(Clock.UtcNow)) history.Save(UsageHistoryPath);
+                facts = new StartFacts(Updates.InstallKind, Updates.ChannelName, history.AgeDays(Clock.UtcNow), history.ActiveDaysIn30(Clock.UtcNow),
+                    history.FeaturesUsed.Count);
+            }
+        }
+        Usage.Track("app_started", UsageEvents.Started(Settings.Current, Jt9Path is not null, facts));
+    }
+
+    private string UsageHistoryPath => Path.Combine(Paths.Root, "usage-history.json");
+
+    private UsageHistory UsageHistoryFile() => _usageHistory ??= UsageHistory.Load(UsageHistoryPath);
+
+    // Called for every event that is allowed: the first time a feature is used on this computer, say so once.
+    private void NoteFirstUse(string name, IReadOnlyDictionary<string, object>? props)
+    {
+        if (!TrackedFeatures.Contains(name)) return;
+        var feature = name switch
+        {
+            "view_opened" when props?.GetValueOrDefault("view") is { } v => $"view:{v}",
+            "window_opened" when props?.GetValueOrDefault("window") is { } w => $"window:{w}",
+            "contact_logged" when props?.GetValueOrDefault("mode") is { } m => $"logged:{m}",
+            "contact_logged" => null,
+            _ => name,
+        };
+        if (feature is null) return;
+        var history = UsageHistoryFile();
+        bool first;
+        int age;
+        lock (history)
+        {
+            first = history.FirstUse(feature);
+            if (first) history.Save(UsageHistoryPath);
+            age = history.AgeDays(Clock.UtcNow);
+        }
+        if (first)
+            Usage.Track("feature_first_use", new Dictionary<string, object> { ["feature"] = feature, ["install_age"] = UsageHistory.AgeBucket(age) });
+    }
+
+    // The radio's connection result for the usage statistics: the kind of radio and Hamlib model, ok or why not. A
+    // result from before the statistics started (the first open at start-up) waits for them.
+    private void TrackRadio(string mode, int? model, string result)
+    {
+        var p = new Dictionary<string, object> { ["rig"] = mode, ["result"] = result };
+        if (model is { } m) p["rig_model"] = m.ToString(CultureInfo.InvariantCulture);
+        if (Usage is null) _pendingRadioUsage = p;
+        else Usage.Track("radio_connect", p);
+    }
 
     // One "app_running" a day for runs left open across midnight UTC, so they still count as active that day.
     private void TrackDay()
@@ -656,6 +764,12 @@ public sealed class AppHost : IAsyncDisposable
         var today = Clock.UtcNow.Date;
         if (today == _usageDay) return;
         _usageDay = today;
+        if (Usage.Allowed)
+        {
+            var history = UsageHistoryFile();
+            lock (history)
+                if (history.Touch(Clock.UtcNow)) history.Save(UsageHistoryPath);
+        }
         Usage.Track("app_running", UsageEvents.BandMode(Settings.Current.Operating.Band, Settings.Current.Operating.Mode));
     }
 
@@ -1210,16 +1324,21 @@ public sealed class AppHost : IAsyncDisposable
         // A serial port that is not there yet would only start rigctld to fail; wait for Windows to list it.
         var port = RigctldRig.CleanSerialPort(Settings.Current.Profile.Rig.Port, OperatingSystem.IsWindows());
         if (port is not null && IsSerialPortName(port) && !RigctldRig.SerialPorts().Contains(port, StringComparer.OrdinalIgnoreCase)) return;
-        await OpenRigAsync().ConfigureAwait(false);
-        if (!_rigRetry) Log.Information("Radio is back: {Radio}", _rig.Name);
+        await OpenRigAsync(track: false).ConfigureAwait(false);
+        if (!_rigRetry)
+        {
+            Log.Information("Radio is back: {Radio}", _rig.Name);
+            TrackRadio(Settings.Current.Profile.Rig.Mode, Settings.Current.Profile.Rig.Model, "recovered");
+        }
     }
 
     private static bool IsSerialPortName(string port) =>
         port.StartsWith("COM", StringComparison.OrdinalIgnoreCase) || port.StartsWith("/dev/", StringComparison.Ordinal);
 
-    private async Task OpenRigAsync()
+    private async Task OpenRigAsync(bool track = true)
     {
         _rigRetry = false;
+        string? usage = null;
         var r = Settings.Current.Profile.Rig;
         var old = _rig;
         IRig rig;
@@ -1235,11 +1354,13 @@ public sealed class AppHost : IAsyncDisposable
             // Nothing set up: no made-up radio. The Down status makes the transmit guard refuse.
             rig = new VoxRig(dialHz);
             status = new ServiceStatus(ServiceHealth.Down, "No radio set up. Open Station setup to choose your radio.", Clock.UtcNow);
+            usage = "not_set_up";
         }
         else if (r.Mode == RigModes.Vox)
         {
             rig = new VoxRig(Frequencies.Find(Settings.Current.Operating.Band, SettingsMapper.ToConfig(Settings.Current).Mode)?.DialHz ?? 14_074_000);
             status = new ServiceStatus(ServiceHealth.Ok, "Audio only (VOX)", Clock.UtcNow);
+            usage = "ok";
         }
         else
         {
@@ -1252,6 +1373,7 @@ public sealed class AppHost : IAsyncDisposable
                     exe is null ? "rigctld (Hamlib) not found. Reinstall Costas, or set the Hamlib folder in Settings."
                     : r.Model is null ? "No radio model chosen. Open Station setup to choose your radio."
                     : "No port chosen for the radio. Open Station setup and press Test connection to find it.", Clock.UtcNow);
+                usage = exe is null ? "rigctld_missing" : r.Model is null ? "no_model" : "no_port";
             }
             else if (HamlibModel.SerialPortProblem(r.Model.Value, r.Port) is { } wrongPort)
             {
@@ -1259,6 +1381,7 @@ public sealed class AppHost : IAsyncDisposable
                 // the radio would never answer. Say what to change instead of "rigctld is not answering".
                 rig = new VoxRig(dialHz);
                 status = new ServiceStatus(ServiceHealth.Down, wrongPort, Clock.UtcNow);
+                usage = "wrong_port_type";
             }
             else
             {
@@ -1282,16 +1405,19 @@ public sealed class AppHost : IAsyncDisposable
                     opened.MaxPowerOverride = () => Settings.Current.Profile.Rig.MaxPowerWatts;
                     rig = opened;
                     status = new ServiceStatus(ServiceHealth.Ok, rig.Name, Clock.UtcNow);
+                    usage = "ok";
                 }
                 catch (RigException ex)
                 {
                     rig = new VoxRig(dialHz);
                     status = new ServiceStatus(ServiceHealth.Down, ex.Message, Clock.UtcNow);
                     _rigRetry = true;
+                    usage = "failed";
                 }
             }
         }
         _rigKey = RigKey(r);
+        if (track && usage is not null) TrackRadio(r.Mode, r.Mode == RigModes.Hamlib ? r.Model : null, usage);
         rig.Faulted += (sender, f) =>
         {
             // A radio already replaced can still report a late fault while it shuts down; that is not this radio's state.
@@ -1584,7 +1710,15 @@ public sealed class AppHost : IAsyncDisposable
         if (ClubLog is not null) await ClubLog.DisposeAsync().ConfigureAwait(false);
         Udp?.Dispose();
         Updates?.Dispose();
-        if (Usage is not null) await Usage.DisposeAsync().ConfigureAwait(false);
+        if (Usage is not null)
+        {
+            Usage.Track("app_closed", new Dictionary<string, object>
+            {
+                ["length"] = UsageEvents.RunLength(Clock.UtcNow - _usageStartedUtc),
+                ["contacts"] = UsageEvents.Capped(_usageContacts),
+            });
+            await Usage.DisposeAsync().ConfigureAwait(false);
+        }
         Pota?.Dispose();
         Dxpeditions?.Dispose();
         Recording?.Dispose();

@@ -92,6 +92,12 @@ public sealed class Transmitter
     /// <summary>Raised with a fault message after PTT has been released.</summary>
     public event Action<string>? Fault;
 
+    /// <summary>
+    /// Raised when a transmission or tune is refused by a guard, with the kind of reason: disabled, no_audio, output_dead,
+    /// output_muted, radio_fault, clock, band_edge or message. For the usage statistics; the text still goes to the caller.
+    /// </summary>
+    public event Action<string>? Refused;
+
     /// <summary>Transmit gain in dBFS.</summary>
     public double GainDb { get; set; } = -6.0;
 
@@ -128,11 +134,11 @@ public sealed class Transmitter
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(guard);
-        if (DisabledReason is not null) return DisabledReason;
-        if (!guard.AudioReady || _output is null) return "No audio output device is open; transmitting is disabled.";
-        if (SilencedText() is { } silent) return silent;
-        if (guard.RigFault is not null) return $"Radio fault: {guard.RigFault}";
-        if (!_frequencies.TransmitAllowed(guard.Band, mode, guard.DialHz, offsetHz, widthHz, out var bandWhy)) return bandWhy;
+        if (DisabledReason is not null) return Refuse("disabled", DisabledReason);
+        if (!guard.AudioReady || _output is null) return Refuse("no_audio", "No audio output device is open; transmitting is disabled.");
+        if (SilencedText() is { } silent) return Refuse("output_muted", silent);
+        if (guard.RigFault is not null) return Refuse("radio_fault", $"Radio fault: {guard.RigFault}");
+        if (!_frequencies.TransmitAllowed(guard.Band, mode, guard.DialHz, offsetHz, widthHz, out var bandWhy)) return Refuse("band_edge", bandWhy);
         long epoch;
         lock (_gate)
         {
@@ -263,42 +269,19 @@ public sealed class Transmitter
     {
         long epoch;
         lock (_gate) epoch = haltEpoch ?? _haltEpoch;
-        refusal = DisabledReason;
-        if (refusal is not null) return null;
-        if (!guard.AudioReady || _output is null)
-        {
-            refusal = "No audio output device is open; transmitting is disabled.";
-            return null;
-        }
-        if (_outputFault is { } dead)
-        {
-            refusal = OutputDeadText(dead);
-            return null;
-        }
-        if (SilencedText() is { } silent)
-        {
-            refusal = silent;
-            return null;
-        }
-        if (guard.RigFault is not null)
-        {
-            refusal = $"Radio fault: {guard.RigFault}";
-            return null;
-        }
-        if (!ClockEstimate.TransmitAllowed(guard.ClockOffsetSeconds, guard.ClockBlockSeconds, out var clockWhy))
-        {
-            refusal = clockWhy;
-            return null;
-        }
-        if (!_frequencies.TransmitAllowed(guard.Band, mode, guard.DialHz, offsetHz, out var bandWhy))
-        {
-            refusal = bandWhy;
-            return null;
-        }
+        refusal = DisabledReason is { } disabled ? Refuse("disabled", disabled)
+            : !guard.AudioReady || _output is null ? Refuse("no_audio", "No audio output device is open; transmitting is disabled.")
+            : _outputFault is { } dead ? Refuse("output_dead", OutputDeadText(dead))
+            : SilencedText() is { } silent ? Refuse("output_muted", silent)
+            : guard.RigFault is not null ? Refuse("radio_fault", $"Radio fault: {guard.RigFault}")
+            : !ClockEstimate.TransmitAllowed(guard.ClockOffsetSeconds, guard.ClockBlockSeconds, out var clockWhy) ? Refuse("clock", clockWhy)
+            : !_frequencies.TransmitAllowed(guard.Band, mode, guard.DialHz, offsetHz, out var bandWhy) ? Refuse("band_edge", bandWhy)
+            : null;
+        if (refusal is not null || _output is null) return null;
         var enc = FtxEncoder.Encode(plan.Message, mode);
         if (!enc.Ok)
         {
-            refusal = $"Not sent: \"{plan.Message}\". {enc.Error}";
+            refusal = Refuse("message", $"Not sent: \"{plan.Message}\". {enc.Error}");
             return null;
         }
         var samples = GfskSynth.Render(enc.Tones, mode, offsetHz, _output.SampleRate, Math.Pow(10, GainDb / 20));
@@ -609,12 +592,12 @@ public sealed class Transmitter
     /// </summary>
     public async Task<string?> TuneAsync(int offsetHz, double seconds, TxGuardInput guard)
     {
-        if (DisabledReason is not null) return DisabledReason;
-        if (!guard.AudioReady || _output is null) return "No audio output device is open.";
-        if (_outputFault is { } dead) return OutputDeadText(dead);
-        if (SilencedText() is { } silent) return silent;
-        if (guard.RigFault is not null) return $"Radio fault: {guard.RigFault}";
-        if (!_frequencies.TransmitAllowed(guard.Band, Mode.Ft8, guard.DialHz, offsetHz, out var why)) return why;
+        if (DisabledReason is not null) return Refuse("disabled", DisabledReason);
+        if (!guard.AudioReady || _output is null) return Refuse("no_audio", "No audio output device is open.");
+        if (_outputFault is { } dead) return Refuse("output_dead", OutputDeadText(dead));
+        if (SilencedText() is { } silent) return Refuse("output_muted", silent);
+        if (guard.RigFault is not null) return Refuse("radio_fault", $"Radio fault: {guard.RigFault}");
+        if (!_frequencies.TransmitAllowed(guard.Band, Mode.Ft8, guard.DialHz, offsetHz, out var why)) return Refuse("band_edge", why);
         var n = (int)(seconds * _output.SampleRate);
         var tone = new float[n];
         var amp = Math.Pow(10, GainDb / 20);
@@ -727,6 +710,12 @@ public sealed class Transmitter
             CancelPending();
             Fault?.Invoke(OutputDeadText(why));
         }
+    }
+
+    private string Refuse(string kind, string text)
+    {
+        Refused?.Invoke(kind);
+        return text;
     }
 
     // Keying the radio with the output muted puts nothing on the air and looks like a broken radio: refuse and say why.

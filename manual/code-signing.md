@@ -60,7 +60,8 @@ Costas does not send anything about you anywhere unless a feature you set up nee
   entries for the logbooks, for example).
 - **Updates**: Costas asks GitHub for the latest release when it starts and once a day. You can turn this off in
   **Settings › Updates**.
-- **Usage statistics**: anonymous counts of which features are used, sent to Aptabase. They never include your
+- **Usage statistics**: anonymous counts of which features are used and how setup, the radio, updates and online
+  services go, sent to Aptabase. They never include your
   callsign, grid, frequencies, the stations you work or anything from your log, and nothing is sent while you are
   offline. [Settings › Privacy](settings.md#privacy) lists exactly what is sent and has the switch to turn it off.
 - **Crash reports**: when Costas hits an error it did not expect, the kind of error and where it happened, plus the

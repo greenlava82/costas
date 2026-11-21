@@ -22,13 +22,17 @@ public sealed partial class UpdateBarViewModel : ObservableObject
     private readonly Func<bool> _busyOnAir;
     private readonly Action _shutdown;
     private readonly Func<string, Task<Process?>>? _showSplash;
+    private readonly Action<string, IReadOnlyDictionary<string, object>?>? _track;
 
     /// <summary>
     /// Creates the bar. <paramref name="busyOnAir"/> is true while transmitting or in a contact. <paramref name="showSplash"/>
     /// puts up the window that stays on screen while Costas closes, updates and reopens (given the version).
     /// </summary>
-    public UpdateBarViewModel(UpdateService updates, Func<bool> busyOnAir, Action shutdown, Func<string, Task<Process?>>? showSplash = null)
+    /// <paramref name="track"/> records usage events (update started or failed).
+    public UpdateBarViewModel(UpdateService updates, Func<bool> busyOnAir, Action shutdown, Func<string, Task<Process?>>? showSplash = null,
+                              Action<string, IReadOnlyDictionary<string, object>?>? track = null)
     {
+        _track = track;
         _updates = updates;
         _busyOnAir = busyOnAir;
         _shutdown = shutdown;
@@ -86,6 +90,7 @@ public sealed partial class UpdateBarViewModel : ObservableObject
         if (!OperatingSystem.IsWindows() && !_updates.DeltaUpdates)
         {
             if (_updates.Available is { PageUrl: { Length: > 0 } page }) Browser.Open(page);
+            Track("update_started", "page");
             Detail = AppContext.BaseDirectory.StartsWith("/opt/costas", StringComparison.Ordinal)
                 ? "Download the .deb from the release page and open it; it installs over this version and keeps your log and settings. The AppImage updates itself."
                 : "Download the Linux build from the release page and unpack it; it makes a new folder, so run Costas from there. The AppImage updates itself.";
@@ -97,6 +102,7 @@ public sealed partial class UpdateBarViewModel : ObservableObject
             return;
         }
         Busy = true;
+        var stage = "download";
         try
         {
             var progress = new Progress<double>(p => Detail = $"Downloading… {p:P0}");
@@ -107,6 +113,7 @@ public sealed partial class UpdateBarViewModel : ObservableObject
                 return;
             }
             Detail = "Updating; Costas will reopen when the update has installed…";
+            stage = "apply";
             // The splash stays up from here until the new Costas is on screen, so the app does not just vanish.
             var splash = _updates.ShowsSplash && _showSplash is not null && _updates.Available is { } target
                 ? await _showSplash(target.Version.ToString())
@@ -121,18 +128,23 @@ public sealed partial class UpdateBarViewModel : ObservableObject
                 throw;
             }
             splash?.Dispose();
+            Track("update_started", _updates.DeltaUpdates ? "delta" : "full");
             _shutdown();
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or InvalidDataException
                                        or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             Detail = $"Update failed: {ex.Message}";
+            _track?.Invoke("update_failed", new Dictionary<string, object> { ["stage"] = stage, ["install"] = _updates.InstallKind, ["channel"] = _updates.ChannelName });
         }
         finally
         {
             Busy = false;
         }
     }
+
+    private void Track(string name, string kind) =>
+        _track?.Invoke(name, new Dictionary<string, object> { ["kind"] = kind, ["install"] = _updates.InstallKind, ["channel"] = _updates.ChannelName });
 
     // The update did not start, so Costas stays open and the splash must not sit over it.
     private static void CloseSplash(Process? splash)
