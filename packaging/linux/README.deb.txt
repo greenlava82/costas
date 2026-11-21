@@ -19,4 +19,7 @@ Updates: Costas tells you when a newer build is out and opens the release page. 
 (or run: sudo apt install ./costas_<version>_amd64.deb). It replaces this version. Your log and settings are kept in
 ~/.local/share/Costas and are not touched. To remove Costas: sudo apt remove costas.
 
+The AppImage (CostasApp.AppImage on the same release page) updates itself like the Windows version: press Update and
+Costas downloads only what changed and restarts. It uses the same log and settings.
+
 Licence: GNU GPL v3 or later (see LICENSE). User manual: https://somedudenamedtony.github.io/costas/

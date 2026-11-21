@@ -43,7 +43,15 @@ If flrig controls the radio, choose **FLRig** as the manufacturer, then enter fl
 runs on another PC or listens on another port (flrig's *Config › Setup › Server* page shows both).
 Keep flrig running: it owns the radio's COM port. TRXManager and ACLog work the same way.
 
-FlexRadio (6000 and 8000 series, including the 8600): if you made COM ports in **SmartSDR CAT**, choose
+**FlexRadio (6000 and 8000 series): one click.** When a FlexRadio is on your network, the Radio step shows it at the
+top under **Found on your network**, for example *FLEX-8600 “Shack” at 192.168.1.20*. Press **Use this radio**. Costas
+asks the radio which slice you transmit on, chooses Hamlib's **SmartSDR Slice** model for it with the radio's address,
+sets **Transmit (PTT)** to **CAT command**, picks the DAX audio devices (SmartSDR DAX's *DAX Audio RX* and *DAX Audio TX*
+on Windows, RimuDAX's *rimu.dax.rx1* and *rimu.dax.tx* on Linux) and runs **Test connection**. Nothing is transmitted.
+Start SmartSDR (or RimuSDR) and its DAX first so the slice and audio devices exist. If no radio shows up (a firewall
+can block the radio's announcements, or the radio is on another network), set it up by hand as below.
+
+By hand: if you made COM ports in **SmartSDR CAT**, choose
 **Kenwood › TS-2000** and the SmartSDR CAT port as **Port**. SmartSDR CAT's COM ports answer as a TS-2000, and their
 baud rate does not matter. If you also made a PTT port in SmartSDR CAT, choose **RTS line on a serial port** under
 **Transmit (PTT)** and pick it as **PTT port**; otherwise leave **CAT command**. Hamlib's own **FlexRadio › 6xxx**
@@ -51,15 +59,21 @@ model connects only over the network, to a TCP port set up in SmartSDR CAT, so C
 instead of a COM port. The **SmartSDR Slice A** to **H** models talk to the radio itself: enter the radio's IP address
 with port `4992`.
 
-FlexRadio on Linux, with RimuSDR instead of SmartSDR: RimuSDR's helpers give Costas the same two things SmartSDR CAT
-and DAX give it on Windows, a control port and audio devices.
+FlexRadio on Linux, with RimuSDR instead of SmartSDR: **Use this radio** does all of this; by hand, Costas needs
+RimuSDR's audio devices and a way to control the radio.
 
 1. In RimuSDR, put the slice you operate on DAX channel **1** and turn its **DAX** button on.
 2. In RimuDAX, choose **DAX** mode (not TCI) with **TX** and **RX1** enabled. Its audio devices exist only in DAX mode.
-3. In RimuCAT, add a port with protocol **Hamlib** (it listens on TCP port `4532`) for that slice.
-4. In Costas, choose **Hamlib › NET rigctl** with **Server (host:port)** `127.0.0.1:4532`, and leave **Transmit (PTT)**
-   on **CAT command**.
-5. In the audio step, choose **rimu.dax.rx1 (PulseAudio)** as **Input** and **rimu.dax.tx (PulseAudio)** as
+3. Radio control, either way:
+    - **Straight to the radio (simplest)**: choose **FlexRadio › SmartSDR Slice A** (B, C… for another slice) and enter
+      the radio's IP address with port `4992`, for example `192.168.1.20:4992`. Nothing else needs to run. Leave
+      **Transmit (PTT)** on **CAT command**. These models need Hamlib 4.6 or newer (Debian 13 and Ubuntu 25.04 have it).
+    - **Through RimuCAT**: in RimuCAT, add a port with protocol **Hamlib** (TCP port `4532`) for that slice and keep
+      RimuCAT running. In Costas, choose **Hamlib › NET rigctl** with `127.0.0.1:4532` and **CAT command**. If Test
+      connection says *Nothing is listening*, that port is not set up or RimuCAT is not running. If it says the address
+      *accepted the connection* but the radio did not answer, RimuCAT is there but not answering Hamlib: use the
+      direct route above.
+4. In the audio step, choose **rimu.dax.rx1 (PulseAudio)** as **Input** and **rimu.dax.tx (PulseAudio)** as
    **Output**. With the default devices, Costas transmits into your speakers while the radio, keyed, sends silence.
 
 Costas does not speak TCI, so the "TCI Client" choice other programs offer for RimuDAX's TCI mode is not used.

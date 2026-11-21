@@ -41,4 +41,32 @@ public class AudioDeviceMatchTests
         AudioDeviceMatch.SuggestRadio([Speakers]).Should().BeNull();
         AudioDeviceMatch.SuggestRadio([Codec, Codec with { Id = "{c}", Name = "Speakers (2- USB Audio CODEC)" }]).Should().BeNull();
     }
+
+    [Fact]
+    public void SuggestFlex_RimuDaxDevices_PicksThem()
+    {
+        AudioDevice[] outputs = [Speakers, new("PulseAudio:rimu.dax.tx", "rimu.dax.tx (PulseAudio)"), new("ALSA:pulse", "pulse")];
+        AudioDevice[] inputs = [new("PulseAudio:rimu.dax.rx1", "rimu.dax.rx1 (PulseAudio)"), new("PulseAudio:rimu.dax.rx2", "rimu.dax.rx2 (PulseAudio)")];
+
+        AudioDeviceMatch.SuggestFlex(outputs, transmit: true)!.Id.Should().Be("PulseAudio:rimu.dax.tx");
+        AudioDeviceMatch.SuggestFlex(inputs, transmit: false, channel: 2)!.Id.Should().Be("PulseAudio:rimu.dax.rx2");
+    }
+
+    [Fact]
+    public void SuggestFlex_SmartSdrDaxOnWindows_PicksChannelNotItsNeighbours()
+    {
+        AudioDevice[] inputs =
+        [
+            new("{1}", "DAX Audio RX 1 (FlexRadio Systems DAX Audio)"),
+            new("{10}", "DAX Audio RX 10 (FlexRadio Systems DAX Audio)"),
+            new("{2}", "DAX Audio RX 2 (FlexRadio Systems DAX Audio)"),
+        ];
+        AudioDevice[] outputs = [Speakers, new("{t}", "DAX Audio TX (FlexRadio Systems DAX TX)")];
+
+        AudioDeviceMatch.SuggestFlex(inputs, transmit: false, channel: 1)!.Id.Should().Be("{1}");
+        AudioDeviceMatch.SuggestFlex(outputs, transmit: true)!.Id.Should().Be("{t}");
+    }
+
+    [Fact]
+    public void SuggestFlex_NoDaxDevice_ReturnsNull() => AudioDeviceMatch.SuggestFlex([Speakers, Codec], transmit: true).Should().BeNull();
 }

@@ -76,4 +76,28 @@ public class SetupNetworkTests
 
         SetupViewModel.PickModel(models, new HamlibModel(3073, "Icom", "IC-7300", "Stable")).Should().BeNull();
     }
+
+    [Fact]
+    public void NetworkProblemText_NetRigctlNothingListening_SaysSoAndOffersFlexDirect()
+    {
+        var text = SetupViewModel.NetworkProblemText(2, "rigctld", "127.0.0.1:4532", reachable: false, null);
+
+        text.Should().StartWith("Nothing is listening at 127.0.0.1:4532").And.Contain("SmartSDR Slice A").And.Contain("RimuCAT");
+    }
+
+    [Fact]
+    public void NetworkProblemText_NetRigctlReachableButSilent_DoesNotSayNothingListens()
+    {
+        var text = SetupViewModel.NetworkProblemText(2, "rigctld", "127.0.0.1:4532", reachable: true, "rigctld is not answering.");
+
+        text.Should().StartWith("127.0.0.1:4532 accepted the connection").And.NotContain("Nothing is listening").And.Contain("SmartSDR Slice A");
+    }
+
+    [Fact]
+    public void NetworkProblemText_FlrigReachableButSilent_KeepsTheProblem()
+    {
+        var text = SetupViewModel.NetworkProblemText(4, "flrig", "127.0.0.1:12345", reachable: true, "Timed out.");
+
+        text.Should().Contain("Timed out.").And.Contain("Check that flrig is connected").And.NotContain("SmartSDR");
+    }
 }

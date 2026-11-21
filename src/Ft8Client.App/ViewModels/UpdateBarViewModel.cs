@@ -76,19 +76,19 @@ public sealed partial class UpdateBarViewModel : ObservableObject
 
     /// <summary>
     /// Downloads and verifies the installer, starts the unattended upgrade (a progress window, nothing to click) and
-    /// closes the app so it can be upgraded; Costas reopens when the installer has finished. On Linux there is no
-    /// installer: it opens the release page to download the new build from.
+    /// closes the app so it can be upgraded; Costas reopens when the installer has finished. On Linux the AppImage updates
+    /// the same way (Velopack); the .deb and the tarball have no installer, so it opens the release page instead.
     /// </summary>
     [RelayCommand]
     private async Task Install()
     {
         if (Busy) return;
-        if (!OperatingSystem.IsWindows())
+        if (!OperatingSystem.IsWindows() && !_updates.DeltaUpdates)
         {
             if (_updates.Available is { PageUrl: { Length: > 0 } page }) Browser.Open(page);
             Detail = AppContext.BaseDirectory.StartsWith("/opt/costas", StringComparison.Ordinal)
-                ? "Download the .deb from the release page and open it; it installs over this version and keeps your log and settings."
-                : "Download the Linux build from the release page and unpack it; it makes a new folder, so run Costas from there.";
+                ? "Download the .deb from the release page and open it; it installs over this version and keeps your log and settings. The AppImage updates itself."
+                : "Download the Linux build from the release page and unpack it; it makes a new folder, so run Costas from there. The AppImage updates itself.";
             return;
         }
         if (_busyOnAir())

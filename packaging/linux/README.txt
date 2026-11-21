@@ -31,4 +31,7 @@ it. It unpacks into a new folder named for its version: run ./Costas from there,
 Costas to your desktop's menu, change Exec= in ~/.local/share/applications/costas.desktop to the new folder. Your log
 and settings are kept in ~/.local/share/Costas and are not touched.
 
+The AppImage (CostasApp.AppImage on the same release page) updates itself like the Windows version: press Update and
+Costas downloads only what changed and restarts. It uses the same log and settings.
+
 Licence: GNU GPL v3 or later (see LICENSE). User manual: https://somedudenamedtony.github.io/costas/
