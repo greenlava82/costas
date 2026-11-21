@@ -76,4 +76,20 @@ public class SetupNetworkTests
 
         SetupViewModel.PickModel(models, new HamlibModel(3073, "Icom", "IC-7300", "Stable")).Should().BeNull();
     }
+
+    [Fact]
+    public void NetworkProblemText_NetRigctlRefused_SaysNothingListensAndOffersFlexDirect()
+    {
+        var text = SetupViewModel.NetworkProblemText(2, "rigctld", "127.0.0.1:4532", "rigctld connection failed: Connection refused");
+
+        text.Should().StartWith("Nothing is listening at 127.0.0.1:4532").And.Contain("SmartSDR Slice A").And.Contain("RimuCAT");
+    }
+
+    [Fact]
+    public void NetworkProblemText_OtherFailure_KeepsTheProblem()
+    {
+        var text = SetupViewModel.NetworkProblemText(4, "flrig", "127.0.0.1:12345", "Timed out.");
+
+        text.Should().Contain("did not answer. Timed out.").And.NotContain("SmartSDR");
+    }
 }

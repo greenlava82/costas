@@ -51,15 +51,19 @@ model connects only over the network, to a TCP port set up in SmartSDR CAT, so C
 instead of a COM port. The **SmartSDR Slice A** to **H** models talk to the radio itself: enter the radio's IP address
 with port `4992`.
 
-FlexRadio on Linux, with RimuSDR instead of SmartSDR: RimuSDR's helpers give Costas the same two things SmartSDR CAT
-and DAX give it on Windows, a control port and audio devices.
+FlexRadio on Linux, with RimuSDR instead of SmartSDR: Costas needs RimuSDR's audio devices, and a way to control the
+radio.
 
 1. In RimuSDR, put the slice you operate on DAX channel **1** and turn its **DAX** button on.
 2. In RimuDAX, choose **DAX** mode (not TCI) with **TX** and **RX1** enabled. Its audio devices exist only in DAX mode.
-3. In RimuCAT, add a port with protocol **Hamlib** (it listens on TCP port `4532`) for that slice.
-4. In Costas, choose **Hamlib › NET rigctl** with **Server (host:port)** `127.0.0.1:4532`, and leave **Transmit (PTT)**
-   on **CAT command**.
-5. In the audio step, choose **rimu.dax.rx1 (PulseAudio)** as **Input** and **rimu.dax.tx (PulseAudio)** as
+3. Radio control, either way:
+    - **Straight to the radio (simplest)**: choose **FlexRadio › SmartSDR Slice A** (B, C… for another slice) and enter
+      the radio's IP address with port `4992`, for example `192.168.1.20:4992`. Nothing else needs to run. Leave
+      **Transmit (PTT)** on **CAT command**. These models need Hamlib 4.6 or newer (Debian 13 and Ubuntu 25.04 have it).
+    - **Through RimuCAT**: in RimuCAT, add a port with protocol **Hamlib** (TCP port `4532`) for that slice and keep
+      RimuCAT running. In Costas, choose **Hamlib › NET rigctl** with `127.0.0.1:4532` and **CAT command**. If Test
+      connection says *Nothing is listening*, that port is not set up or RimuCAT is not running.
+4. In the audio step, choose **rimu.dax.rx1 (PulseAudio)** as **Input** and **rimu.dax.tx (PulseAudio)** as
    **Output**. With the default devices, Costas transmits into your speakers while the radio, keyed, sends silence.
 
 Costas does not speak TCI, so the "TCI Client" choice other programs offer for RimuDAX's TCI mode is not used.

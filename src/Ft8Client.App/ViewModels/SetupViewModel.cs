@@ -229,6 +229,25 @@ public sealed partial class SetupViewModel : ObservableObject
     [ObservableProperty]
     public partial string NetworkAddress { get; set; } = "127.0.0.1:4532";
 
+    /// <summary>
+    /// What Test connection says when a network model's server does not answer. "Connection refused" means nothing listens
+    /// at that address at all: the program that should provide it is not running, or uses another port. For NET rigctl it
+    /// names the usual providers, and points FlexRadio owners at the SmartSDR Slice models, which need no helper program.
+    /// </summary>
+    internal static string NetworkProblemText(int model, string serverName, string address, string? problem)
+    {
+        var refused = problem is not null && problem.Contains("refused", StringComparison.OrdinalIgnoreCase);
+        if (!refused)
+            return $"The {serverName} server at {address} did not answer. {problem} Check that {serverName} is running and its listening address and TCP port match.";
+        var text = $"Nothing is listening at {address} (connection refused): the program that should run the {serverName} server is not running, or listens on another address or port.";
+        if (model == 2)
+        {
+            text += " Start it first: rigctld, Hamlib Launcher, or the Hamlib port of an SDR program's CAT helper (such as RimuCAT), and keep it running."
+                + " A FlexRadio can also be reached directly, with nothing else running: choose FlexRadio › SmartSDR Slice A (the slice you operate) and the radio's IP address with port 4992.";
+        }
+        return text;
+    }
+
     /// <summary>Whether an address contains a host and a valid TCP port.</summary>
     public static bool IsNetworkAddress(string? address) =>
         !string.IsNullOrWhiteSpace(address)
@@ -550,7 +569,7 @@ public sealed partial class SetupViewModel : ObservableObject
                 Message = string.Empty;
                 if (networkState is null)
                 {
-                    Check(false, $"The {ServerName} server at {NetworkAddress.Trim()} did not answer. {networkProblem} Check that {ServerName} is running and its listening address and TCP port match.");
+                    Check(false, NetworkProblemText(Model?.Number ?? 0, ServerName, NetworkAddress.Trim(), networkProblem));
                     return;
                 }
                 Readback = $"{MainViewModel.FormatFrequency(networkState.FrequencyHz)} MHz {networkState.Mode}";
