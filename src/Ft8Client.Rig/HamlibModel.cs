@@ -30,6 +30,18 @@ public sealed record HamlibModel(int Number, string Manufacturer, string Model, 
     /// <summary>Hamlib model number of the FlexRadio 6xxx driver (<c>RIG_MODEL_F6K</c>).</summary>
     public const int Flex6xxxModel = 2036;
 
+    /// <summary>
+    /// Costas's own number for DXLab Commander, offered in the radio list beside Hamlib's models. It is not a Hamlib
+    /// model: Costas talks to Commander's command port itself (<see cref="DxLab.DxLabCommanderRig"/>), as WSJT-X does.
+    /// </summary>
+    public const int DxLabCommanderModel = 952002;
+
+    /// <summary>The DXLab Commander entry in the radio list.</summary>
+    public static HamlibModel DxLabCommander { get; } = new(DxLabCommanderModel, "DXLab", "Commander (DX Lab Suite)", "Stable");
+
+    /// <summary>True for <see cref="DxLabCommanderModel"/>.</summary>
+    public static bool IsDxLabCommander(int? number) => number == DxLabCommanderModel;
+
     /// <summary>Hamlib model number of the Kenwood TS-2000, the radio SmartSDR CAT's COM ports imitate.</summary>
     public const int KenwoodTs2000Model = 2014;
 
@@ -71,7 +83,9 @@ public sealed record HamlibModel(int Number, string Manufacturer, string Model, 
     /// which Hamlib's FlexRadio 6xxx driver cannot use.
     /// </summary>
     public static string? SetupNoteFor(int number) =>
-        number == Flex6xxxModel
+        number == DxLabCommanderModel
+            ? "Costas controls the radio through Commander, which keeps the radio's port, so Commander and the rest of DXLab stay running. Start Commander first. The address is Commander's Base Port plus 2 (52002 for the default 52000). Choose CAT for keying to key through Commander."
+            : number == Flex6xxxModel
             ? "Hamlib's FlexRadio 6xxx driver connects over the network, to a TCP port set up in SmartSDR CAT. If you made COM ports in SmartSDR CAT, choose Kenwood as the manufacturer and TS-2000 as the model instead, with the CAT port (and the PTT port if you made one)." + AmpNote
             : IsSmartSdrSlice(number)
                 ? "Enter the radio's own IP address with port 4992, not 127.0.0.1. Using SmartSDR CAT COM ports instead? Choose Kenwood TS-2000." + AmpNote
@@ -99,6 +113,7 @@ public sealed record HamlibModel(int Number, string Manufacturer, string Model, 
         5 => "127.0.0.1:1003",  // TRXManager
         8 => "127.0.0.1:1100",  // ACLog
         9 => "127.0.0.1:4532",  // SDR#
+        DxLabCommanderModel => "127.0.0.1:52002",
         _ => null,
     };
 
@@ -111,6 +126,7 @@ public sealed record HamlibModel(int Number, string Manufacturer, string Model, 
         5 => "TRXManager",
         8 => "ACLog",
         9 => "SDR#",
+        DxLabCommanderModel => "DXLab Commander",
         _ => "rigctld",
     };
 

@@ -37,9 +37,14 @@ public static partial class HamlibModels
     /// </summary>
     public static bool IsTestModel(int? number) => number is 1 or 6;
 
-    /// <summary>The models to offer in a radio list, sorted by manufacturer then model; test radios only in developer mode.</summary>
+    /// <summary>
+    /// The models to offer in a radio list, sorted by manufacturer then model, with DXLab Commander added; test radios
+    /// only in developer mode.
+    /// </summary>
     public static IReadOnlyList<HamlibModel> ForPicker(IEnumerable<HamlibModel> models, bool includeTestModels) =>
         models.Where(m => includeTestModels || !IsTestModel(m.Number))
+            .Where(m => !HamlibModel.IsDxLabCommander(m.Number))
+            .Append(HamlibModel.DxLabCommander)
             .OrderBy(m => m.Manufacturer, StringComparer.OrdinalIgnoreCase)
             .ThenBy(m => m.Model, StringComparer.OrdinalIgnoreCase)
             .ToList();
