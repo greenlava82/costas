@@ -82,7 +82,13 @@ internal sealed class FakeFlexRadio : IAsyncDisposable
             }
         }
         // The listener is stopped only after this loop has ended (DisposeAsync), so cancellation is the only way out.
+        // On Windows a cancelled accept can end as SocketException (OperationAborted) instead of
+        // OperationCanceledException: the cancel aborts the pending I/O, and which exception comes back depends on
+        // whether the abort or the token is seen first (failed main CI on Windows after PR #196).
         catch (OperationCanceledException)
+        {
+        }
+        catch (SocketException ex) when (_cts.IsCancellationRequested && ex.SocketErrorCode == SocketError.OperationAborted)
         {
         }
     }
