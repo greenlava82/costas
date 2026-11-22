@@ -581,9 +581,13 @@ public class RigTests
         rig.Faulted += (_, f) => faults.Add(f);
         // Only this rig's rigctld: other test classes run alongside this one with their own, and killing those failed
         // their commands with "rigctld closed the connection".
-        var own = rig.ProcessForTests!;
-        own.Kill();
-        await own.WaitForExitAsync(ct);
+        // The test kills and waits through its own Process object: the rig disposes its object as soon as it sees the
+        // exit and restarts, and waiting on that one failed with "No process is associated with this object".
+        using (var own = System.Diagnostics.Process.GetProcessById(rig.ProcessIdForTests!.Value))
+        {
+            own.Kill();
+            await own.WaitForExitAsync(ct);
+        }
         // The exit is reported with no command pending, and commands fail (rather than quietly restarting) until it is back.
         var faultDeadline = DateTime.UtcNow.AddSeconds(5);
         while (faults.Count == 0 && DateTime.UtcNow < faultDeadline) await Task.Delay(20, ct);

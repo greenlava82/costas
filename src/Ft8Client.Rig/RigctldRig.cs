@@ -83,10 +83,11 @@ public sealed class RigctldRig : IRig
     public bool ProcessRunning => _process is { HasExited: false };
 
     /// <summary>
-    /// The running rigctld's process, for tests that kill it to check recovery. Tests run in parallel, each with its own
-    /// rigctld, so killing every process named rigctld would break the others.
+    /// The running rigctld's process id, for tests that kill it to check recovery. Tests run in parallel, each with its
+    /// own rigctld, so killing every process named rigctld would break the others. An id rather than the Process: the
+    /// supervisor disposes its Process as soon as it sees the exit, so a test waiting on that object could find it gone.
     /// </summary>
-    internal Process? ProcessForTests => _process;
+    internal int? ProcessIdForTests => _process?.Id;
 
     /// <inheritdoc />
     public event EventHandler<RigFault>? Faulted;
