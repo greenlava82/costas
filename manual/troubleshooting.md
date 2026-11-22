@@ -78,6 +78,14 @@ Use [Station setup › Transmit test](setup.md#4-transmit-test) into a dummy loa
   USB cable, check the antenna's choke or ground, and turn off Windows' USB selective suspend.
   If you had already exchanged reports, Costas keeps the contact: the other station's `RR73` still logs it, and
   ++ctrl+r++ sends your last message again once the radio is back.
+- **Transmit stops a few seconds in at high power, with "PTT release failed" or "rigctld is not running"**: RF is
+  getting into the CAT (USB) cable and garbling the radio's replies. Costas now shrugs off an odd unanswered read while
+  it transmits: only three in a row, a refused command or rigctld stopping ends the transmission, and the live meters
+  pause for 15 s after a failed meter read so the cable carries less. If it still stops, fix the RF: clip-on ferrites
+  on the USB cable at both ends (several turns through a mix-31 core works best on HF), a common-mode choke at the
+  antenna feed point, a short USB cable straight to the computer (no hub), and Windows' USB selective suspend off.
+  Dropping the power until it stops cutting out confirms it is RF. The log (☰ › Report a problem…) shows each
+  failed read as "Radio read failed".
 - **"The radio did not answer the transmit command within 2 s"**: Costas waits for the radio to confirm it has keyed
   before any audio goes out, so a slow answer starts the message a little late instead of cutting off its start. No
   answer at all means the radio link is stuck: check the USB cable and the radio indicator, then try again.

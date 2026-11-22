@@ -1421,8 +1421,18 @@ public sealed class AppHost : IAsyncDisposable
         rig.Faulted += (sender, f) =>
         {
             // A radio already replaced can still report a late fault while it shuts down; that is not this radio's state.
-            if (ReferenceEquals(sender, _rig)) Session?.SetService(ServiceNames.Radio, new ServiceStatus(ServiceHealth.Down, f.Message, f.TimeUtc));
+            if (!ReferenceEquals(sender, _rig)) return;
+            // Logged, so a "transmit keeps stopping" report's log shows what the radio link did.
+            Log.Warning("Radio fault: {Message}", f.Message);
+            Session?.SetService(ServiceNames.Radio, new ServiceStatus(ServiceHealth.Down, f.Message, f.TimeUtc));
         };
+        if (rig is RigctldRig hamlib)
+        {
+            hamlib.ReadFailed += (sender, why) =>
+            {
+                if (ReferenceEquals(sender, _rig)) Log.Information("{Why}", why);
+            };
+        }
         _rig = rig;
         Transmitter?.SetRig(rig);
         if (Plan.MutesTransmitAudio(r))
