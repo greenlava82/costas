@@ -17,11 +17,33 @@ namespace Ft8Client.Rig;
 
 /// <summary>
 /// Radio control through a supervised <c>rigctld</c> child process. On a failed command the fault is raised, the
-/// process is restarted with back-off (1, 2, 5, 10 s), and PTT release is retried over a fresh connection.
+/// process is restarted with back-off (1, 2, 5, 10 s), and PTT release is retried over a fresh connection. A status
+/// read (the dial, the mode) that fails while rigctld is still running is retried by the next poll instead: up to
+/// <see cref="ReadFailuresTolerated"/> in a row are not a fault, because RF in the CAT cable at high power garbles an
+/// odd reply without the radio link being lost, and stopping the transmission and killing rigctld for each one made
+/// every high-power transmission end within seconds (issue reported by DF2RG, IC-7300 at 100 W).
 /// </summary>
 public sealed class RigctldRig : IRig
 {
     private static readonly TimeSpan[] RestartDelays = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10)];
+
+    /// <summary>
+    /// Failed status reads in a row that are retried quietly while rigctld runs; the next one is a fault. Commands that
+    /// change the radio (PTT, frequency, mode) are never retried quietly, and neither is rigctld exiting.
+    /// </summary>
+    public const int ReadFailuresTolerated = 2;
+
+    /// <summary>
+    /// How long a status read may take. Longer than Hamlib's own worst case for one command on a garbled link (the Icom
+    /// drivers wait 1 s and retry 3 times, about 4 s), so a reply Hamlib recovers by retrying is not cut off first, as
+    /// WSJT-X, which calls Hamlib directly, never cuts it off. Reads have their own connection, so PTT commands never
+    /// wait behind one in Costas.
+    /// </summary>
+    public static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>How long meter reads stop after one fails, so a struggling CAT link carries only what matters.</summary>
+    public static readonly TimeSpan MeterPause = TimeSpan.FromSeconds(15);
+
     private readonly RigctldOptions _options;
     private readonly IProcessGuard _guard;
     private readonly IClock _clock;
@@ -30,12 +52,15 @@ public sealed class RigctldRig : IRig
     private Process? _live;
     private RigctldClient? _client;
     private RigctldClient? _meters;
+    private RigctldClient? _reads;
     private int _port;
     private int _restarts;
     private int _backoff;
     private bool _modeFallback;
     private volatile bool _disposed;
     private volatile bool _pttMayBeOn;
+    private int _readFailures;
+    private long _metersPausedUntilTicks;
     private readonly Queue<string> _stderr = new();
 
     private RigctldRig(RigctldOptions options, IProcessGuard guard, IClock clock)
@@ -65,6 +90,12 @@ public sealed class RigctldRig : IRig
 
     /// <inheritdoc />
     public event EventHandler<RigFault>? Faulted;
+
+    /// <summary>
+    /// Raised for a failed read that is retried quietly (see <see cref="ReadFailuresTolerated"/>) or a failed meter read,
+    /// with what went wrong, so the log shows a CAT link that is struggling before it fails outright.
+    /// </summary>
+    public event EventHandler<string>? ReadFailed;
 
     /// <summary>Starts rigctld and waits until it answers.</summary>
     public static async Task<RigctldRig> StartAsync(RigctldOptions options, IProcessGuard guard, IClock clock, CancellationToken ct)
@@ -156,15 +187,15 @@ public sealed class RigctldRig : IRig
     /// <inheritdoc />
     public async Task<RigState> GetStateAsync(CancellationToken ct)
     {
-        var f = await Run(c => c.GetFrequencyAsync(ct), ct).ConfigureAwait(false);
-        var m = await Run(c => c.SendAsync("m", ct), ct).ConfigureAwait(false);
-        var t = await Run(c => c.SendAsync("t", ct), ct).ConfigureAwait(false);
-        var s = await Run(c => c.SendAsync("s", ct), ct).ConfigureAwait(false);
+        var f = await Read(c => c.GetFrequencyAsync(ct), ct).ConfigureAwait(false);
+        var m = await Read(c => c.SendAsync("m", ct), ct).ConfigureAwait(false);
+        var t = await Read(c => c.SendAsync("t", ct), ct).ConfigureAwait(false);
+        var s = await Read(c => c.SendAsync("s", ct), ct).ConfigureAwait(false);
         return new RigState(f, m["Mode"] ?? "?", t["PTT"] == "1", s["Split"] == "1", RigState.ParsePassband(m["Passband"]));
     }
 
     /// <inheritdoc />
-    public Task<long> GetFrequencyAsync(CancellationToken ct) => Run(c => c.GetFrequencyAsync(ct), ct);
+    public Task<long> GetFrequencyAsync(CancellationToken ct) => Read(c => c.GetFrequencyAsync(ct), ct);
 
     /// <inheritdoc />
     public Task SetFrequencyAsync(long hz, CancellationToken ct) =>
@@ -241,7 +272,7 @@ public sealed class RigctldRig : IRig
     {
         // Its own connection, so a slow meter reply never holds up a PTT command waiting on the main client's lock.
         var m = _meters;
-        if (m is null || !ProcessRunning) return TxMeterReading.None;
+        if (m is null || !ProcessRunning || MetersPaused) return TxMeterReading.None;
         try
         {
             var alc = await m.GetLevelAsync("ALC", ct).ConfigureAwait(false);
@@ -253,6 +284,7 @@ public sealed class RigctldRig : IRig
         }
         catch (Exception ex) when (ex is RigException or ObjectDisposedException)
         {
+            PauseMeters(ex);
             return TxMeterReading.None;
         }
     }
@@ -294,7 +326,7 @@ public sealed class RigctldRig : IRig
         // The meter connection, for the same reason as the meters. RFPOWER is the power setting as a fraction of the
         // radio's maximum; power2mW turns it into milliwatts using the driver's table for the frequency and mode.
         var m = _meters;
-        if (m is null || !ProcessRunning) return null;
+        if (m is null || !ProcessRunning || MetersPaused) return null;
         try
         {
             var level = await m.GetLevelAsync("RFPOWER", ct).ConfigureAwait(false);
@@ -308,6 +340,7 @@ public sealed class RigctldRig : IRig
         }
         catch (Exception ex) when (ex is RigException or ObjectDisposedException)
         {
+            PauseMeters(ex);
             return null;
         }
     }
@@ -564,6 +597,7 @@ public sealed class RigctldRig : IRig
             await StopProcessAsync().ConfigureAwait(false);
             if (_client is not null) await _client.DisposeAsync().ConfigureAwait(false);
             if (_meters is not null) await _meters.DisposeAsync().ConfigureAwait(false);
+            if (_reads is not null) await _reads.DisposeAsync().ConfigureAwait(false);
         }
         finally
         {
@@ -579,6 +613,7 @@ public sealed class RigctldRig : IRig
             if (_client is null || !ProcessRunning) throw new RigException("rigctld is not running; restarting it.");
             var result = await f(_client).ConfigureAwait(false);
             _backoff = 0; // working again: the next fault starts the back-off from the shortest delay
+            Volatile.Write(ref _readFailures, 0);
             return result;
         }
         catch (RigException ex) when (!ex.Refused && !_disposed)
@@ -587,6 +622,50 @@ public sealed class RigctldRig : IRig
             _ = Task.Run(() => RestartAsync(CancellationToken.None), CancellationToken.None);
             throw;
         }
+    }
+
+    // A status read, on its own connection with a longer wait (ReadTimeout). Unlike Run, a failure while rigctld is still running is passed to the caller without a fault or a
+    // restart, up to ReadFailuresTolerated in a row: the polls read again a second later. Hamlib's Icom drivers retry a
+    // garbled CI-V reply three times with a 1 s timeout, so one bad frame used to outlast the client's 2 s wait without
+    // anything being wrong with the link. Treating that as a dead radio stopped the transmission and killed rigctld,
+    // whose restart then failed the PTT release ("PTT release failed", "rigctld is not running"). A dead rigctld, a
+    // refused command and the PTT, frequency and mode commands all still fault at once.
+    private async Task<T> Read<T>(Func<RigctldClient, Task<T>> f, CancellationToken ct)
+    {
+        var c = _reads;
+        if (c is null || !ProcessRunning) return await Run(f, ct).ConfigureAwait(false);
+        try
+        {
+            var result = await f(c).ConfigureAwait(false);
+            _backoff = 0;
+            Volatile.Write(ref _readFailures, 0);
+            return result;
+        }
+        catch (RigException ex) when (!ex.Refused && !_disposed)
+        {
+            var inARow = Interlocked.Increment(ref _readFailures);
+            if (inARow <= ReadFailuresTolerated && ProcessRunning)
+            {
+                ReadFailed?.Invoke(this, $"Radio read failed ({inARow} in a row), reading again: {ex.Message}");
+                throw;
+            }
+            Volatile.Write(ref _readFailures, 0);
+            var why = inARow > 1 ? $"The radio did not answer {inARow} reads in a row ({ex.Message}); restarting rigctld." : ex.Message;
+            RaiseFault(why);
+            _ = Task.Run(() => RestartAsync(CancellationToken.None), CancellationToken.None);
+            throw new RigException(why, ex);
+        }
+    }
+
+    private bool MetersPaused => _clock.UtcNow.Ticks < Volatile.Read(ref _metersPausedUntilTicks);
+
+    // A meter read that fails stops meter reads for a while: they are display only, and on a CAT link that RF is
+    // disturbing every extra command is another chance for a garbled reply that holds up the commands that matter.
+    private void PauseMeters(Exception ex)
+    {
+        if (_disposed || ex is ObjectDisposedException) return;
+        Volatile.Write(ref _metersPausedUntilTicks, (_clock.UtcNow + MeterPause).Ticks);
+        ReadFailed?.Invoke(this, $"Radio meter read failed; meters paused for {MeterPause.TotalSeconds:0} s: {ex.Message}");
     }
 
     private async Task Run(Func<RigctldClient, Task> f, CancellationToken ct) =>
@@ -674,6 +753,8 @@ public sealed class RigctldRig : IRig
         _client = new RigctldClient("127.0.0.1", _port);
         if (_meters is not null) await _meters.DisposeAsync().ConfigureAwait(false);
         _meters = new RigctldClient("127.0.0.1", _port, TimeSpan.FromSeconds(1));
+        if (_reads is not null) await _reads.DisposeAsync().ConfigureAwait(false);
+        _reads = new RigctldClient("127.0.0.1", _port, ReadTimeout);
         // rigctld listens only once it has opened the radio. A network model opens another program's server first, and
         // Hamlib waits 10 s for each start-up command that server leaves unanswered (\get_powerstat, \chk_vfo,
         // \dump_state), so give those up to 40 s before calling the server silent.
