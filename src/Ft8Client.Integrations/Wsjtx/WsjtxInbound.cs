@@ -9,7 +9,8 @@
 namespace Ft8Client.Integrations.Wsjtx;
 
 /// <summary>
-/// Parses the "In" datagrams this app acts on: Reply (4), Halt Tx (8) and Highlight Callsign (13). Field layouts are
+/// Parses the "In" datagrams this app acts on: Reply (4), Replay (7), Halt Tx (8), Highlight Callsign (13) and Configure
+/// (15). Field layouts are
 /// from WSJT-X <c>Network/NetworkMessage.hpp</c>.
 /// </summary>
 public static class WsjtxInbound
@@ -17,11 +18,17 @@ public static class WsjtxInbound
     /// <summary>Reply.</summary>
     public const uint Reply = 4;
 
+    /// <summary>Replay.</summary>
+    public const uint Replay = 7;
+
     /// <summary>Halt Tx.</summary>
     public const uint HaltTx = 8;
 
     /// <summary>Highlight Callsign.</summary>
     public const uint Highlight = 13;
+
+    /// <summary>Configure.</summary>
+    public const uint Configure = 15;
 
     /// <summary>
     /// Parses a datagram. Returns null for a datagram that is not WSJT-X, has an unknown schema, is one of the types
@@ -40,8 +47,10 @@ public static class WsjtxInbound
             return type switch
             {
                 Reply => new WsjtxReply(id, r.Time(), r.Int32(), r.Double(), r.UInt32(), r.Utf8() ?? string.Empty, r.Utf8() ?? string.Empty, r.Bool(), r.UInt8()),
+                Replay => new WsjtxReplay(id),
                 HaltTx => new WsjtxHaltTx(id, r.Bool()),
                 Highlight => new WsjtxHighlight(id, r.Utf8() ?? string.Empty, r.Color(), r.Color(), r.Bool()),
+                Configure => ReadConfigure(id, r),
                 _ => null,
             };
         }
@@ -49,5 +58,19 @@ public static class WsjtxInbound
         {
             return null;
         }
+    }
+
+    // Mode, frequency tolerance, submode, fast mode, T/R period, Rx DF, DX call, DX grid, generate messages, in that order.
+    private static WsjtxConfigure ReadConfigure(string id, QDataStreamParser r)
+    {
+        var mode = r.Utf8() ?? string.Empty;
+        r.UInt32();
+        r.Utf8();
+        r.Bool();
+        r.UInt32();
+        r.UInt32();
+        var call = r.Utf8() ?? string.Empty;
+        var grid = r.Utf8() ?? string.Empty;
+        return new WsjtxConfigure(id, mode, call, grid, r.Bool());
     }
 }

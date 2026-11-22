@@ -9,6 +9,7 @@
 using Ft8Client.App.Engine;
 using Ft8Client.App.Services;
 using Ft8Client.App.ViewModels;
+using Ft8Client.Core;
 using Ft8Client.Core.Decoding;
 using Ft8Client.Core.Messages;
 using Ft8Client.Integrations.Wsjtx;
@@ -19,8 +20,8 @@ public class UdpInboundTests
 {
     private static readonly DateTime Slot = new(2026, 10, 12, 21, 40, 15, DateTimeKind.Utc);
 
-    private static RawDecodeLine Line(DateTime slot, string text, bool toMe = false, bool tx = false) =>
-        new(new Decode(slot, -10, 0.1, 1200, text, false), MessageParser.Parse(text), null, toMe, tx);
+    private static RawDecodeLine Line(DateTime slot, string text, bool toMe = false, bool tx = false, Mode mode = Mode.Ft8) =>
+        new(new Decode(slot, -10, 0.1, 1200, text, false), MessageParser.Parse(text), null, toMe, tx, mode);
 
     private static WsjtxReply Reply(string text, DateTime? slot = null) =>
         new("Costas", (slot ?? Slot).TimeOfDay, -10, 0.1, 1200, "~", text, false, 0);
@@ -94,5 +95,23 @@ public class UdpInboundTests
         vm.ApplyHighlights();
 
         vm.Lines.Single(l => l.IsLine).Background.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReplayDecodes_RecentReceivedLines_SentAgainNotNew()
+    {
+        var lines = new[]
+        {
+            Line(Slot, "CQ K1ABC FN42"),
+            Line(Slot.AddMinutes(-20), "CQ G4AAA IO91"),
+            Line(Slot, "CQ W7LIT DN40", tx: true),
+            Line(Slot, "CQ JA1XYZ PM95", mode: Mode.Ft4),
+            Line(Slot.AddSeconds(-15), "CQ VK2ABC QF56"),
+        };
+
+        var sent = UdpInteropService.ReplayDecodes(lines, Mode.Ft8, Slot.AddSeconds(10), offAir: false).ToList();
+
+        sent.Select(d => d.Message).Should().Equal("CQ VK2ABC QF56", "CQ K1ABC FN42");
+        sent.Should().OnlyContain(d => !d.IsNew);
     }
 }

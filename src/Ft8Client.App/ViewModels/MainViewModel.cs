@@ -144,6 +144,16 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
             case Integrations.Wsjtx.WsjtxHaltTx:
                 Halt();
                 break;
+            case Integrations.Wsjtx.WsjtxConfigure c when Callsign.IsValid(Callsign.Normalize(c.DxCall)):
+                // DXLab SpotCollector sends this when a spot is double-clicked (WSJT-X fills in DX Call and DX Grid and
+                // generates its messages but does not transmit). Costas selects the station; calling stays the operator's click.
+                var dx = Callsign.Normalize(c.DxCall);
+                SelectTab(0);
+                StatusText = Operate.SelectCall(dx)
+                    ? $"Another program picked {dx}; it is selected in Next in line. Click Call to call it."
+                    : $"Another program picked {dx}, which is not in Next in line on this band right now.";
+                StatusKind = TextKind.Normal;
+                break;
             case Integrations.Wsjtx.WsjtxHighlight h:
                 Raw.Highlight(h);
                 Dispatch(Raw.ApplyHighlights);

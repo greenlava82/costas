@@ -17,4 +17,5 @@ namespace Ft8Client.Integrations.Wsjtx;
 /// <param name="Message">Message text.</param>
 /// <param name="LowConfidence">The decoder flagged it.</param>
 /// <param name="OffAir">Decoded from a recording, not the air.</param>
-public sealed record WsjtxDecode(DateTime TimeUtc, int Snr, double Dt, int OffsetHz, string Mode, string Message, bool LowConfidence, bool OffAir);
+/// <param name="IsNew">False for a decode sent again in answer to Replay.</param>
+public sealed record WsjtxDecode(DateTime TimeUtc, int Snr, double Dt, int OffsetHz, string Mode, string Message, bool LowConfidence, bool OffAir, bool IsNew = true);

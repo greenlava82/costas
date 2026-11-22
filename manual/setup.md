@@ -43,6 +43,12 @@ If flrig controls the radio, choose **FLRig** as the manufacturer, then enter fl
 runs on another PC or listens on another port (flrig's *Config › Setup › Server* page shows both).
 Keep flrig running: it owns the radio's COM port. TRXManager and ACLog work the same way.
 
+If you use the DXLab Suite, choose **DXLab** as the manufacturer and **Commander (DX Lab Suite)** as the model, and keep
+Commander running: it owns the radio's COM port, so DXKeeper, SpotCollector and DXView keep following the radio while
+Costas works. The address is `127.0.0.1:52002`, which is Commander's *Base Port* (52000 by default, on Commander's
+*Network Service* settings) plus 2. Set **Transmit (PTT)** to **CAT command** to key through Commander, or to VOX.
+Commander has no power, meter or tuner commands, so Costas cannot read power or meters or start the tuner through it.
+
 **FlexRadio (6000 and 8000 series): one click.** When a FlexRadio is on your network, the Radio step shows it at the
 top under **Found on your network**, for example *FLEX-8600 “Shack” at 192.168.1.20*. Press **Use this radio**. Costas
 asks the radio which slice you transmit on, chooses Hamlib's **SmartSDR Slice** model for it with the radio's address,
@@ -110,7 +116,8 @@ again to carry on and set the radio up later.
 !!! tip "Close other radio programs first"
     Only one program can use a COM port at a time. If WSJT-X, JTDX, Flrig, N1MM+ or the radio maker's own utility is
     running, close it before you test. When Costas searches every port it names any port another program is holding.
-    The exception is a program you chose as the radio (flrig, or a rigctld server for NET rigctl): keep that one running.
+    The exception is a program you chose as the radio (flrig, DXLab Commander, or a rigctld server for NET rigctl): keep
+    that one running.
 
 **No CAT cable?** Tick **My radio has no CAT control: use audio and VOX only**. Costas then cannot read or set the
 frequency, and keys the radio by VOX. Set the radio to the right frequency yourself.

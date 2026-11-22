@@ -410,6 +410,23 @@ The page is called **PSK Reporter and RBN** in Settings.
   folders go; **Open folder** shows it. Not written in simulation.
 - **Save received audio**: none, only slots with decodes, or all, as WAV files, kept for 30 days by default.
 
+### DXLab Suite {#dxlab}
+
+Costas speaks to the DXLab Suite the way WSJT-X does, so DXLab's own WSJT-X settings apply.
+
+- **Radio**: choose **DXLab › Commander** in [Station setup](setup.md#2-radio-cat-and-ptt). Commander keeps the
+  radio, and Costas sets frequency, mode and split and keys through it.
+- **SpotCollector**: point it at the WSJT-X UDP port above (2237, or the second program's port when JTAlert or
+  GridTracker has 2237). Every decode goes to SpotCollector as a spot. Double-clicking a spot in SpotCollector
+  selects that station in Next in line; Costas does not call it until you click **Call**. When SpotCollector starts
+  after Costas, it asks for the decodes it missed and Costas sends the last 15 minutes again.
+- **DXKeeper**: each logged contact goes to SpotCollector as a full ADIF record, and SpotCollector passes it to
+  DXKeeper, so DXKeeper's duplicate and award checks see it at once.
+- **DXView and Pathfinder**: the station you are working is sent in Costas's status, so SpotCollector can look it up
+  in DXView and Pathfinder as it does for WSJT-X.
+- **Highlights**: when a program sends WSJT-X's *Highlight Callsign* message for a needed station, the colours show on
+  the [Raw decodes](raw-decodes.md) page.
+
 ## Mobile connection
 
 ![Settings: Mobile connection](images/settings-mobile-connection.png)

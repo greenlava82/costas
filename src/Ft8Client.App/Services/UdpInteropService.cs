@@ -20,8 +20,8 @@ namespace Ft8Client.App.Services;
 
 /// <summary>
 /// WSJT-X UDP interop. Out: heartbeat every 15 s, status on change, decodes, clear on band change, logged contacts (both
-/// forms) and close on exit. In: Reply, Halt Tx and Highlight Callsign addressed to this app, passed on through
-/// <see cref="Inbound"/>. Lets GridTracker, JTAlert and loggers follow and drive this app unchanged. Everything goes to
+/// forms) and close on exit. In: Reply, Halt Tx, Highlight Callsign and Configure addressed to this app, passed on through
+/// <see cref="Inbound"/>; Replay is answered here. Lets GridTracker, JTAlert and loggers follow and drive this app unchanged. Everything goes to
 /// one address and port, and to a second one when that is on (DXLab SpotCollector and JTAlert cannot share a port).
 /// </summary>
 public sealed class UdpInteropService : IDisposable
@@ -175,6 +175,12 @@ public sealed class UdpInteropService : IDisposable
     {
         var m = WsjtxInbound.Parse(datagram);
         if (m is null || m.TargetId != ClientId) return;
+        if (m is WsjtxReplay)
+        {
+            Log.Information("UDP Replay from {From}", from);
+            Replay();
+            return;
+        }
         if (m is not WsjtxHighlight) Log.Information("UDP {Kind} from {From}", m.GetType().Name, from);
         try
         {
@@ -184,6 +190,35 @@ public sealed class UdpInteropService : IDisposable
         {
             Log.Warning(ex, "UDP {Kind} from {From} not handled", m.GetType().Name, from);
         }
+    }
+
+    /// <summary>
+    /// Answers Replay as WSJT-X does: the decodes still on screen (this band and mode, the last 15 minutes) again, marked
+    /// not new, then a Status. Lets SpotCollector or GridTracker catch up when they start after Costas.
+    /// </summary>
+    private void Replay()
+    {
+        var s = _session.Snapshot;
+        if (!ModeInfo.IsSlotted(s.Mode)) return;
+        foreach (var d in ReplayDecodes(s.RawDecodes, s.Mode, DateTime.UtcNow, _offAir))
+            Send(WsjtxMessages.Decode(ClientId, d));
+        lock (_gate) _lastStatus = null;
+        OnChanged(s);
+    }
+
+    /// <summary>
+    /// The decodes a Replay sends again: received lines (not this station's own transmissions) in <paramref name="mode"/>
+    /// from the last 15 minutes, oldest first, marked not new.
+    /// </summary>
+    public static IEnumerable<WsjtxDecode> ReplayDecodes(IEnumerable<RawDecodeLine> lines, Mode mode, DateTime nowUtc, bool offAir)
+    {
+        var since = nowUtc - TimeSpan.FromMinutes(15);
+        var name = ModeInfo.Name(mode);
+        return lines
+            .Where(l => !l.Transmitted && l.Mode == mode && l.Decode.SlotStartUtc >= since)
+            .OrderBy(l => l.Decode.SlotStartUtc)
+            .Select(l => new WsjtxDecode(l.Decode.SlotStartUtc, l.Decode.Snr, l.Decode.Dt, l.Decode.OffsetHz, name, l.Decode.Text,
+                l.Decode.LowConfidence, offAir, IsNew: false));
     }
 
     private void OnBandChanged() => Send(WsjtxMessages.Clear(ClientId));
