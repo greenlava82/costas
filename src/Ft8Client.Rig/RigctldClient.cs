@@ -16,6 +16,9 @@ namespace Ft8Client.Rig;
 public sealed class RigctldClient : IAsyncDisposable
 {
     private readonly SemaphoreSlim _lock = new(1, 1);
+    // Cancelled by DisposeAsync, so a command still waiting on rigctld ends at once instead of holding the lock.
+    private readonly CancellationTokenSource _closed = new();
+    private bool _disposed;
     private readonly TimeSpan _timeout;
     private TcpClient? _tcp;
     private StreamReader? _reader;
@@ -44,7 +47,10 @@ public sealed class RigctldClient : IAsyncDisposable
         await _lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            // The rig replaces this client when it restarts rigctld; a command that reaches the old one fails like any
+            // other lost connection.
+            if (_disposed) throw new RigException("The connection to rigctld was closed.");
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, _closed.Token);
             cts.CancelAfter(_timeout);
             var sw = System.Diagnostics.Stopwatch.StartNew();
             try
@@ -62,17 +68,17 @@ public sealed class RigctldClient : IAsyncDisposable
                 LastRoundTrip = sw.Elapsed;
                 return RigctldReply.Parse(lines);
             }
-            catch (Exception ex) when (ex is IOException or SocketException or OperationCanceledException && !ct.IsCancellationRequested)
+            catch (Exception ex) when (ex is IOException or SocketException or OperationCanceledException or ObjectDisposedException)
             {
+                // Whatever happened, the reply may still arrive and the next command would read it as its own: start the
+                // next command on a fresh connection.
                 Disconnect();
+                // The caller gave up. This is checked first because a connection error can land in the same moment
+                // ("connection refused" while a cancelled start-up was still retrying); the caller must see the
+                // cancellation, or it would not stop the rigctld it started.
+                if (ct.IsCancellationRequested) throw new OperationCanceledException("The rigctld command was cancelled.", ex, ct);
+                if (_closed.IsCancellationRequested) throw new RigException("The connection to rigctld was closed.", ex);
                 throw new RigException(ex is OperationCanceledException ? "rigctld did not answer in time." : $"rigctld connection failed: {ex.Message}", ex);
-            }
-            catch (OperationCanceledException)
-            {
-                // The caller gave up mid-command: the reply may still arrive, and the next command would read it as its
-                // own. Start the next command on a fresh connection.
-                Disconnect();
-                throw;
             }
         }
         finally
@@ -155,10 +161,21 @@ public sealed class RigctldClient : IAsyncDisposable
     }
 
     /// <inheritdoc />
-    public ValueTask DisposeAsync()
+    // The lock is not disposed: a command running on another thread still releases it when it ends. Cancelling _closed
+    // ends that command first, then the connection is closed under the lock.
+    public async ValueTask DisposeAsync()
     {
-        Disconnect();
-        _lock.Dispose();
-        return ValueTask.CompletedTask;
+        if (_closed.IsCancellationRequested) return;
+        await _closed.CancelAsync().ConfigureAwait(false);
+        await _lock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            _disposed = true;
+            Disconnect();
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 }

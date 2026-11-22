@@ -27,6 +27,9 @@ public sealed class RigctldRig : IRig
 {
     private static readonly TimeSpan[] RestartDelays = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10)];
 
+    // The back-off wait before a restart; a test holds it to look at the rig while rigctld is down.
+    internal Func<TimeSpan, CancellationToken, Task> RestartWaitForTests { get; set; } = Task.Delay;
+
     /// <summary>
     /// Failed status reads in a row that are retried quietly while rigctld runs; the next one is a fault. Commands that
     /// change the radio (PTT, frequency, mode) are never retried quietly, and neither is rigctld exiting.
@@ -50,10 +53,11 @@ public sealed class RigctldRig : IRig
     private readonly SemaphoreSlim _restartLock = new(1, 1);
     private Process? _process;
     private Process? _live;
-    private RigctldClient? _client;
+    private volatile RigctldClient? _client;
     private RigctldClient? _meters;
     private RigctldClient? _reads;
     private int _port;
+    private readonly Func<int> _pickPort;
     private int _restarts;
     private int _backoff;
     private bool _modeFallback;
@@ -63,11 +67,12 @@ public sealed class RigctldRig : IRig
     private long _metersPausedUntilTicks;
     private readonly Queue<string> _stderr = new();
 
-    private RigctldRig(RigctldOptions options, IProcessGuard guard, IClock clock)
+    private RigctldRig(RigctldOptions options, IProcessGuard guard, IClock clock, Func<int>? pickPort = null)
     {
         _options = options;
         _guard = guard;
         _clock = clock;
+        _pickPort = pickPort ?? FreePort;
     }
 
     /// <inheritdoc />
@@ -99,9 +104,13 @@ public sealed class RigctldRig : IRig
     public event EventHandler<string>? ReadFailed;
 
     /// <summary>Starts rigctld and waits until it answers.</summary>
-    public static async Task<RigctldRig> StartAsync(RigctldOptions options, IProcessGuard guard, IClock clock, CancellationToken ct)
+    public static Task<RigctldRig> StartAsync(RigctldOptions options, IProcessGuard guard, IClock clock, CancellationToken ct) =>
+        StartAsync(options, guard, clock, ct, pickPort: null);
+
+    /// <summary>As above, with the TCP port for rigctld chosen by <paramref name="pickPort"/> (tests force a port in use).</summary>
+    internal static async Task<RigctldRig> StartAsync(RigctldOptions options, IProcessGuard guard, IClock clock, CancellationToken ct, Func<int>? pickPort)
     {
-        var rig = new RigctldRig(options, guard, clock);
+        var rig = new RigctldRig(options, guard, clock, pickPort);
         await rig.LaunchAsync(ct).ConfigureAwait(false);
         return rig;
     }
@@ -608,14 +617,21 @@ public sealed class RigctldRig : IRig
 
     private async Task<T> Run<T>(Func<RigctldClient, Task<T>> f, CancellationToken ct)
     {
+        var client = _client;
         try
         {
             // A dead rigctld is a rig error (the transmitter must stop), not something to paper over by restarting quietly.
-            if (_client is null || !ProcessRunning) throw new RigException("rigctld is not running; restarting it.");
-            var result = await f(_client).ConfigureAwait(false);
+            if (client is null || !ProcessRunning) throw new RigException("rigctld is not running; restarting it.");
+            var result = await f(client).ConfigureAwait(false);
             _backoff = 0; // working again: the next fault starts the back-off from the shortest delay
             Volatile.Write(ref _readFailures, 0);
             return result;
+        }
+        // A command that was still on the client a restart has since replaced fails, but the fault was raised and the
+        // restart done already: restarting again would kill the rigctld that was just started.
+        catch (RigException ex) when (!ex.Refused && !_disposed && client is not null && !ReferenceEquals(client, _client))
+        {
+            throw;
         }
         catch (RigException ex) when (!ex.Refused && !_disposed)
         {
@@ -691,7 +707,7 @@ public sealed class RigctldRig : IRig
             _backoff++;
             _restarts++;
             await StopProcessAsync().ConfigureAwait(false);
-            await Task.Delay(delay, ct).ConfigureAwait(false);
+            await RestartWaitForTests(delay, ct).ConfigureAwait(false);
             if (_disposed) return;
             await LaunchAsync(ct).ConfigureAwait(false);
             if (_pttMayBeOn)
@@ -716,9 +732,20 @@ public sealed class RigctldRig : IRig
         }
     }
 
+    // The TCP port is free when chosen, but another program can take it before rigctld opens it; rigctld then exits at
+    // once, saying nothing. Try a fresh port up to twice before giving up.
     private async Task LaunchAsync(CancellationToken ct)
     {
-        _port = FreePort();
+        for (var attempt = 1; ; attempt++)
+        {
+            if (await LaunchOnceAsync(ct, mayRetryPort: attempt < 3).ConfigureAwait(false)) return;
+        }
+    }
+
+    // True once rigctld answers; false when it exited because its TCP port was taken and mayRetryPort is set.
+    private async Task<bool> LaunchOnceAsync(CancellationToken ct, bool mayRetryPort)
+    {
+        _port = _pickPort();
         var psi = new ProcessStartInfo(_options.ExecutablePath)
         {
             UseShellExecute = false,
@@ -765,8 +792,10 @@ public sealed class RigctldRig : IRig
             try
             {
                 await _client.GetFrequencyAsync(ct).ConfigureAwait(false);
+                // An answer while our rigctld has already exited came from whatever holds the port, not from ours.
+                if (_process.HasExited) throw new RigException("rigctld exited.");
                 WatchForExit(_process);
-                return;
+                return true;
             }
             catch (RigException) when (DateTime.UtcNow < deadline && !_process.HasExited)
             {
@@ -792,6 +821,7 @@ public sealed class RigctldRig : IRig
                 // the operator needs, not our internal TCP port number.
                 string said;
                 lock (_stderr) said = string.Join(" ", _stderr);
+                if (exited && said.Length == 0 && mayRetryPort && PortInUse(_port)) return false;
                 throw new RigException(exited && said.Length > 0
                     ? $"rigctld stopped: {said}"
                     : $"rigctld is not answering: {ex.Message}" + (said.Length > 0 ? $" ({said})" : string.Empty), ex);
@@ -844,11 +874,26 @@ public sealed class RigctldRig : IRig
         }
     }
 
+    private static bool PortInUse(int port)
+    {
+        try
+        {
+            var l = new TcpListener(IPAddress.Loopback, port);
+            l.Start();
+            l.Stop();
+            return false;
+        }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+        {
+            return true;
+        }
+    }
+
     private static readonly Queue<int> RecentPorts = new();
 
     // A free TCP port for a new rigctld. The port search starts several at once, so a port handed out recently is never
     // handed out again: two rigctlds on one port would let a client read another port's radio.
-    private static int FreePort()
+    internal static int FreePort()
     {
         lock (RecentPorts)
         {

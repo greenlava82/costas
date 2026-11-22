@@ -136,26 +136,11 @@ public class RigTests
         var exe = HamlibModels.Find("rigctld", null);
         Assert.SkipWhen(exe is null, "rigctld is not installed.");
         var ct = TestContext.Current.CancellationToken;
-        var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
-        l.Start();
-        var port = ((System.Net.IPEndPoint)l.LocalEndpoint).Port;
-        l.Stop();
-        using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe!, ["-m", "1", "-T", "127.0.0.1", "-t", port.ToString(System.Globalization.CultureInfo.InvariantCulture)]))!;
+        var (p, port) = await StartDummyRigctld(exe!, ct);
         try
         {
             await using var c = new RigctldClient("127.0.0.1", port);
-            for (var i = 0; ; i++)
-            {
-                try
-                {
-                    await c.SetAsync("L RFPOWER 0.25", ct);
-                    break;
-                }
-                catch (RigException) when (i < 150) // up to 15 s for rigctld to open its port on a busy runner
-                {
-                    await Task.Delay(100, ct);
-                }
-            }
+            await c.SetAsync("L RFPOWER 0.25", ct);
             (await c.GetLevelAsync("RFPOWER", ct)).Should().Be(0.25);
             // The dummy rig takes 100 W as full power.
             (await c.PowerToMilliwattsAsync(0.25, 14_074_000, "PKTUSB", ct)).Should().Be(25_000);
@@ -164,6 +149,44 @@ public class RigTests
         {
             p.Kill();
             await p.WaitForExitAsync(ct);
+            p.Dispose();
+        }
+    }
+
+    // A dummy-radio rigctld of the test's own on a free port, answering. The port is free when picked, but another test's
+    // rigctld can take it first; ours then exits at once, and another port is tried.
+    private static async Task<(System.Diagnostics.Process Process, int Port)> StartDummyRigctld(string exe, CancellationToken ct)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var port = RigctldRig.FreePort();
+            var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe,
+                ["-m", "1", "-P", "RIG", "-T", "127.0.0.1", "-t", port.ToString(System.Globalization.CultureInfo.InvariantCulture)]))!;
+            await using (var c = new RigctldClient("127.0.0.1", port))
+            {
+                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15); // a busy runner can be slow to start it
+                while (true)
+                {
+                    try
+                    {
+                        await c.GetFrequencyAsync(ct);
+                        // An answer while ours has exited came from whatever holds the port.
+                        if (!p.HasExited) return (p, port);
+                        break;
+                    }
+                    catch (RigException) when (DateTime.UtcNow < deadline && !p.HasExited)
+                    {
+                        await Task.Delay(100, ct);
+                    }
+                    catch (RigException) when (p.HasExited)
+                    {
+                        break;
+                    }
+                }
+            }
+            await p.WaitForExitAsync(ct);
+            p.Dispose();
+            if (attempt == 5) throw new InvalidOperationException("rigctld could not open a TCP port after 5 tries.");
         }
     }
 
@@ -335,20 +358,11 @@ public class RigTests
         var exe = HamlibModels.Find("rigctld", null);
         Assert.SkipWhen(exe is null, "rigctld is not installed.");
         var ct = TestContext.Current.CancellationToken;
-        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        using var server = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe!,
-            ["-m", "1", "-P", "RIG", "-T", "127.0.0.1", "-t", port.ToString(System.Globalization.CultureInfo.InvariantCulture)]))!;
+        var (started, port) = await StartDummyRigctld(exe!, ct);
+        using var server = started;
         try
         {
             await using var direct = new RigctldClient("127.0.0.1", port);
-            for (var i = 0; ; i++)
-            {
-                try { await direct.GetFrequencyAsync(ct); break; }
-                catch (RigException) when (i < 150) { await Task.Delay(100, ct); }
-            }
             await direct.SetAsync("F 14074000", ct);
             await using (var proxy = await RigctldRig.StartAsync(
                 new RigctldOptions(exe!, 2, $"127.0.0.1:{port}", null), NullProcessGuard.Instance, SystemClock.Instance, ct))
@@ -433,6 +447,32 @@ public class RigTests
     public async Task ReadPtt_AudioOnly_Unknown()
     {
         (await new VoxRig(14_074_000).ReadPttAsync(TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task StartAsync_PortTakenBeforeRigctldOpensIt_StartsOnAnotherPort()
+    {
+        var exe = HamlibModels.Find("rigctld", null);
+        Assert.SkipWhen(exe is null, "rigctld is not installed.");
+        var ct = TestContext.Current.CancellationToken;
+        // Another program (or another test's rigctld) holds the first port picked, as happens when it takes a port
+        // between our check and rigctld opening it. rigctld exits at once, silently; the rig must try another port.
+        var taken = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        taken.Start();
+        try
+        {
+            var takenPort = ((System.Net.IPEndPoint)taken.LocalEndpoint).Port;
+            var picks = 0;
+            int Pick() => ++picks == 1 ? takenPort : RigctldRig.FreePort();
+            await using var rig = await RigctldRig.StartAsync(new RigctldOptions(exe!, 1, "COM-TEST", 38400), NullProcessGuard.Instance,
+                SystemClock.Instance, ct, Pick);
+            picks.Should().Be(2);
+            (await rig.GetFrequencyAsync(ct)).Should().BePositive();
+        }
+        finally
+        {
+            taken.Stop();
+        }
     }
 
     [Fact]
@@ -578,7 +618,18 @@ public class RigTests
 
         // Kill rigctld behind the client's back: the next command faults, then the supervisor restarts it.
         var faults = new List<RigFault>();
-        rig.Faulted += (_, f) => faults.Add(f);
+        rig.Faulted += (_, f) =>
+        {
+            lock (faults) faults.Add(f);
+        };
+        // The restart waits until the test has seen commands fail: on a slow runner its 1 s back-off could otherwise end
+        // before the test looks, and the command meant to fail would succeed.
+        var restartMayGo = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        rig.RestartWaitForTests = async (delay, token) =>
+        {
+            await restartMayGo.Task.WaitAsync(token);
+            await Task.Delay(delay, token);
+        };
         // Only this rig's rigctld: other test classes run alongside this one with their own, and killing those failed
         // their commands with "rigctld closed the connection".
         // The test kills and waits through its own Process object: the rig disposes its object as soon as it sees the
@@ -589,11 +640,16 @@ public class RigTests
             await own.WaitForExitAsync(ct);
         }
         // The exit is reported with no command pending, and commands fail (rather than quietly restarting) until it is back.
-        var faultDeadline = DateTime.UtcNow.AddSeconds(5);
-        while (faults.Count == 0 && DateTime.UtcNow < faultDeadline) await Task.Delay(20, ct);
-        faults.Should().NotBeEmpty();
+        var faultDeadline = DateTime.UtcNow.AddSeconds(15);
+        int FaultCount()
+        {
+            lock (faults) return faults.Count;
+        }
+        while (FaultCount() == 0 && DateTime.UtcNow < faultDeadline) await Task.Delay(20, ct);
+        FaultCount().Should().BePositive();
         await rig.Invoking(r => r.SetFrequencyAsync(7_074_000, ct)).Should().ThrowAsync<RigException>();
-        var deadline = DateTime.UtcNow.AddSeconds(10);
+        restartMayGo.SetResult();
+        var deadline = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
             try
