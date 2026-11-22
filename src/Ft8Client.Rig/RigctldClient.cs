@@ -61,7 +61,14 @@ public sealed class RigctldClient : IAsyncDisposable
                 var lines = new List<string>();
                 while (true)
                 {
-                    var line = await _reader!.ReadLineAsync(cts.Token).ConfigureAwait(false) ?? throw new RigException("rigctld closed the connection.");
+                    var line = await _reader!.ReadLineAsync(cts.Token).ConfigureAwait(false);
+                    if (line is null)
+                    {
+                        // TcpClient.Connected still says true after the far end closed: drop the connection, or every
+                        // later command would write into it and fail the same way instead of connecting again.
+                        Disconnect();
+                        throw new RigException("rigctld closed the connection.");
+                    }
                     lines.Add(line);
                     if (line.StartsWith("RPRT ", StringComparison.Ordinal)) break;
                 }
