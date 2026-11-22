@@ -21,7 +21,8 @@ namespace Ft8Client.App.Services;
 /// <summary>
 /// WSJT-X UDP interop. Out: heartbeat every 15 s, status on change, decodes, clear on band change, logged contacts (both
 /// forms) and close on exit. In: Reply, Halt Tx and Highlight Callsign addressed to this app, passed on through
-/// <see cref="Inbound"/>. Lets GridTracker, JTAlert and loggers follow and drive this app unchanged.
+/// <see cref="Inbound"/>. Lets GridTracker, JTAlert and loggers follow and drive this app unchanged. Everything goes to
+/// one address and port, and to a second one when that is on (DXLab SpotCollector and JTAlert cannot share a port).
 /// </summary>
 public sealed class UdpInteropService : IDisposable
 {
@@ -35,8 +36,8 @@ public sealed class UdpInteropService : IDisposable
     private readonly bool _offAir;
     private readonly Lock _gate = new();
     private readonly Timer _heartbeat;
-    private WsjtxUdpBroadcaster? _udp;
-    private (bool Enabled, string Address, int Port) _target;
+    private readonly WsjtxUdpBroadcaster?[] _udp = new WsjtxUdpBroadcaster?[2];
+    private readonly (bool Enabled, string Address, int Port)[] _target = new (bool, string, int)[2];
     private WsjtxStatus? _lastStatus;
     private bool _warned;
 
@@ -72,18 +73,19 @@ public sealed class UdpInteropService : IDisposable
     public string Resend(QsoRecord q)
     {
         ArgumentNullException.ThrowIfNull(q);
-        WsjtxUdpBroadcaster? udp;
-        (bool Enabled, string Address, int Port) target;
+        List<(WsjtxUdpBroadcaster? Udp, string Where)> targets;
         lock (_gate)
         {
-            udp = _udp;
-            target = _target;
+            targets = Enumerable.Range(0, _target.Length).Where(i => _target[i].Enabled)
+                .Select(i => (_udp[i], $"{_target[i].Address}:{_target[i].Port}")).ToList();
         }
-        if (!target.Enabled) return "UDP to other programs is off. Turn it on in Settings › Other programs, then try again.";
-        if (udp is null) return $"Costas cannot send to {target.Address}:{target.Port}. Check the address in Settings › Other programs.";
+        if (targets.Count == 0) return "UDP to other programs is off. Turn it on in Settings › Other programs, then try again.";
+        if (targets.FirstOrDefault(t => t.Udp is null) is { Where: { } bad }) return $"Costas cannot send to {bad}. Check the address in Settings › Other programs.";
+        var where = string.Join(" and ", targets.Select(t => t.Where));
         var ok = SendLogged(q);
-        return ok ? $"Sent {q.Call} to {target.Address}:{target.Port} again (QSO Logged and Logged ADIF)."
-            : $"Sending {q.Call} to {target.Address}:{target.Port} failed: {udp.LastError}";
+        var error = targets.Select(t => t.Udp!.LastError).FirstOrDefault(e => !string.IsNullOrEmpty(e));
+        return ok ? $"Sent {q.Call} to {where} again (QSO Logged and Logged ADIF)."
+            : $"Sending {q.Call} to {where} failed: {error}";
     }
 
     /// <summary>Sends a logged contact as QSO Logged and Logged ADIF.</summary>
@@ -105,27 +107,36 @@ public sealed class UdpInteropService : IDisposable
 
     private void Reconfigure(AppSettings s)
     {
-        var t = (s.Udp.Enabled, s.Udp.Address, s.Udp.Port);
+        // The second program only while UDP is on at all, so one switch turns everything off.
+        (bool Enabled, string Address, int Port)[] wanted =
+            [(s.Udp.Enabled, s.Udp.Address, s.Udp.Port), (s.Udp.Enabled && s.Udp.SecondEnabled, s.Udp.SecondAddress, s.Udp.SecondPort)];
+        var opened = false;
         lock (_gate)
         {
-            if (t == _target && (_udp is not null || !t.Enabled)) return;
-            _target = t;
-            _udp?.Dispose();
-            _udp = null;
-            _lastStatus = null;
-            _warned = false;
-            if (!t.Enabled) return;
-            try
+            for (var i = 0; i < wanted.Length; i++)
             {
-                _udp = new WsjtxUdpBroadcaster(t.Address, t.Port);
-                _udp.Received += OnReceived;
-            }
-            catch (Exception ex) when (ex is FormatException or System.Net.Sockets.SocketException or ArgumentException)
-            {
-                Log.Warning("UDP interop off: cannot send to {Address}:{Port}: {Error}", t.Address, t.Port, ex.Message);
+                var t = wanted[i];
+                if (t == _target[i] && (_udp[i] is not null || !t.Enabled)) continue;
+                _target[i] = t;
+                _udp[i]?.Dispose();
+                _udp[i] = null;
+                _lastStatus = null;
+                _warned = false;
+                if (!t.Enabled) continue;
+                try
+                {
+                    var udp = new WsjtxUdpBroadcaster(t.Address, t.Port);
+                    udp.Received += OnReceived;
+                    _udp[i] = udp;
+                    opened = true;
+                }
+                catch (Exception ex) when (ex is FormatException or System.Net.Sockets.SocketException or ArgumentException)
+                {
+                    Log.Warning("UDP interop off: cannot send to {Address}:{Port}: {Error}", t.Address, t.Port, ex.Message);
+                }
             }
         }
-        if (t.Enabled) Send(WsjtxMessages.Heartbeat(ClientId, AppInfo.Version, string.Empty));
+        if (opened) Send(WsjtxMessages.Heartbeat(ClientId, AppInfo.Version, string.Empty));
     }
 
     private void OnChanged(SessionSnapshot s)
@@ -177,17 +188,22 @@ public sealed class UdpInteropService : IDisposable
 
     private void OnBandChanged() => Send(WsjtxMessages.Clear(ClientId));
 
-    // True when the datagram went out.
+    // True when the datagram went out to every program it is meant for (false when none is open).
     private bool Send(byte[] datagram)
     {
-        WsjtxUdpBroadcaster? udp;
-        lock (_gate) udp = _udp;
-        if (udp is null) return false;
-        if (udp.Send(datagram)) return true;
-        if (_warned) return false;
-        _warned = true;
-        Log.Warning("UDP interop send failed: {Error}", udp.LastError);
-        return false;
+        WsjtxUdpBroadcaster[] open;
+        lock (_gate) open = _udp.OfType<WsjtxUdpBroadcaster>().ToArray();
+        if (open.Length == 0) return false;
+        var all = true;
+        foreach (var udp in open)
+        {
+            if (udp.Send(datagram)) continue;
+            all = false;
+            if (_warned) continue;
+            _warned = true;
+            Log.Warning("UDP interop send failed: {Error}", udp.LastError);
+        }
+        return all;
     }
 
     /// <inheritdoc />
@@ -202,8 +218,11 @@ public sealed class UdpInteropService : IDisposable
         Send(WsjtxMessages.Close(ClientId));
         lock (_gate)
         {
-            _udp?.Dispose();
-            _udp = null;
+            for (var i = 0; i < _udp.Length; i++)
+            {
+                _udp[i]?.Dispose();
+                _udp[i] = null;
+            }
         }
     }
 }

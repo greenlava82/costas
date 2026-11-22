@@ -321,7 +321,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             // 2026-11-13). Display only: the engine has them already. Skipped if the full decode got there first.
             if (_lastDecodedSlot is not { } done || done < audio.SlotStartUtc)
             {
-                _tracker.ApplyEarly(audio.SlotStartUtc, heard);
+                _tracker.ApplyEarly(audio.SlotStartUtc, Unblocked(heard));
                 _earlyDecodedSlot = audio.SlotStartUtc;
             }
         }
@@ -438,7 +438,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     {
         var heard = result.Decodes.Select(HeardMessage.From).ToList();
         if (heard.Count == 0) return;
-        _tracker.ApplySuperFox(slot, heard);
+        _tracker.ApplySuperFox(slot, Unblocked(heard));
         AddRaw(slot, heard);
         FeedEngine(slot, mode, heard, _clock.UtcNow);
         foreach (var h in heard)
@@ -527,9 +527,36 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         if (slot + ModeInfo.SlotLength(mode) < SlotMath.SlotStart(now, mode)) return;
         if (!_fedToEngine.TryGetValue(slot, out var fed)) _fedToEngine[slot] = fed = new HashSet<string>(StringComparer.Ordinal);
         foreach (var old in _fedToEngine.Keys.Where(k => k < slot - TimeSpan.FromMinutes(1)).ToList()) _fedToEngine.Remove(old);
-        var fresh = heard.Where(h => h.Decode.LowConfidence || !fed.Contains(h.Decode.Text)).ToList();
+        var fresh = Unblocked(heard).Where(h => h.Decode.LowConfidence || !fed.Contains(h.Decode.Text)).ToList();
         foreach (var h in fresh.Where(h => !h.Decode.LowConfidence)) fed.Add(h.Decode.Text);
         _engine.OnDecodes(slot, mode, fresh, now);
+    }
+
+    /// <summary>
+    /// Under _gate. The slot as the station list and the contact engine see it: without messages sent by a call on the
+    /// block list for this band and mode, so a blocked call is never listed, answered or auto-called. Raw decodes, the
+    /// journal and other programs still get every decode. The station being worked is kept, so blocking it does not cut
+    /// a contact off halfway.
+    /// </summary>
+    private List<HeardMessage> Unblocked(List<HeardMessage> heard)
+    {
+        var block = _config.Blocked;
+        if (block.IsEmpty) return heard;
+        var dx = _engine.DxCall;
+        return heard.Where(h => h.Message.SenderCall is not { } sender || Callsign.EqualsCall(sender, dx)
+            || !block.IsBlocked(sender, _config.Band, _config.Mode)).ToList();
+    }
+
+    // Under _gate: drops stations and waiting callers that are now blocked, so a call blocked from its row goes at once.
+    private void DropBlocked()
+    {
+        var block = _config.Blocked;
+        if (block.IsEmpty) return;
+        var dx = _engine.DxCall;
+        bool Blocked(string call) => !Callsign.EqualsCall(call, dx) && block.IsBlocked(call, _config.Band, _config.Mode);
+        _tracker.RemoveWhere(Blocked);
+        _engine.RemoveWaiting(Blocked);
+        _callWhenFree.RemoveAll(Blocked);
     }
 
     private DecodeContext FullContext()
@@ -601,8 +628,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             _quiet.Slot(slot, result.Decodes.Count);
 
             _tracker.KeepFor = _config.Ranking.KeepCqCallers;
-            _tracker.ApplySlot(slot, heard);
-            _pileups.ApplySlot(slot, heard);
+            var shown = Unblocked(heard);
+            _tracker.ApplySlot(slot, shown);
+            _pileups.ApplySlot(slot, shown);
             FeedEngine(slot, mode, heard, now);
             CallWhenFreeNow(now);
             AutoCallNow(now);
@@ -649,7 +677,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             if (unnamed is not null) _unnamedSignals = unnamed;
             _partials = partials ?? [];
             _reading = reading;
-            foreach (var h in heard) _tracker.ApplyText(h);
+            foreach (var h in heard.Where(h => !_config.Blocked.IsBlocked(h.Call, _config.Band, _config.Mode))) _tracker.ApplyText(h);
             _tracker.AgeText(utc);
             KeyboardActivity(utc);
             foreach (var l in lines)
@@ -1354,6 +1382,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             _engine.Configure(config.MyCall, config.MyGrid, CappedContact());
             ReloadContestLog();
             _kbd.Configure(config.MyCall);
+            DropBlocked();
             if (stationChanged)
             {
                 _receptionHistory.Clear();
@@ -1751,6 +1780,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 LastTxSlotUtc = _tx.LastStartedSlot,
                 TransmittingMessage = _tx.CurrentMessage,
                 CallingCq = keyboard ? _kbd.CallingCq : _engine.CallingCq,
+                UnansweredCqs = keyboard ? 0 : _engine.UnansweredCqs,
                 RigTuningUntilUtc = _rigTuningUntil is { } until && until > now ? until : null,
                 TxOffsetHz = keyboard && _kbd.InContact ? _kbd.PartnerOffsetHz : _txOffset,
                 TxOffsetClear = _txOffsetClear,

@@ -112,6 +112,26 @@ and is the same setting as **Settings › Contacts › CQ**. The bottom of the s
 When someone answers, Costas starts the contact with the first caller. Anyone else who calls you meanwhile waits in
 the **Calling you** bar.
 
+While nobody answers, the contact card counts your CQs: *Calling CQ · 5 with no answer*, and the status line reads
+*Calling CQ. 5 CQs with no answer.* The count goes back to zero when a station answers (or you call one) and when
+you start a new CQ run. It counts FT8 and FT4 CQs.
+
+Calls on your [block list](#blocking-a-call) are never answered: Costas keeps calling CQ as if they had not called.
+
+## Blocking a call
+
+Some stations call you again and again on the same band. To stop working one there, click its call in Next in line
+and choose **Block on 20 m** (your current band) in its details. The call leaves the station list, Next in line and
+**Calling you** at once, Costas never answers it when you call CQ, and Auto-call and Call when free skip it. Portable
+forms of the call (*ON4XYZ/P*) are blocked with it.
+
+Raw decodes, the decode journal, ALL.TXT, PSK Reporter and other programs still get everything heard, so nothing is
+hidden from your records. A contact already under way when you block the call carries on to its end, and you can
+still call a blocked station yourself from Raw decodes.
+
+To block a call on every band, in one mode only, or to unblock it, use
+[Settings › Blocked calls](settings.md#blocked-calls).
+
 ## The Calling you bar
 
 When a station calls you and you have not answered, a bar is pinned above the top card, outside the scrolling area,

@@ -200,4 +200,15 @@ public class ContactPanelViewModelTests
         p.HoundMode.Should().BeFalse();
         p.HoundNote.Should().BeEmpty();
     }
+
+    [Fact]
+    public void CallingCq_UnansweredCqs_CountInCaptionAndSubline()
+    {
+        ContactPanelViewModel.CallingCq(0).Should().BeSameAs(ContactPanelViewModel.IdleCallingCq);
+        var five = ContactPanelViewModel.CallingCq(5);
+        five.Caption.Should().Be("Calling CQ · 5 with no answer");
+        five.Subline.Should().Be("Waiting for a station to answer. 5 CQs in a row with no answer.");
+        five.IsIdle.Should().BeTrue();
+        ContactPanelViewModel.CallingCq(1).Subline.Should().Be("Waiting for a station to answer. 1 CQ sent so far with no answer.");
+    }
 }

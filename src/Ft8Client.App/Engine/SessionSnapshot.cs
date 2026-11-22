@@ -134,6 +134,9 @@ public sealed record SessionSnapshot
     /// <summary>True while calling CQ.</summary>
     public bool CallingCq { get; init; }
 
+    /// <summary>FT8 and FT4: CQs sent in a row with no answer (see <see cref="Core.Contacts.ContactEngine.UnansweredCqs"/>).</summary>
+    public int UnansweredCqs { get; init; }
+
     /// <summary>Current transmit offset.</summary>
     public int TxOffsetHz { get; init; } = 1500;
 

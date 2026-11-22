@@ -92,7 +92,7 @@ public sealed class AppHost : IAsyncDisposable
     // ever try each feature. Views and windows count by name, logged contacts by mode.
     private static readonly HashSet<string> TrackedFeatures = new(StringComparer.Ordinal)
     {
-        "station_called", "cq_started", "caller_answered", "caller_dismissed", "call_when_free", "auto_call_started", "hunt_added",
+        "station_called", "cq_started", "caller_answered", "caller_dismissed", "call_when_free", "auto_call_started", "hunt_added", "call_blocked",
         "hunt_go", "cluster_go", "tune", "contest_start", "contest_export", "macro_sent", "remote_connected", "remote_action", "view_opened",
         "window_opened", "contact_logged",
     };

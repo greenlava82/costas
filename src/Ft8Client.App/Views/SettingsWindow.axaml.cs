@@ -20,7 +20,7 @@ public partial class SettingsWindow : Window
     private static readonly (string Group, string[] Pages)[] Groups =
     [
         ("STATION", ["Station", "Transmitting", "Contacts", "PSK and RTTY"]),
-        ("FINDING STATIONS", ["Who to call", "Hunt list", "Notifications"]),
+        ("FINDING STATIONS", ["Who to call", "Hunt list", "Blocked calls", "Notifications"]),
         ("CONNECTIONS", ["Logbooks", "PSK Reporter and RBN", "Mobile connection", "Other programs"]),
         ("COSTAS", ["Appearance", "Updates", "Privacy", "Advanced", "Developer"]),
     ];

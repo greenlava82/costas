@@ -124,4 +124,9 @@ public interface IOperateCommands
     void Hunt(Core.Hunting.HuntTarget target)
     {
     }
+
+    /// <summary>Puts a call on the block list (station details). Nothing is called or sent.</summary>
+    void Block(Core.Blocking.BlockedCall entry)
+    {
+    }
 }

@@ -959,6 +959,26 @@
                   <TextBox Text="{Binding UdpPort}" Width="80" />
                 </StackPanel>
                 <TextBlock Classes="help" Text="The defaults (127.0.0.1, port 2237) work with GridTracker and JTAlert on this computer." />
+                <CheckBox Content="Also send to a second program" IsChecked="{Binding UdpSecondEnabled}" IsEnabled="{Binding UdpEnabled}" Margin="0,6,0,0" />
+                <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding UdpSecondEnabled}" IsVisible="{Binding UdpEnabled}">
+                  <TextBlock Text="Address" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding UdpSecondAddress}" Width="150" AutomationProperties.Name="Second program address" />
+                  <TextBlock Text="Port" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding UdpSecondPort}" Width="80" AutomationProperties.Name="Second program port" />
+                </StackPanel>
+                <TextBlock Classes="help" Text="Two programs cannot listen on the same port. To use DXLab SpotCollector and JTAlert or GridTracker together, give each its own port here and in that program, for example 2237 and 2238. Both get the same decodes, status and logged contacts." />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="ALL.TXT" />
+              <StackPanel Grid.Column="1" Spacing="6">
+                <CheckBox Content="Write every decode and transmission to ALL.TXT, one folder per month" IsChecked="{Binding AllTxt}" />
+                <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding AllTxt}">
+                  <TextBlock Text="Folder" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding AllTxtFolder}" Width="300" PlaceholderText="{Binding DefaultAllTxtFolder}" AutomationProperties.Name="ALL.TXT folder" />
+                  <Button Content="Open folder" Command="{Binding OpenAllTxtFolderCommand}" />
+                </StackPanel>
+                <TextBlock Classes="help" Text="The same line layout as WSJT-X's ALL.TXT, in a folder for each month (for example 2026-11\ALL.TXT), for programs and scripts that read it. Leave the folder blank for Documents\Costas. Costas keeps its own decode journal either way." />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
@@ -1175,6 +1195,48 @@
               <StackPanel Grid.Column="1" Spacing="4">
                 <CheckBox Content="Only when Costas is in the background" IsChecked="{Binding NotifyOnlyInBackground}" />
                 <TextBlock Classes="help" Text="Minimized, in mini mode, or behind another window. A station is notified at most once every 10 minutes, and when several arrive within a minute they are merged into one notification, so a busy band does not flood the notification centre. Notifications are silent: the chime settings decide whether Costas makes a sound." />
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Blocked calls (owner request 2026-11-22, from user feedback): last in the XAML so the page numbers above stay put. -->
+      <TabItem Header="Blocked calls">
+        <ScrollViewer>
+          <StackPanel>
+            <TextBlock Classes="page" Text="Blocked calls" />
+            <TextBlock Classes="intro" Text="Calls you do not want to work, on one band or every band. A blocked call leaves the station list, Next in line and Calling you, Costas never answers it when you call CQ, and Auto-call skips it. Raw decodes, the decode journal and other programs still get everything heard. A contact already under way when you block the call carries on." />
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Blocked" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <TextBlock Classes="help" Text="Nothing blocked. Add a call below, or use Block on this band in a station's details." IsVisible="{Binding BlockEmpty}" Margin="0,6,0,0" />
+                <ItemsControl ItemsSource="{Binding BlockRows}" AutomationProperties.Name="Blocked calls">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:BlockRowViewModel">
+                      <DockPanel Margin="0,2">
+                        <Button DockPanel.Dock="Right" Content="Remove" Padding="8,2" Margin="12,0,0,0" HorizontalAlignment="Right"
+                                Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).RemoveBlockCommand}" CommandParameter="{Binding}"
+                                AutomationProperties.Name="{Binding Text, StringFormat='Remove {0}'}" />
+                        <TextBlock Text="{Binding Text}" VerticalAlignment="Center" />
+                      </DockPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Add" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox Text="{Binding BlockValue}" Width="150" PlaceholderText="ON4XYZ" AutomationProperties.Name="Call to block" />
+                  <ComboBox ItemsSource="{Binding BlockBands}" SelectedItem="{Binding BlockBand}" MinWidth="110" AutomationProperties.Name="Band" />
+                  <ComboBox ItemsSource="{Binding BlockModes}" SelectedItem="{Binding BlockMode}" MinWidth="110" AutomationProperties.Name="Mode" />
+                  <Button Content="Add" Command="{Binding AddBlockCommand}" />
+                </StackPanel>
+                <TextBlock Classes="help" Text="{Binding BlockError}" Foreground="{DynamicResource CriticalBrush}"
+                           IsVisible="{Binding BlockError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <TextBlock Classes="help" Text="Portable forms of the call (ON4XYZ/P) are blocked with it." />
               </StackPanel>
             </Grid>
           </StackPanel>

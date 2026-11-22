@@ -65,6 +65,13 @@ public sealed class StationTracker
         _myPosition = Messages.Grid.ToLatLon(myGrid);
     }
 
+    /// <summary>Removes every station whose call matches (a call just put on the block list).</summary>
+    public void RemoveWhere(Func<string, bool> match)
+    {
+        ArgumentNullException.ThrowIfNull(match);
+        foreach (var key in _stations.Keys.Where(match).ToList()) _stations.Remove(key);
+    }
+
     /// <summary>Forgets every station (band or mode change).</summary>
     public void Clear()
     {

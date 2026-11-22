@@ -155,7 +155,9 @@ ever damaged Costas starts from that copy and says so on the status bar.
 
 ## Decode journal and saved audio
 
-Every decode and transmission is written to a monthly text file in the data folder's `journal` folder. Costas reads
+Every decode and transmission is written to a monthly text file in the data folder's `journal` folder. To get the same
+lines as WSJT-X style `ALL.TXT` files in a folder of your choice, one folder per month, turn on
+[Settings › Other programs › ALL.TXT](settings.md#other-programs). Costas reads
 it back to tell you [when you hear each country](awards.md#when-to-look). You can also
 keep the received audio of each slot as WAV files (**Settings › Other programs › Save received audio**: none, only
 slots with decodes, or all, kept for a number of days).
