@@ -72,6 +72,26 @@ public sealed class RigReadToleranceTests
     }
 
     [Fact]
+    public async Task GetFrequency_ReplyTakesAsLongAsHamlibRetrying_ReadsItWithoutFault()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "The stand-in rigctld is a Python script run directly.");
+        using var fake = new FakeRigctld();
+        var ct = TestContext.Current.CancellationToken;
+        await using var rig = await RigctldRig.StartAsync(fake.Options("slowreads=1"), NullProcessGuard.Instance, SystemClock.Instance, ct);
+        var faults = new List<string>();
+        var quiet = new List<string>();
+        rig.Faulted += (_, f) => { lock (faults) faults.Add(f.Message); };
+        rig.ReadFailed += (_, why) => { lock (quiet) quiet.Add(why); };
+
+        await rig.SetPttAsync(true, ct);
+        (await rig.GetFrequencyAsync(ct)).Should().Be(14_074_000, "a 3 s reply is Hamlib recovering a garbled frame, not a lost radio");
+
+        lock (faults) faults.Should().BeEmpty();
+        lock (quiet) quiet.Should().BeEmpty();
+        await rig.SetPttAsync(false, ct);
+    }
+
+    [Fact]
     public async Task GetFrequency_BadReadsPastTheLimit_FaultsAndRestartsRigctld()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "The stand-in rigctld is a Python script run directly.");

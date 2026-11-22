@@ -33,6 +33,14 @@ public sealed class RigctldRig : IRig
     /// </summary>
     public const int ReadFailuresTolerated = 2;
 
+    /// <summary>
+    /// How long a status read may take. Longer than Hamlib's own worst case for one command on a garbled link (the Icom
+    /// drivers wait 1 s and retry 3 times, about 4 s), so a reply Hamlib recovers by retrying is not cut off first, as
+    /// WSJT-X, which calls Hamlib directly, never cuts it off. Reads have their own connection, so PTT commands never
+    /// wait behind one in Costas.
+    /// </summary>
+    public static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(5);
+
     /// <summary>How long meter reads stop after one fails, so a struggling CAT link carries only what matters.</summary>
     public static readonly TimeSpan MeterPause = TimeSpan.FromSeconds(15);
 
@@ -44,6 +52,7 @@ public sealed class RigctldRig : IRig
     private Process? _live;
     private RigctldClient? _client;
     private RigctldClient? _meters;
+    private RigctldClient? _reads;
     private int _port;
     private int _restarts;
     private int _backoff;
@@ -588,6 +597,7 @@ public sealed class RigctldRig : IRig
             await StopProcessAsync().ConfigureAwait(false);
             if (_client is not null) await _client.DisposeAsync().ConfigureAwait(false);
             if (_meters is not null) await _meters.DisposeAsync().ConfigureAwait(false);
+            if (_reads is not null) await _reads.DisposeAsync().ConfigureAwait(false);
         }
         finally
         {
@@ -614,15 +624,15 @@ public sealed class RigctldRig : IRig
         }
     }
 
-    // A status read. Unlike Run, a failure while rigctld is still running is passed to the caller without a fault or a
+    // A status read, on its own connection with a longer wait (ReadTimeout). Unlike Run, a failure while rigctld is still running is passed to the caller without a fault or a
     // restart, up to ReadFailuresTolerated in a row: the polls read again a second later. Hamlib's Icom drivers retry a
-    // garbled CI-V reply three times with a 1 s timeout, so one bad frame can outlast the client's 2 s wait without
+    // garbled CI-V reply three times with a 1 s timeout, so one bad frame used to outlast the client's 2 s wait without
     // anything being wrong with the link. Treating that as a dead radio stopped the transmission and killed rigctld,
     // whose restart then failed the PTT release ("PTT release failed", "rigctld is not running"). A dead rigctld, a
     // refused command and the PTT, frequency and mode commands all still fault at once.
     private async Task<T> Read<T>(Func<RigctldClient, Task<T>> f, CancellationToken ct)
     {
-        var c = _client;
+        var c = _reads;
         if (c is null || !ProcessRunning) return await Run(f, ct).ConfigureAwait(false);
         try
         {
@@ -743,6 +753,8 @@ public sealed class RigctldRig : IRig
         _client = new RigctldClient("127.0.0.1", _port);
         if (_meters is not null) await _meters.DisposeAsync().ConfigureAwait(false);
         _meters = new RigctldClient("127.0.0.1", _port, TimeSpan.FromSeconds(1));
+        if (_reads is not null) await _reads.DisposeAsync().ConfigureAwait(false);
+        _reads = new RigctldClient("127.0.0.1", _port, ReadTimeout);
         // rigctld listens only once it has opened the radio. A network model opens another program's server first, and
         // Hamlib waits 10 s for each start-up command that server leaves unanswered (\get_powerstat, \chk_vfo,
         // \dump_state), so give those up to 40 s before calling the server silent.

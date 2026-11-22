@@ -9,8 +9,9 @@
 
 # A stand-in rigctld on a CAT link that RF is disturbing: after the start-up read, the next N frequency reads answer
 # RPRT -5 (Hamlib's timeout, as when a garbled CI-V reply outlasts its retries), then reads work again. "l ALC" can be
-# made to answer late. Settings come in -C as comma-separated key=value: log=<file> (each run appends "start" and every
-# command), badreads=<N>, slowalc=1.
+# made to answer late, and so can the N frequency reads after the start-up read (as Hamlib retrying a garbled reply).
+# Settings come in -C as comma-separated key=value: log=<file> (each run appends "start" and every command),
+# badreads=<N>, slowreads=<N>, slowalc=1.
 import socket, sys, threading, time
 
 args = sys.argv[1:]
@@ -18,6 +19,7 @@ port = int(args[args.index("-t") + 1])
 conf = dict(kv.split("=", 1) for kv in args[args.index("-C") + 1].split(","))
 log = conf["log"]
 bad = int(conf.get("badreads", "0"))
+slow = int(conf.get("slowreads", "0"))
 slow_alc = conf.get("slowalc") == "1"
 lock = threading.Lock()
 reads = [0]
@@ -45,6 +47,8 @@ def serve(conn):
                 if 1 < n <= 1 + bad:
                     buf.write("get_freq:\nRPRT -5\n")
                 else:
+                    if 1 < n <= 1 + slow:
+                        time.sleep(3)
                     buf.write("get_freq:\nFrequency: 14074000\nRPRT 0\n")
             elif cmd.startswith("l "):
                 if cmd == "l ALC" and slow_alc:
