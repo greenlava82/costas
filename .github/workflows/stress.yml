@@ -43,23 +43,47 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
       - run: dotnet build -c Release
-      - name: Full suite 6 times
+      - run: dotnet tool install -g dotnet-dump
+      - name: Full suite 8 times, dumping the App test process if it does not exit
         shell: bash
         run: |
+          # Give a lingering process two minutes instead of ten seconds, so it can be dumped.
+          for d in tests/*/bin/Release/net10.0; do echo '{"shutdownForegroundThreadWaitSeconds": 120}' > "$d/xunit.runner.json"; done
           fails=0
-          for i in 1 2 3 4 5 6; do
-            if dotnet test -c Release --no-build > run-$i.txt 2>&1; then echo "run $i passed"; else echo "run $i FAILED"; fails=$((fails+1)); sed 's/\x1b\[[0-9;]*m//g' run-$i.txt | grep -A60 "^failed " | head -150; fi
+          for i in 1 2 3 4 5 6 7 8; do
+            dotnet test -c Release --no-build > run-$i.txt 2>&1 &
+            tp=$!
+            dumped=0
+            while kill -0 $tp 2>/dev/null; do
+              if [ $dumped = 0 ] && grep -q "Waiting 120 seconds for foreground threads" run-$i.txt; then
+                dumped=1
+                for name in Ft8Client.App.Tests Ft8Client.Rig.Tests Ft8Client.Integrations.Tests Ft8Client.Data.Tests Ft8Client.Audio.Tests Ft8Client.Core.Tests Ft8Client.Decoding.Tests Ft8Client.Modems.Tests; do
+                  for pid in $(powershell -NoProfile -Command "(Get-Process $name -ErrorAction SilentlyContinue).Id"); do
+                    pid=$(echo $pid | tr -d '\r')
+                    echo "=== dumping $name pid $pid"
+                    dotnet-dump collect -p $pid -o "dump-$i-$name.dmp" > /dev/null && \
+                      dotnet-dump analyze "dump-$i-$name.dmp" -c "clrthreads" -c "clrstack -all" -c "exit" > "threads-$i-$name.txt" 2>&1
+                    rm -f "dump-$i-$name.dmp"
+                  done
+                done
+              fi
+              sleep 2
+            done
+            if wait $tp; then echo "run $i passed"; else echo "run $i FAILED"; fails=$((fails+1)); sed 's/\x1b\[[0-9;]*m//g' run-$i.txt | grep -E -A60 "^failed |FATAL|Waiting" | head -150; fi
           done
+          for f in threads-*.txt; do [ -f "$f" ] && { echo "##### $f"; cat "$f"; }; done
           exit $fails
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: windows-runs-${{ matrix.shard }}
-          path: run-*.txt
+          path: |
+            run-*.txt
+            threads-*.txt
