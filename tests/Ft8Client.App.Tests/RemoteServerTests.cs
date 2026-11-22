@@ -43,8 +43,19 @@ public sealed class RemoteServerTests : IAsyncLifetime
         _control = new RemoteControl(_target, _clock, new DeviceTokens(), _ => { }, users: _users);
         _server = new RemoteServer(_control, id => RemoteStateBuilder.Build(_target.Snapshot, _clock.UtcNow, new RemoteContext { Units = DistanceUnit.Miles },
             _control.ControlFor(id), _control.ViewingFor(id)));
-        _port = FreePort();
-        await _server.StartAsync(_port);
+        // The port is free when picked, but another test's server can take it first: then pick another.
+        for (var attempt = 1; ; attempt++)
+        {
+            _port = FreePort();
+            try
+            {
+                await _server.StartAsync(_port);
+                break;
+            }
+            catch (IOException) when (attempt < 5)
+            {
+            }
+        }
         _http.BaseAddress = new Uri($"http://127.0.0.1:{_port}/");
     }
 

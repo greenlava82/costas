@@ -286,6 +286,8 @@ public sealed class AppHost : IAsyncDisposable
     /// <summary>The amplifier and tuner paired with a FlexRadio, through the radio's own API.</summary>
     public FlexAccessoryService Accessories { get; private set; } = null!;
 
+    private int _disposeStarted;
+
     /// <summary>Remote control from a phone on the home network.</summary>
     public RemoteControlService Remote { get; private set; } = null!;
 
@@ -1678,6 +1680,8 @@ public sealed class AppHost : IAsyncDisposable
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        // Once only: a UI test stops the app before its window goes, then disposes it again on the way out.
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0) return;
         try
         {
             await Transmitter.HaltAsync().ConfigureAwait(false);

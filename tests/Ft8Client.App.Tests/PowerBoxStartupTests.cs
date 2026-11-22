@@ -48,7 +48,7 @@ public class PowerBoxStartupTests
             host.RadioPower.Power.Should().NotBeNull("the reading is taken before the window exists");
 
             var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(PowerBoxStartupTests).Assembly);
-            await session.Dispatch(() =>
+            await session.DispatchThenStop(host, () =>
             {
                 var vm = new MainViewModel(host);
 

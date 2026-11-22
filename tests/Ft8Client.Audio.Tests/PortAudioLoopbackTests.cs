@@ -56,6 +56,7 @@ public class PortAudioLoopbackTests
             await Task.Delay(20, TestContext.Current.CancellationToken);
         }
         got.Should().Be(want, "the input should keep delivering samples");
+        while (output.IsPlaying && DateTime.UtcNow < deadline) await Task.Delay(20, TestContext.Current.CancellationToken);
         output.IsPlaying.Should().BeFalse("playback ends when the samples run out");
 
         // The moment Play was called goes where the slot's transmission starts, so latency shows as DT.

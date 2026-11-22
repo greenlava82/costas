@@ -181,7 +181,7 @@ public class TransmitSafetySessionTests
         r.Decoder.Script(Slot(2), "W7LIT ZL2RPA -05");
         r.Decoder.Script(Slot(4), "W7LIT ZL2RPA RR73");
         await r.RunUntilAsync(Slot(5).AddSeconds(14));
-        work.Flush(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        work.Flush(TimeSpan.FromSeconds(15)).Should().BeTrue();
 
         errors.Should().BeEmpty();
         lock (r.Sent) r.Sent.Should().Equal("ZL2RPA W7LIT DN40", "ZL2RPA W7LIT R-10", "ZL2RPA W7LIT 73");

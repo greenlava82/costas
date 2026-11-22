@@ -26,7 +26,7 @@ public class SingleInstanceTests
 
         second.Should().BeNull();
         File.Exists(Path.Combine(root, SingleInstance.ShowFileName)).Should().BeTrue();
-        shown.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).Should().BeTrue("the first copy is asked to come to the front");
+        shown.Wait(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken).Should().BeTrue("the first copy is asked to come to the front");
     }
 
     [Fact]

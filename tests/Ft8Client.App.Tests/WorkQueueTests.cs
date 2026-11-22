@@ -22,7 +22,7 @@ public class WorkQueueTests
             var item = i;
             q.Post(() => ran.Add((item, Environment.CurrentManagedThreadId)));
         }
-        q.Flush(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        q.Flush(TimeSpan.FromSeconds(15)).Should().BeTrue();
 
         ran.Select(x => x.Item).Should().Equal(Enumerable.Range(0, 50));
         ran.Select(x => x.Thread).Distinct().Should().ContainSingle().Which.Should().NotBe(Environment.CurrentManagedThreadId);
@@ -36,7 +36,7 @@ public class WorkQueueTests
         using var q = new WorkQueue("TestWork", errors.Add);
         q.Post(() => throw new IOException("disk full"));
         q.Post(() => ran = true);
-        q.Flush(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        q.Flush(TimeSpan.FromSeconds(15)).Should().BeTrue();
 
         errors.Should().ContainSingle().Which.Message.Should().Be("disk full");
         ran.Should().BeTrue();

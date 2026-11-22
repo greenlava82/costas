@@ -10,6 +10,13 @@ using Avalonia;
 using Avalonia.Headless;
 
 [assembly: AvaloniaTestApplication(typeof(Ft8Client.App.Tests.AppearanceTestAppBuilder))]
+// One application for the whole assembly, started before any test runs (UiSessionWarmup). Per-test applications
+// reset Avalonia's UI thread before each UI test, and in that moment the first dispatcher created on any thread becomes
+// the UI thread: a test or a running app touching Avalonia on a background thread then made the next UI test fail with
+// "The calling thread cannot access this object because a different thread owns it" (about once in a hundred runs on
+// the Windows runner). With one application the UI thread is never reset, so no other thread can take it.
+[assembly: AvaloniaTestIsolation(AvaloniaTestIsolationLevel.PerAssembly)]
+[assembly: AssemblyFixture(typeof(Ft8Client.App.Tests.UiSessionWarmup))]
 
 namespace Ft8Client.App.Tests;
 

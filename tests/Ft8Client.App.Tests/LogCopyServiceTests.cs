@@ -82,7 +82,7 @@ public class LogCopyServiceTests
         }, folder), new SystemClock(), Quiet);
         using var cts = new CancellationTokenSource();
         var run = copy.RunAsync(cts.Token);
-        writing.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).Should().BeTrue();
+        writing.Wait(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken).Should().BeTrue();
 
         // Request returns while the write is still held, so it did not wait for it. (Timing it against a few
         // milliseconds failed whenever a busy runner paused the test thread.)

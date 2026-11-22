@@ -116,7 +116,7 @@ public class ProfileChipTests
             await using var host = await AppHost.StartAsync(TestHost.Args(dir));
             database = host.Database;
             var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(ProfileChipTests).Assembly);
-            await session.Dispatch(() => test(host, new MainViewModel(host)), CancellationToken.None);
+            await session.DispatchThenStop(host, () => test(host, new MainViewModel(host)), CancellationToken.None);
         }
         finally
         {

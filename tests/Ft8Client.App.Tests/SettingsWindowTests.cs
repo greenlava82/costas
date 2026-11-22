@@ -23,7 +23,7 @@ public class SettingsWindowTests
     [Fact]
     public void Matches_EveryWordSomewhere_True()
     {
-        var e = new SettingsSearchEntry("Sync", "Logbooks", ["Read my logbook and upload new contacts", "minutes"], new TabItem(), null);
+        var e = new SettingsSearchEntry("Sync", "Logbooks", ["Read my logbook and upload new contacts", "minutes"], Page: null!, null);
         e.Matches("upload logbooks").Should().BeTrue("one word is in the text, the other is the page");
         e.Matches("UPLOAD").Should().BeTrue();
         e.Matches("upload tqsl").Should().BeFalse();
@@ -32,7 +32,7 @@ public class SettingsWindowTests
     [Fact]
     public void Display_LabelDoesNotMatch_ShowsTheMatchingLine()
     {
-        var e = new SettingsSearchEntry("Sync", "Logbooks", ["Read my logbook and upload new contacts", "minutes"], new TabItem(), null);
+        var e = new SettingsSearchEntry("Sync", "Logbooks", ["Read my logbook and upload new contacts", "minutes"], Page: null!, null);
         e.Display("upload").Should().Be("Read my logbook and upload new contacts");
         e.Display("sync").Should().Be("Sync");
     }
@@ -54,7 +54,7 @@ public class SettingsWindowTests
             await using var host = await AppHost.StartAsync(TestHost.Args(dir));
             database = host.Database;
             var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(SettingsWindowTests).Assembly);
-            await session.Dispatch(() =>
+            await session.DispatchThenStop(host, () =>
             {
                 var vm = new SettingsViewModel(host);
                 var window = new SettingsWindow { DataContext = vm };

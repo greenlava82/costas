@@ -36,7 +36,7 @@ public class QuietReadoutViewTests
             await using var host = await AppHost.StartAsync(TestHost.Args(dir));
             database = host.Database;
             var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(QuietReadoutViewTests).Assembly);
-            await session.Dispatch(() => test(new MainViewModel(host), host), CancellationToken.None);
+            await session.DispatchThenStop(host, () => test(new MainViewModel(host), host), CancellationToken.None);
         }
         finally
         {

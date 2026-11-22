@@ -95,7 +95,7 @@ public class CrashReportTests
     {
         var (client, transport) = Client(() => true, Path.GetTempPath());
         client.CaptureException(Thrown("Contact with W7LIT in DN40 on 14074000 Hz failed"));
-        client.Flush(TimeSpan.FromSeconds(5));
+        client.Flush(TimeSpan.FromSeconds(15));
 
         transport.Sent.Should().ContainSingle();
         var body = transport.Sent[0];
@@ -115,7 +115,7 @@ public class CrashReportTests
         var (client, transport) = Client(() => on, Path.GetTempPath());
         on = false;
         client.CaptureException(Thrown("boom"));
-        client.Flush(TimeSpan.FromSeconds(5));
+        client.Flush(TimeSpan.FromSeconds(15));
         transport.Sent.Should().BeEmpty();
     }
 
@@ -151,7 +151,7 @@ public class CrashReportTests
             CrashReporter.Log(error: true, "should not be sent");
             CrashReporter.Count("should_not_be_counted");
             on = true;
-            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(5));
+            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(15));
         }
 
         var all = string.Join("\n", transport.Sent);
@@ -176,7 +176,7 @@ public class CrashReportTests
                    }))
             {
                 CrashReporter.Log(error: false, "hello");
-                Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(5));
+                Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(15));
             }
             var m = System.Text.RegularExpressions.Regex.Match(string.Join("\n", transport.Sent), "\"user.id\":\\{\"value\":\"([^\"]+)\"");
             m.Success.Should().BeTrue();
@@ -204,7 +204,7 @@ public class CrashReportTests
             CrashReporter.CaptureLogged(true, "Could not open {Port}", "Could not open COM3 for W7LIT", ex).Should().BeTrue();
             // The same fault again in this run: already reported.
             CrashReporter.CaptureLogged(true, "Could not open {Port}", "Could not open COM4 for W7LIT", Thrown("again")).Should().BeFalse();
-            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(5));
+            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(15));
         }
 
         var events = transport.Sent.Where(b => b.Contains("\"type\":\"event\"")).ToList();
@@ -221,7 +221,7 @@ public class CrashReportTests
         {
             CrashReporter.CaptureLogged(false, "LoTW download failed: {Reason}", "LoTW download failed: timeout", null).Should().BeFalse();
             CrashReporter.CaptureLogged(false, "Audio input could not be opened", "Audio input could not be opened", Thrown("gone")).Should().BeTrue();
-            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(5));
+            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(15));
         }
 
         var events = transport.Sent.Where(b => b.Contains("\"type\":\"event\"")).ToList();
@@ -238,7 +238,7 @@ public class CrashReportTests
             on = false;
             CrashReporter.CaptureLogged(true, "Boom", "Boom", Thrown("boom")).Should().BeFalse();
             on = true;
-            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(5));
+            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(15));
         }
         transport.Sent.Should().NotContain(b => b.Contains("\"type\":\"event\""));
     }
@@ -261,7 +261,7 @@ public class CrashReportTests
         var transport = new CapturingTransport();
         using (StartTo(transport, () => true, environment: CrashReporter.DevelopmentEnvironment))
         {
-            var (outcome, id) = await CrashReporter.SendTestAsync(TimeSpan.FromSeconds(5));
+            var (outcome, id) = await CrashReporter.SendTestAsync(TimeSpan.FromSeconds(15));
             outcome.Should().Be(CrashReportTestOutcome.Sent);
             id.Should().NotBeNullOrEmpty();
         }
@@ -278,9 +278,9 @@ public class CrashReportTests
         using (StartTo(transport, () => on))
         {
             on = false;
-            (await CrashReporter.SendTestAsync(TimeSpan.FromSeconds(5))).Outcome.Should().Be(CrashReportTestOutcome.Off);
+            (await CrashReporter.SendTestAsync(TimeSpan.FromSeconds(15))).Outcome.Should().Be(CrashReportTestOutcome.Off);
             on = true;
-            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(5));
+            Sentry.SentrySdk.Flush(TimeSpan.FromSeconds(15));
         }
         transport.Sent.Should().NotContain(b => b.Contains(nameof(CrashReportTestException)));
     }

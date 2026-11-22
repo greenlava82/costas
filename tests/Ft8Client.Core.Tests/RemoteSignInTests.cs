@@ -68,7 +68,9 @@ public class RemoteSignInTests
         var token = s.Issue(T0);
         s.Verify(token, T0.AddDays(29)).Should().BeTrue();
         s.Verify(token, T0.AddDays(30)).Should().BeFalse();
-        s.Verify("00" + token[2..], T0).Should().BeFalse();
+        // A different token: change the first character to another hex digit. ("00" + the rest was the same token
+        // whenever the random token already started with 00, one run in 256.)
+        s.Verify((token[0] == '0' ? "1" : "0") + token[1..], T0).Should().BeFalse();
     }
 
     [Fact]
