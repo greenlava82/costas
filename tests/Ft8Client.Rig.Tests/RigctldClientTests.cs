@@ -97,4 +97,89 @@ public class RigctldClientTests
 
         await command.Awaiting(c => c).Should().ThrowAsync<OperationCanceledException>();
     }
+
+    // A rigctld that closes the first connections it accepts without reading them (as Hamlib 4.5.5's rigctld does to a
+    // few in a hundred), then answers "f" on the next; DropAnswered closes that one after its first reply.
+    private sealed class DroppingServer : IAsyncDisposable
+    {
+        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly CancellationTokenSource _cts = new();
+        private readonly Task _serve;
+        private int _drop;
+
+        public DroppingServer(int drop, bool dropAnswered = false)
+        {
+            _drop = drop;
+            DropAnswered = dropAnswered;
+            _listener.Start();
+            _serve = ServeAsync();
+        }
+
+        public bool DropAnswered { get; }
+
+        public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
+
+        public int Commands;
+
+        private async Task ServeAsync()
+        {
+            try
+            {
+                while (true)
+                {
+                    using var c = await _listener.AcceptSocketAsync(_cts.Token);
+                    if (_drop-- > 0)
+                    {
+                        c.Close();
+                        continue;
+                    }
+                    using var s = new NetworkStream(c);
+                    using var r = new StreamReader(s);
+                    while (await r.ReadLineAsync(_cts.Token) is not null)
+                    {
+                        Interlocked.Increment(ref Commands);
+                        await s.WriteAsync("get_freq:\nFrequency: 14074000\nRPRT 0\n"u8.ToArray(), _cts.Token);
+                        if (DropAnswered) break;
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or IOException or SocketException)
+            {
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _cts.CancelAsync();
+            await _serve;
+            _listener.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task SendAsync_NewConnectionDroppedBeforeReading_ConnectsAgainAndGetsTheReply()
+    {
+        await using var server = new DroppingServer(drop: 2);
+        await using var client = new RigctldClient("127.0.0.1", server.Port, TimeSpan.FromSeconds(15));
+
+        (await client.GetFrequencyAsync(TestContext.Current.CancellationToken)).Should().Be(14_074_000);
+        Volatile.Read(ref server.Commands).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task SendAsync_AnsweringConnectionClosed_FailsWithoutResending()
+    {
+        await using var server = new DroppingServer(drop: 0, dropAnswered: true);
+        await using var client = new RigctldClient("127.0.0.1", server.Port, TimeSpan.FromSeconds(15));
+        await client.GetFrequencyAsync(TestContext.Current.CancellationToken);
+
+        // The connection that answered is closed now (rigctld stopped, say): the next command fails, and is not sent
+        // again, because rigctld may have acted on it.
+        var act = () => client.GetFrequencyAsync(TestContext.Current.CancellationToken);
+        await act.Should().ThrowAsync<RigException>();
+        Volatile.Read(ref server.Commands).Should().Be(1);
+
+        // The one after that connects again.
+        (await client.GetFrequencyAsync(TestContext.Current.CancellationToken)).Should().Be(14_074_000);
+    }
 }

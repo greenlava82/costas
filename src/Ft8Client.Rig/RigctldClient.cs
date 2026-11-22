@@ -55,22 +55,18 @@ public sealed class RigctldClient : IAsyncDisposable
             var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                await EnsureConnectedAsync(cts.Token).ConfigureAwait(false);
                 var bytes = Encoding.ASCII.GetBytes("+" + command + "\n");
-                await _stream!.WriteAsync(bytes, cts.Token).ConfigureAwait(false);
                 var lines = new List<string>();
-                while (true)
+                for (var attempt = 1; ; attempt++)
                 {
-                    var line = await _reader!.ReadLineAsync(cts.Token).ConfigureAwait(false);
-                    if (line is null)
-                    {
-                        // TcpClient.Connected still says true after the far end closed: drop the connection, or every
-                        // later command would write into it and fail the same way instead of connecting again.
-                        Disconnect();
-                        throw new RigException("rigctld closed the connection.");
-                    }
-                    lines.Add(line);
-                    if (line.StartsWith("RPRT ", StringComparison.Ordinal)) break;
+                    var fresh = await EnsureConnectedAsync(cts.Token).ConfigureAwait(false);
+                    if (await ExchangeAsync(bytes, lines, cts.Token).ConfigureAwait(false)) break;
+                    // Closed before any reply. Hamlib's rigctld (4.5.5 at least) drops a few in a hundred connections it
+                    // has just accepted, before reading anything from them; a connection that has answered once is never
+                    // dropped that way. So on a connection opened for this command, connect again and resend: rigctld
+                    // never saw the command, and every command sent is an absolute setting or a read anyway.
+                    Disconnect();
+                    if (!fresh || attempt == 3) throw new RigException("rigctld closed the connection.");
                 }
                 LastRoundTrip = sw.Elapsed;
                 return RigctldReply.Parse(lines);
@@ -147,14 +143,42 @@ public sealed class RigctldClient : IAsyncDisposable
         return long.TryParse(r["Power mW"], NumberStyles.Integer, CultureInfo.InvariantCulture, out var mw) ? mw : null;
     }
 
-    private async Task EnsureConnectedAsync(CancellationToken ct)
+    // True when it opened a new connection.
+    private async Task<bool> EnsureConnectedAsync(CancellationToken ct)
     {
-        if (_tcp is { Connected: true }) return;
+        if (_tcp is { Connected: true }) return false;
         Disconnect();
         _tcp = new TcpClient { NoDelay = true };
         await _tcp.ConnectAsync(Host, Port, ct).ConfigureAwait(false);
         _stream = _tcp.GetStream();
         _reader = new StreamReader(_stream, Encoding.ASCII);
+        return true;
+    }
+
+    // Writes the command and reads its reply into lines. False when rigctld closed or reset the connection before any
+    // reply came; a connection lost partway through a reply throws.
+    private async Task<bool> ExchangeAsync(byte[] command, List<string> lines, CancellationToken ct)
+    {
+        try
+        {
+            await _stream!.WriteAsync(command, ct).ConfigureAwait(false);
+            while (true)
+            {
+                var line = await _reader!.ReadLineAsync(ct).ConfigureAwait(false);
+                if (line is null)
+                {
+                    if (lines.Count == 0) return false;
+                    Disconnect();
+                    throw new RigException("rigctld closed the connection.");
+                }
+                lines.Add(line);
+                if (line.StartsWith("RPRT ", StringComparison.Ordinal)) return true;
+            }
+        }
+        catch (IOException) when (lines.Count == 0 && !ct.IsCancellationRequested)
+        {
+            return false;
+        }
     }
 
     private void Disconnect()
