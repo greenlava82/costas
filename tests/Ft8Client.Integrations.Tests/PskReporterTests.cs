@@ -145,10 +145,8 @@ public class PskReporterTests
     [Fact]
     public async Task Feed_LocalBroker_ReceivesFiltersDedupesAndReconnects()
     {
-        var port = FreePort();
         var factory = new MqttServerFactory();
-        var server = factory.CreateMqttServer(BrokerOptions(port));
-        await server.StartAsync();
+        var (server, port) = await StartBroker(factory);
         var received = new List<ReceptionReport>();
         await using var feed = new PskFeedClient(Countries, "127.0.0.1", port, tls: false);
         feed.Report += r =>
@@ -181,9 +179,7 @@ public class PskReporterTests
     [Fact]
     public async Task Feed_FollowNeighbours_RaisesNeighbourReportsAndLearnsMyDxcc()
     {
-        var port = FreePort();
-        var server = new MqttServerFactory().CreateMqttServer(BrokerOptions(port));
-        await server.StartAsync();
+        var (server, port) = await StartBroker(new MqttServerFactory());
         var neighbours = new List<NeighbourReport>();
         await using var feed = new PskFeedClient(Countries, "127.0.0.1", port, tls: false);
         feed.NeighbourReport += r =>
@@ -216,9 +212,7 @@ public class PskReporterTests
     [Fact]
     public async Task Feed_AllBandsTooBusy_SamplesTheOtherBands()
     {
-        var port = FreePort();
-        var server = new MqttServerFactory().CreateMqttServer(BrokerOptions(port));
-        await server.StartAsync();
+        var (server, port) = await StartBroker(new MqttServerFactory());
         var neighbours = new List<NeighbourReport>();
         var samples = new List<BandSample>();
         await using var feed = new PskFeedClient(Countries, "127.0.0.1", port, tls: false, sampleDwell: TimeSpan.FromSeconds(2));
@@ -278,9 +272,7 @@ public class PskReporterTests
     [Fact]
     public async Task Feed_FollowHunt_RaisesReportsOfHuntedCallsAndCountries()
     {
-        var port = FreePort();
-        var server = new MqttServerFactory().CreateMqttServer(BrokerOptions(port));
-        await server.StartAsync();
+        var (server, port) = await StartBroker(new MqttServerFactory());
         var spots = new List<HuntSpot>();
         await using var feed = new PskFeedClient(Countries, "127.0.0.1", port, tls: false);
         feed.HuntReport += r =>
@@ -325,9 +317,7 @@ public class PskReporterTests
     [Fact]
     public async Task Feed_FollowNeighboursOnAllBands_RaisesReportsFromOtherBands()
     {
-        var port = FreePort();
-        var server = new MqttServerFactory().CreateMqttServer(BrokerOptions(port));
-        await server.StartAsync();
+        var (server, port) = await StartBroker(new MqttServerFactory());
         var neighbours = new List<NeighbourReport>();
         await using var feed = new PskFeedClient(Countries, "127.0.0.1", port, tls: false);
         feed.NeighbourReport += r =>
@@ -354,9 +344,7 @@ public class PskReporterTests
     [Fact]
     public async Task Feed_ConfiguredGridWithoutMySpot_FollowsNearbyCountriesAndChangesLocation()
     {
-        var port = FreePort();
-        var server = new MqttServerFactory().CreateMqttServer(BrokerOptions(port));
-        await server.StartAsync();
+        var (server, port) = await StartBroker(new MqttServerFactory());
         var neighbours = new System.Collections.Concurrent.ConcurrentQueue<NeighbourReport>();
         var hunts = new System.Collections.Concurrent.ConcurrentQueue<HuntSpot>();
         await using var feed = new PskFeedClient(Countries, "127.0.0.1", port, tls: false);
@@ -443,6 +431,34 @@ public class PskReporterTests
         .WithDefaultEndpointBoundIPV6Address(IPAddress.None)
         .WithDefaultEndpointPort(port)
         .Build();
+
+    // A broker on a port that was free when picked; another test's server can take it first, so pick again then.
+    private static async Task<(MqttServer Server, int Port)> StartBroker(MqttServerFactory factory)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var port = FreePort();
+            var server = factory.CreateMqttServer(BrokerOptions(port));
+            try
+            {
+                await server.StartAsync();
+                return (server, port);
+            }
+            catch (Exception ex) when (attempt < 5 && InUse(ex))
+            {
+                server.Dispose();
+            }
+        }
+    }
+
+    private static bool InUse(Exception? ex)
+    {
+        for (; ex is not null; ex = ex.InnerException)
+        {
+            if (ex is System.Net.Sockets.SocketException { SocketErrorCode: System.Net.Sockets.SocketError.AddressAlreadyInUse }) return true;
+        }
+        return false;
+    }
 
     private static int FreePort()
     {

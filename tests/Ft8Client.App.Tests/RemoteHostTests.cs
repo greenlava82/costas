@@ -67,7 +67,17 @@ public class RemoteHostTests
     });
 
     // A whole app with two profiles (K1UTA in use), sign-in on, and the user "dan" linked to the Home profile (K1GLV).
+    // The port is free when picked, but another test's server can take it before this app opens it: then the remote
+    // page reports a problem, and the test starts again on another port.
     internal static async Task WithRemoteHost(Func<AppHost, HttpClient, int, Task> test)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            if (await TryWithRemoteHost(test, mayRetryPort: attempt < 5)) return;
+        }
+    }
+
+    private static async Task<bool> TryWithRemoteHost(Func<AppHost, HttpClient, int, Task> test, bool mayRetryPort)
     {
         var dir = Path.Combine(Path.GetTempPath(), "costas-remote-" + Guid.NewGuid());
         Directory.CreateDirectory(dir);
@@ -91,9 +101,16 @@ public class RemoteHostTests
         {
             await using var host = await AppHost.StartAsync(TestHost.Args(dir));
             database = host.Database;
+            // The remote page starts in the background: wait until it listens (or says why it cannot).
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+            while (!host.Remote.Running && host.Remote.Problem is null && DateTime.UtcNow < deadline)
+                await Task.Delay(20, TestContext.Current.CancellationToken);
+            if (host.Remote.Problem is not null && mayRetryPort) return false;
+            host.Remote.Running.Should().BeTrue(host.Remote.Problem ?? "the remote page should start within 15 s");
             host.Remote.Control.Users!.SetPassword("u1", "correct horse battery");
             using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}/") };
             await test(host, http, port);
+            return true;
         }
         finally
         {
