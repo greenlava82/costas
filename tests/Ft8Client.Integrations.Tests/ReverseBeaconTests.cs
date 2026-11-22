@@ -101,7 +101,9 @@ public class ReverseBeaconTests
 
         (await login.Task.WaitAsync(TimeSpan.FromSeconds(10), ct)).Should().Be("W7LIT\r\n");
         await got.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
-        await Task.Delay(200, ct);
+        // The other three lines are read after the first spot: wait for them rather than for a fixed time.
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (feed.LinesRead < 4 && DateTime.UtcNow < deadline) await Task.Delay(20, ct);
 
         feed.Connected.Should().BeTrue();
         lock (spots) spots.Should().ContainSingle().Which.Should().Be(new RbnSpot("KM3T", "W7LIT", 14_074_000, "FT8", -8, Now.Date.AddHours(4).AddMinutes(40)));

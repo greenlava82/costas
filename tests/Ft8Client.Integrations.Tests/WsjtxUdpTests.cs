@@ -155,7 +155,7 @@ public class WsjtxUdpTests
         var port = ((IPEndPoint)listener.Client.LocalEndPoint!).Port;
         using var b = new WsjtxUdpBroadcaster("127.0.0.1", port);
         b.Send(WsjtxMessages.Clear("Costas")).Should().BeTrue();
-        var got = await listener.ReceiveAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var got = await listener.ReceiveAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
         Open(got.Buffer, WsjtxMessageType.Clear).AtEnd.Should().BeTrue();
         b.Sent.Should().Be(1);
     }

@@ -46,12 +46,24 @@ public class PulseDeviceRoutingTests
         var tone = new float[output.SampleRate * 2];
         for (var i = 0; i < tone.Length; i++) tone[i] = 0.3f * MathF.Sin(2 * MathF.PI * 1000 * i / output.SampleRate);
         output.Play(tone);
-        await Task.Delay(2500, TestContext.Current.CancellationToken);
+        // The sound server's latency varies (a busy runner): listen until the tone has come back and finished playing,
+        // with a deadline, keeping the loudest stretch heard on each input.
+        double namedLoudest = 0, fallbackLoudest = 0;
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (DateTime.UtcNow < deadline && (namedLoudest <= 0.05 || output.IsPlaying))
+        {
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+            namedLoudest = Math.Max(namedLoudest, Rms(named));
+            fallbackLoudest = Math.Max(fallbackLoudest, Rms(fallback));
+        }
+        await Task.Delay(300, TestContext.Current.CancellationToken); // what was still on its way to the default device
+        fallbackLoudest = Math.Max(fallbackLoudest, Rms(fallback));
 
-        Rms(named).Should().BeGreaterThan(0.05, "the tone played to the named sink comes back on the named source");
-        Rms(fallback).Should().BeLessThan(0.01, "the default device hears none of it");
+        namedLoudest.Should().BeGreaterThan(0.05, "the tone played to the named sink comes back on the named source");
+        fallbackLoudest.Should().BeLessThan(0.01, "the default device hears none of it");
     }
 
+    // RMS of what the input captured since the last call.
     private static double Rms(IAudioInput input)
     {
         var buf = new float[input.SampleRate * 4];

@@ -51,10 +51,11 @@ public class FlexDiscoveryTests
         var listening = FlexDiscovery.ListenAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         using var sender = new UdpClient();
         var packet = Packet(Payload);
-        for (var i = 0; i < 6; i++)
+        // As a radio does, broadcast every so often for as long as the search listens (however slow the runner).
+        while (!listening.IsCompleted)
         {
-            await Task.Delay(150, TestContext.Current.CancellationToken);
             await sender.SendAsync(packet, new IPEndPoint(IPAddress.Loopback, FlexDiscovery.Port), TestContext.Current.CancellationToken);
+            await Task.Delay(150, TestContext.Current.CancellationToken);
         }
 
         var found = await listening;

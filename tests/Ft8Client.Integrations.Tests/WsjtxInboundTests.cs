@@ -102,10 +102,10 @@ public class WsjtxInboundTests
         b.Received += (d, _) => got.TrySetResult(d);
 
         b.Send(WsjtxMessages.Clear("Costas"));
-        var first = await listener.ReceiveAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var first = await listener.ReceiveAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
         var halt = Header(8).Bool(false).ToArray();
         await listener.SendAsync(halt, first.RemoteEndPoint, TestContext.Current.CancellationToken);
 
-        (await got.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)).Should().Equal(halt);
+        (await got.Task.WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken)).Should().Equal(halt);
     }
 }
