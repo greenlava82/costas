@@ -1,0 +1,55 @@
+# Temporary: runs the whole test suite many times on both runners to prove it is not flaky. Removed before merge.
+name: Stress tests
+on:
+  push:
+    branches: [claude/project-thread-ig3ur0]
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: sudo apt-get update && sudo apt-get install -y wsjtx libhamlib-utils libportaudio2 pulseaudio pulseaudio-utils libasound2-plugins
+      - run: |
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=costas
+          pactl set-default-sink costas
+          pactl set-default-source costas.monitor
+          echo "COSTAS_AUDIO_LOOPBACK=ALSA:pulse" >> "$GITHUB_ENV"
+          pactl load-module module-null-sink sink_name=rimu.dax.tx
+          pactl load-module module-remap-source master=rimu.dax.tx.monitor source_name=rimu.dax.rx1
+          echo "COSTAS_PULSE_ROUTE=rimu.dax.tx|rimu.dax.rx1" >> "$GITHUB_ENV"
+      - run: dotnet build -c Release
+      - name: Full suite 6 times
+        run: |
+          fails=0
+          for i in 1 2 3 4 5 6; do
+            if dotnet test -c Release --no-build > run-$i.txt 2>&1; then echo "run $i passed"; else echo "run $i FAILED"; fails=$((fails+1)); grep -E "failed .*Ft8|^\s+failed:|Exception" run-$i.txt | head -40; fi
+          done
+          exit $fails
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build -c Release
+      - name: Full suite 6 times
+        shell: bash
+        run: |
+          fails=0
+          for i in 1 2 3 4 5 6; do
+            if dotnet test -c Release --no-build > run-$i.txt 2>&1; then echo "run $i passed"; else echo "run $i FAILED"; fails=$((fails+1)); grep -E "failed .*Ft8|^\s+failed:|Exception" run-$i.txt | head -40; fi
+          done
+          exit $fails
