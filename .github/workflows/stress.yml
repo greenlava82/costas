@@ -30,9 +30,14 @@ jobs:
         run: |
           fails=0
           for i in 1 2 3 4 5 6; do
-            if dotnet test -c Release --no-build > run-$i.txt 2>&1; then echo "run $i passed"; else echo "run $i FAILED"; fails=$((fails+1)); grep -E "failed .*Ft8|^\s+failed:|Exception" run-$i.txt | head -40; fi
+            if dotnet test -c Release --no-build > run-$i.txt 2>&1; then echo "run $i passed"; else echo "run $i FAILED"; fails=$((fails+1)); sed 's/\x1b\[[0-9;]*m//g' run-$i.txt | grep -A60 "^failed " | head -150; fi
           done
           exit $fails
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-runs-${{ matrix.shard }}
+          path: run-*.txt
   windows:
     runs-on: windows-latest
     strategy:
@@ -50,6 +55,11 @@ jobs:
         run: |
           fails=0
           for i in 1 2 3 4 5 6; do
-            if dotnet test -c Release --no-build > run-$i.txt 2>&1; then echo "run $i passed"; else echo "run $i FAILED"; fails=$((fails+1)); grep -E "failed .*Ft8|^\s+failed:|Exception" run-$i.txt | head -40; fi
+            if dotnet test -c Release --no-build > run-$i.txt 2>&1; then echo "run $i passed"; else echo "run $i FAILED"; fails=$((fails+1)); sed 's/\x1b\[[0-9;]*m//g' run-$i.txt | grep -A60 "^failed " | head -150; fi
           done
           exit $fails
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-runs-${{ matrix.shard }}
+          path: run-*.txt
