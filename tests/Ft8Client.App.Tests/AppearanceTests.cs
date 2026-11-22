@@ -108,7 +108,7 @@ public class AppearanceTests
             await using var host = await AppHost.StartAsync(TestHost.Args(dir));
             database = host.Database;
             var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(AppearanceTests).Assembly);
-            await session.Dispatch(() =>
+            await session.DispatchThenStop(host, () =>
             {
                 var appearance = new AppearanceService(Application.Current!);
                 var vm = new MainViewModel(host);

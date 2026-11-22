@@ -54,7 +54,7 @@ public class SettingsWindowTests
             await using var host = await AppHost.StartAsync(TestHost.Args(dir));
             database = host.Database;
             var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(SettingsWindowTests).Assembly);
-            await session.Dispatch(() =>
+            await session.DispatchThenStop(host, () =>
             {
                 var vm = new SettingsViewModel(host);
                 var window = new SettingsWindow { DataContext = vm };

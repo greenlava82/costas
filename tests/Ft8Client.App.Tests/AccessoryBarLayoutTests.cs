@@ -51,7 +51,7 @@ public class AccessoryBarLayoutTests
             await using var host = await AppHost.StartAsync(TestHost.Args(dir));
             database = host.Database;
             var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(AccessoryBarLayoutTests).Assembly);
-            await session.Dispatch(() =>
+            await session.DispatchThenStop(host, () =>
             {
                 var vm = new MainViewModel(host);
                 var window = new MainWindow { DataContext = vm, Width = width, Height = height };
