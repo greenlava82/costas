@@ -83,16 +83,21 @@ Each release also has three Linux builds of the same program:
 | **.deb**, `costas_<version>_amd64.deb` | Debian, Ubuntu, Mint | By hand: download and open the new `.deb` |
 | **Tarball**, `Costas-<version>-linux-x64.tar.gz` | Any 64-bit Linux | By hand: download and unpack the new tarball |
 
+All three include the `jt9` decoder from WSJT-X 3.0.1, as the Windows installer does, so you do not need WSJT-X
+installed. It needs a Linux from 2023 or later (glibc 2.38: Debian 13, Ubuntu 24.04, Mint 22, Fedora 39 or newer); on
+an older one Costas uses the `jt9` from your distribution's `wsjtx` package instead.
+
 They do everything the Windows version does, transmit included, but Linux is still a **preview**: it has had little time
 with real radios. On your first contacts, run the transmit test in Setup and watch the radio's ALC and power, as you
 would on Windows.
 
 ### AppImage (updates itself)
 
-1. Install what Costas uses from your distribution: the `jt9` decoder, Hamlib's `rigctld` and PortAudio. On Debian,
-   Ubuntu and Mint:
+1. Install what Costas uses from your distribution: Hamlib's `rigctld` and PortAudio. On Debian, Ubuntu and Mint:
 
-        sudo apt install wsjtx libhamlib-utils libportaudio2 libsecret-tools pulseaudio-utils
+        sudo apt install libhamlib-utils libportaudio2 libsecret-tools pulseaudio-utils
+
+    On a Linux older than Debian 13 or Ubuntu 24.04, add `wsjtx` for the `jt9` decoder.
 
 2. Download `CostasApp.AppImage` from the [download page](index.md#download) and put it where you keep programs,
    for example `~/Applications`. Keep it in a folder you own: Costas replaces the file when it updates.
@@ -111,16 +116,17 @@ AppImageLauncher can add one.
 
         sudo apt install ./costas_*_amd64.deb
 
-    apt also installs what Costas uses: `wsjtx` for the `jt9` decoder, `libhamlib-utils` for `rigctld`, and the
-    PortAudio audio library. Costas goes in `/opt/costas`, with a **Costas** entry in your desktop's menu and a
+    apt also installs what Costas uses: `libhamlib-utils` for `rigctld`, the PortAudio audio library, and `wsjtx`,
+    whose `jt9` Costas falls back to on a Linux too old for the one it brings. Costas goes in `/opt/costas`, with a **Costas** entry in your desktop's menu and a
     `costas` command.
 3. For a USB CAT cable, add yourself to the `dialout` group (`sudo usermod -aG dialout $USER`), then log out and in.
 
 ### Other distributions
 
-1. Install what Costas uses from your distribution: the `jt9` decoder (usually in the `wsjtx` package), Hamlib's
-   `rigctld`, PortAudio, and optionally `secret-tool` (libsecret) and `pactl`. On Debian and Ubuntu these are
-   `sudo apt install wsjtx libhamlib-utils libportaudio2 libsecret-tools pulseaudio-utils`.
+1. Install what Costas uses from your distribution: Hamlib's `rigctld`, PortAudio, and optionally `secret-tool`
+   (libsecret) and `pactl`. On Debian and Ubuntu these are
+   `sudo apt install libhamlib-utils libportaudio2 libsecret-tools pulseaudio-utils`. On a Linux older than glibc
+   2.38, add the `jt9` decoder too (usually in the `wsjtx` package).
 
     `secret-tool` lets Costas keep your QRZ key in the desktop keyring (without it, the key is asked for again each
     time Costas starts). `pactl` lets Costas list PulseAudio and PipeWire devices by name.

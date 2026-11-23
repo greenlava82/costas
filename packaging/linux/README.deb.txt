@@ -5,8 +5,8 @@ This is a preview. Costas receives and transmits FT8, FT4, PSK31, PSK63 and RTTY
 with real radios on Linux: on your first contacts, run the transmit test in Setup and watch the radio's ALC and power.
 
 Installed from the .deb, Costas lives in /opt/costas. Start it from your desktop's menu (Costas, under Ham Radio or
-Internet) or by typing costas in a terminal. apt installed what it needs: jt9 (wsjtx), rigctld (libhamlib-utils) and
-PortAudio.
+Internet) or by typing costas in a terminal. Costas brings its own jt9 decoder; apt installed rigctld (libhamlib-utils),
+PortAudio, and wsjtx, whose jt9 Costas uses only on a Linux too old for its own.
 
 To use a serial port (your radio's CAT cable), your user needs to be in the dialout group:
 
