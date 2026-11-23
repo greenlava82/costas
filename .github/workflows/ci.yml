@@ -29,6 +29,12 @@ jobs:
           pactl load-module module-remap-source master=rimu.dax.tx.monitor source_name=rimu.dax.rx1
           echo "COSTAS_PULSE_ROUTE=rimu.dax.tx|rimu.dax.rx1" >> "$GITHUB_ENV"
       - run: scripts/ci.sh
+      - name: Cache the WSJT-X AppImage (jt9 for the Linux packages)
+        uses: actions/cache@v4
+        with:
+          path: third_party/.download
+          key: wsjtx-linux-${{ hashFiles('scripts/build-linux.sh') }}
+          restore-keys: wsjtx-linux-
       - name: Build the Linux package
         env:
           # Only release builds carry the Aptabase app key (not a secret: it ships inside the app), so test and pull-request builds never send usage statistics.

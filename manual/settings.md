@@ -524,9 +524,14 @@ only what you see there. See [Report a problem](troubleshooting.md#report-a-prob
 
 ![Settings: Advanced](images/settings-advanced.png)
 
-Costas finds its decoder and radio control programs by itself. Set **jt9 decoder** (full path to `jt9.exe`) or
+Costas finds its decoder and radio control programs by itself, and brings its own `jt9`. Set **jt9 decoder** (full
+path to `jt9`, `jt9.exe` on Windows, or a WSJT-X folder) or
 **Hamlib folder** (the folder containing `rigctld.exe`, or the Hamlib folder with it in `bin`) only to use a different copy, for example a newer Hamlib
 for a radio the bundled one does not support.
+
+A WSJT-X **AppImage** cannot be used as the jt9 decoder, because running it opens WSJT-X itself. Leave the setting
+empty to use Costas's own `jt9`. To use the AppImage's copy instead, run it once with `--appimage-extract` in its own
+folder and set the path to the AppImage or to `squashfs-root/usr/bin/jt9` beside it.
 
 ## Developer mode
 

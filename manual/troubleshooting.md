@@ -156,7 +156,7 @@ already says what Costas thinks is wrong:
 | *the receive audio is clipping* | Turn the same levels down |
 | *the dial is on 14.090, not the usual FT8 frequency* | Click **Go to 14.074**, or tune back yourself. Ignore it if you moved on purpose (a DXpedition off the usual frequency) and are waiting for it |
 | *the radio is in LSB, and FT8 needs USB data* | Set USB data (DATA-U, USB-D) on the radio, or click **Go to 14.074**, which sets it |
-| *the decoder (jt9) is not running* or *is not working* | Open Diagnostics for the decoder's state. *jt9 not found*: reinstall Costas, or set the WSJT-X folder in Settings |
+| *the decoder (jt9) is not running* or *is not working* | Open Diagnostics for the decoder's state. *jt9 not found*: clear **jt9 decoder** in Settings › Advanced to use the copy that comes with Costas, or reinstall Costas. On Linux older than Debian 13 or Ubuntu 24.04, install `wsjtx` |
 | *your clock is 3.1 s off* | Sync the computer's clock, or turn on **Clock correction** in Settings › Transmitting |
 | *Audio, dial, radio mode, decoder and clock look right* | The band may simply be quiet or closed. Try another band; the band menu shows where stations near you are heard |
 

@@ -5,12 +5,14 @@ This is a preview. Costas receives and transmits FT8, FT4, PSK31, PSK63 and RTTY
 used with a real radio on Linux: on your first contacts, run the transmit test in Setup and watch the radio's ALC and
 power.
 
-Install what Costas uses from your distribution (Debian and Ubuntu names):
+The jt9 decoder from WSJT-X 3.0.1 comes with Costas (third_party/wsjtx). It needs glibc 2.38 or newer (Debian 13,
+Ubuntu 24.04 or later); on an older Linux, also install wsjtx and Costas uses its jt9. Install the rest of what Costas
+uses from your distribution (Debian and Ubuntu names):
 
-    sudo apt install wsjtx libhamlib-utils libportaudio2 libsecret-tools
+    sudo apt install libhamlib-utils libportaudio2 libsecret-tools
 
-wsjtx provides the jt9 decoder, libhamlib-utils provides rigctld for radio control, libportaudio2 is the audio
-library, and libsecret-tools lets Costas keep your QRZ key in the desktop keyring. To use a serial port (your
+libhamlib-utils provides rigctld for radio control, libportaudio2 is the audio library, and libsecret-tools lets
+Costas keep your QRZ key in the desktop keyring. To use a serial port (your
 radio's CAT cable), your user needs to be in the dialout group:
 
     sudo usermod -aG dialout $USER     (then log out and back in)
