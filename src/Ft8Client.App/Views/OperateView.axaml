@@ -156,15 +156,22 @@
           <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel ItemSpacing="24" LineSpacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:WaitingRowViewModel">
-              <Grid ColumnDefinitions="Auto,Auto,Auto" MaxWidth="490">
-                <StackPanel Spacing="1" Margin="0,0,12,0">
-                  <TextBlock><Run Text="{Binding Call}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Where}" /><Run Text=" " /><Run Text="{Binding Need}" /></TextBlock>
+              <!-- The text column takes what the buttons leave of the row's width cap and wraps inside it: with an Auto
+                   column a long place name (or a wider font, as on Linux) pushed the button out of the row and the next
+                   caller was drawn on top of it. -->
+              <Grid ColumnDefinitions="*,Auto,Auto" MaxWidth="490">
+                <StackPanel Spacing="1" Margin="0,0,12,0" MinWidth="120">
+                  <TextBlock TextWrapping="Wrap"><Run Text="{Binding Call}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Where}" /><Run Text=" " /><Run Text="{Binding Need}" /></TextBlock>
                   <TextBlock Text="{Binding Note}" IsVisible="{Binding AfterStop}" Foreground="{DynamicResource CautionBrush}" FontWeight="SemiBold" TextWrapping="Wrap" />
                   <TextBlock Text="{Binding Detail}" Classes="secondary num" TextWrapping="Wrap" />
                 </StackPanel>
-                <Button Grid.Column="1" Content="{Binding ButtonText}" VerticalAlignment="Center" IsEnabled="{Binding !Queued}"
+                <!-- Capped, with its words wrapping, so "Will answer after this contact" in a wide font still leaves the
+                     caller's call room beside it. -->
+                <Button Grid.Column="1" VerticalAlignment="Center" IsEnabled="{Binding !Queued}" MaxWidth="200"
                         Command="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).AnswerRowCommand}" CommandParameter="{Binding}"
-                        AutomationProperties.Name="{Binding Call, StringFormat='Answer {0}'}" />
+                        AutomationProperties.Name="{Binding Call, StringFormat='Answer {0}'}">
+                  <TextBlock Text="{Binding ButtonText}" TextWrapping="Wrap" TextAlignment="Center" />
+                </Button>
                 <!-- Dismiss: takes the caller off without answering; nothing is sent. It comes back only if it calls again after going quiet. -->
                 <Button Grid.Column="2" Content="✕" Classes="link" Padding="6,0" Margin="6,0,0,0" VerticalAlignment="Center"
                         Command="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).DismissRowCommand}" CommandParameter="{Binding}"
