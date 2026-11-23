@@ -87,6 +87,9 @@
       <Button Classes="link" Padding="0" Content="{Binding HuntCountryText}" IsVisible="{Binding CanHuntCountry}"
               ToolTip.Tip="Add this country to your Hunt list: you are told when it is heard on any band"
               Command="{Binding $parent[v:OperateView].((vm:OperateViewModel)DataContext).HuntCountryCommand}" CommandParameter="{Binding}" />
+      <Button Classes="link" Padding="0" Content="{Binding $parent[v:OperateView].((vm:OperateViewModel)DataContext).BlockText}"
+              ToolTip.Tip="Put this call on your block list for this band: it leaves the station list, Next in line and Calling you, and Costas never answers or auto-calls it here. Raw decodes still show it. Undo in Settings, Blocked calls."
+              Command="{Binding $parent[v:OperateView].((vm:OperateViewModel)DataContext).BlockCallCommand}" CommandParameter="{Binding}" />
     </WrapPanel>
   </StackPanel>
   </Border>

@@ -98,8 +98,24 @@ public static class SettingsMapper
             MyAntenna = s.Profile.Antenna.Trim(),
             Macros = Macros(s.Operating),
             Rtty = Rtty(s),
+            Blocked = BlockList(s),
         };
     }
+
+    /// <summary>The block list; entries that no longer read as a call are skipped.</summary>
+    public static Core.Blocking.BlockList BlockList(AppSettings s) =>
+        new(s.Blocked.Select(ToBlocked).OfType<Core.Blocking.BlockedCall>());
+
+    /// <summary>A stored block list entry as the domain type, or null when it is not a call.</summary>
+    public static Core.Blocking.BlockedCall? ToBlocked(BlockEntry e)
+    {
+        Mode? mode = ModeInfo.TryParse(e.Mode, out var m) ? m : null;
+        return Core.Blocking.BlockedCall.Create(e.Call, e.Band, mode, out _);
+    }
+
+    /// <summary>A block list entry as stored.</summary>
+    public static BlockEntry ToEntry(Core.Blocking.BlockedCall b) =>
+        new() { Call = b.Call, Band = b.Band, Mode = b.Mode is { } m ? ModeInfo.Name(m) : null };
 
     // The first default Exchange and 73, which could never be sent before the partner's name was known. Stored
     // unchanged, each becomes the current default, which leaves out "GE {NAME}" or "TNX {NAME}" until there is a name

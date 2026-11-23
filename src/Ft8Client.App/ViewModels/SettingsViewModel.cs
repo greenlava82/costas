@@ -108,6 +108,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         TqslFound = host.Lotw.TqslPath is { } tq ? $"TQSL found: {tq}" : "TQSL not found. Install it from ARRL, or type where tqsl.exe is.";
         foreach (var t in HuntService.ToTargets(s.Hunt.Targets)) HuntRows.Add(new HuntRowViewModel(t, t.Describe(host.Countries)));
         HuntEmpty = HuntRows.Count == 0;
+        foreach (var b in s.Blocked.Select(SettingsMapper.ToBlocked).OfType<Core.Blocking.BlockedCall>()) BlockRows.Add(new BlockRowViewModel(b, b.Describe()));
+        BlockEmpty = BlockRows.Count == 0;
         HuntAllBands = s.Hunt.WatchAllBands;
         HuntSound = s.Hunt.Sound;
         NotifyEnabled = s.Notifications.Enabled;
@@ -145,6 +147,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         UdpEnabled = s.Udp.Enabled;
         UdpAddress = s.Udp.Address;
         UdpPort = s.Udp.Port.ToString(CultureInfo.InvariantCulture);
+        UdpSecondEnabled = s.Udp.SecondEnabled;
+        UdpSecondAddress = s.Udp.SecondAddress;
+        UdpSecondPort = s.Udp.SecondPort.ToString(CultureInfo.InvariantCulture);
         RemoteEnabled = s.Remote.Enabled;
         RemotePort = s.Remote.Port.ToString(CultureInfo.InvariantCulture);
         RemoteSignIn = s.Remote.RequireSignIn;
@@ -160,6 +165,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         RefreshLogCopy();
         SaveWav = s.Files.SaveWav;
         Retention = s.Files.RetentionDays.ToString(CultureInfo.InvariantCulture);
+        AllTxt = s.Files.AllTxt;
+        AllTxtFolder = s.Files.AllTxtFolder;
         Theme = s.Appearance.Theme;
         Skin = AppSkin.Find(s.Appearance.Skin);
         Units = s.Appearance.Units;
@@ -913,6 +920,69 @@ public sealed partial class SettingsViewModel : ObservableObject
         HuntEmpty = HuntRows.Count == 0;
     }
 
+    // ------------------------------------------------------------ Blocked calls
+
+    /// <summary>The block list.</summary>
+    public ObservableCollection<BlockRowViewModel> BlockRows { get; } = [];
+
+    /// <summary>The block list is empty.</summary>
+    [ObservableProperty]
+    public partial bool BlockEmpty { get; set; }
+
+    /// <summary>The call typed for the entry being added.</summary>
+    [ObservableProperty]
+    public partial string BlockValue { get; set; } = string.Empty;
+
+    /// <summary>Band choices: Every band, then the bands.</summary>
+    public IReadOnlyList<string> BlockBands { get; } =
+        ["Every band", .. Core.Bands.BandPlan.Bands.Select(b => Core.Bands.BandPlan.Display(b.Band))];
+
+    /// <summary>Band of the entry being added.</summary>
+    [ObservableProperty]
+    public partial string BlockBand { get; set; } = "Every band";
+
+    /// <summary>Mode choices: Every mode, then the modes.</summary>
+    public IReadOnlyList<string> BlockModes { get; } = ["Every mode", .. Core.ModeInfo.Operable.Select(Core.ModeInfo.Name)];
+
+    /// <summary>Mode of the entry being added.</summary>
+    [ObservableProperty]
+    public partial string BlockMode { get; set; } = "Every mode";
+
+    /// <summary>Why the entry could not be added, or blank.</summary>
+    [ObservableProperty]
+    public partial string BlockError { get; set; } = string.Empty;
+
+    /// <summary>Adds the typed call to the block list.</summary>
+    [RelayCommand]
+    private void AddBlock()
+    {
+        var band = BlockBand == "Every band" ? null : BlockBand;
+        Core.Mode? mode = Core.ModeInfo.TryParse(BlockMode, out var m) ? m : null;
+        var b = Core.Blocking.BlockedCall.Create(BlockValue, band, mode, out var error);
+        if (b is null)
+        {
+            BlockError = error;
+            return;
+        }
+        if (BlockRows.Any(r => r.Entry == b))
+        {
+            BlockError = $"{b.Describe()} is already on the list.";
+            return;
+        }
+        BlockRows.Add(new BlockRowViewModel(b, b.Describe()));
+        BlockEmpty = false;
+        BlockError = string.Empty;
+        BlockValue = string.Empty;
+    }
+
+    /// <summary>Removes an entry from the block list.</summary>
+    [RelayCommand]
+    private void RemoveBlock(BlockRowViewModel? row)
+    {
+        if (row is not null) BlockRows.Remove(row);
+        BlockEmpty = BlockRows.Count == 0;
+    }
+
     private static double GreatCircleMiles(int km) => Core.Geo.GreatCircle.ToMiles(km);
 
     /// <summary>Choices for how long a CQ caller stays in Next in line after it was last heard, with their minutes.</summary>
@@ -1189,6 +1259,18 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>UDP port.</summary>
     [ObservableProperty]
     public partial string UdpPort { get; set; }
+
+    /// <summary>Also send to a second program.</summary>
+    [ObservableProperty]
+    public partial bool UdpSecondEnabled { get; set; }
+
+    /// <summary>The second program's address.</summary>
+    [ObservableProperty]
+    public partial string UdpSecondAddress { get; set; }
+
+    /// <summary>The second program's port.</summary>
+    [ObservableProperty]
+    public partial string UdpSecondPort { get; set; }
 
     /// <summary>Serve the remote page.</summary>
     [ObservableProperty]
@@ -1576,6 +1658,25 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial string Retention { get; set; }
 
+    /// <summary>Also write ALL.TXT files.</summary>
+    [ObservableProperty]
+    public partial bool AllTxt { get; set; }
+
+    /// <summary>The ALL.TXT folder as typed; blank for the default.</summary>
+    [ObservableProperty]
+    public partial string AllTxtFolder { get; set; }
+
+    /// <summary>The default ALL.TXT folder, shown in the empty box.</summary>
+    public string DefaultAllTxtFolder { get; } = RecordingService.DefaultAllTxtFolder();
+
+    /// <summary>Opens the ALL.TXT folder in the file manager.</summary>
+    [RelayCommand]
+    private void OpenAllTxtFolder()
+    {
+        var folder = RecordingService.AllTxtFolder(AllTxtFolder);
+        if (!FolderOpener.Open(folder)) Message = $"Could not open {folder}.";
+    }
+
     /// <summary>Themes.</summary>
     public IReadOnlyList<string> Themes { get; } = ["system", "light", "dark"];
 
@@ -1731,6 +1832,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Lotw.UserList = LotwUserList;
             s.Lotw.TqslPath = string.IsNullOrWhiteSpace(TqslPath) ? null : TqslPath.Trim();
             s.Hunt.Targets = HuntRows.Select(r => HuntService.ToEntry(r.Target)).ToList();
+            s.Blocked = BlockRows.Select(r => SettingsMapper.ToEntry(r.Entry)).ToList();
             s.Hunt.WatchAllBands = HuntAllBands;
             s.Hunt.Sound = HuntSound;
             s.Notifications.Enabled = NotifyEnabled;
@@ -1791,6 +1893,9 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Udp.Enabled = UdpEnabled;
             s.Udp.Address = UdpAddress.Trim();
             s.Udp.Port = Int(UdpPort, 1, 65535, 2237);
+            s.Udp.SecondEnabled = UdpSecondEnabled;
+            s.Udp.SecondAddress = UdpSecondAddress.Trim();
+            s.Udp.SecondPort = Int(UdpSecondPort, 1, 65535, 2238);
             s.Remote.Enabled = RemoteEnabled;
             s.Remote.Port = Int(RemotePort, 1024, 65535, 8073);
             s.Remote.RequireSignIn = RemoteSignIn;
@@ -1803,6 +1908,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             })];
             s.Files.SaveWav = SaveWav;
             s.Files.RetentionDays = Int(Retention, 1, 3650, 30);
+            s.Files.AllTxt = AllTxt;
+            s.Files.AllTxtFolder = AllTxtFolder.Trim();
             s.Appearance.Theme = Theme;
             s.Appearance.Skin = Skin.Id;
             s.Appearance.Units = Units;

@@ -35,6 +35,7 @@ using Ft8Client.Integrations.Net;
 using Ft8Client.Integrations.Time;
 using Ft8Client.Integrations.Usage;
 using Ft8Client.Rig;
+using Ft8Client.Rig.DxLab;
 using Serilog;
 
 namespace Ft8Client.App;
@@ -92,7 +93,7 @@ public sealed class AppHost : IAsyncDisposable
     // ever try each feature. Views and windows count by name, logged contacts by mode.
     private static readonly HashSet<string> TrackedFeatures = new(StringComparer.Ordinal)
     {
-        "station_called", "cq_started", "caller_answered", "caller_dismissed", "call_when_free", "auto_call_started", "hunt_added",
+        "station_called", "cq_started", "caller_answered", "caller_dismissed", "call_when_free", "auto_call_started", "hunt_added", "call_blocked",
         "hunt_go", "cluster_go", "tune", "contest_start", "contest_export", "macro_sent", "remote_connected", "remote_action", "view_opened",
         "window_opened", "contact_logged",
     };
@@ -1371,6 +1372,42 @@ public sealed class AppHost : IAsyncDisposable
             rig = new VoxRig(Frequencies.Find(Settings.Current.Operating.Band, SettingsMapper.ToConfig(Settings.Current).Mode)?.DialHz ?? 14_074_000);
             status = new ServiceStatus(ServiceHealth.Ok, "Audio only (VOX)", Clock.UtcNow);
             usage = "ok";
+        }
+        else if (HamlibModel.IsDxLabCommander(r.Model))
+        {
+            // DXLab Commander keeps the radio's port; Costas talks to Commander's command port itself (owner request
+            // 2026-11-22). Keying is CAT through Commander, or the radio's VOX.
+            if (r.Ptt is not ("cat" or "vox"))
+            {
+                rig = new VoxRig(dialHz);
+                status = new ServiceStatus(ServiceHealth.Down, "With DXLab Commander, keying must be CAT (through Commander) or VOX. Change it in Station setup.", Clock.UtcNow);
+                usage = "wrong_ptt";
+            }
+            else
+            {
+                if (old is DxLabCommanderRig)
+                {
+                    if (Transmitter is { Transmitting: true }) await Transmitter.HaltAsync().ConfigureAwait(false);
+                    var placeholder = new VoxRig(dialHz);
+                    _rig = placeholder;
+                    Transmitter?.SetRig(placeholder);
+                    await old.DisposeAsync().ConfigureAwait(false);
+                    old = placeholder;
+                }
+                try
+                {
+                    rig = await DxLabCommanderRig.ConnectAsync(r.Port, Clock, CultureInfo.CurrentCulture, _cts.Token, pttViaCat: r.Ptt == "cat").ConfigureAwait(false);
+                    status = new ServiceStatus(ServiceHealth.Ok, rig.Name, Clock.UtcNow);
+                    usage = "ok";
+                }
+                catch (RigException ex)
+                {
+                    rig = new VoxRig(dialHz);
+                    status = new ServiceStatus(ServiceHealth.Down, ex.Message, Clock.UtcNow);
+                    _rigRetry = true;
+                    usage = "failed";
+                }
+            }
         }
         else
         {

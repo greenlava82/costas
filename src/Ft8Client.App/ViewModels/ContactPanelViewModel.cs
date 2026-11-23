@@ -113,6 +113,21 @@ public sealed class ContactPanelViewModel
         Received = NotYet,
     };
 
+    /// <summary>
+    /// The idle card while calling CQ, with the CQs sent in a row that nobody answered: "Calling CQ · 5 with no answer".
+    /// The same instance for 0.
+    /// </summary>
+    public static ContactPanelViewModel CallingCq(int unanswered) => unanswered <= 0 ? IdleCallingCq : new()
+    {
+        Caption = $"Calling CQ · {unanswered} with no answer",
+        Call = "—",
+        IsIdle = true,
+        Subline = unanswered == 1 ? "Waiting for a station to answer. 1 CQ sent so far with no answer."
+            : $"Waiting for a station to answer. {unanswered} CQs in a row with no answer.",
+        Sent = NotYet,
+        Received = NotYet,
+    };
+
     /// <summary>The strip, one box per step in order.</summary>
     public IReadOnlyList<StepViewModel> Steps { get; private init; } = [];
 

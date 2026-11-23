@@ -92,4 +92,7 @@ public sealed record SessionConfig
 
     /// <summary>The RTTY speed, shift and polarity to send.</summary>
     public RttyFormat Rtty { get; init; } = RttyFormat.Standard;
+
+    /// <summary>Calls hidden and never answered on some bands or modes.</summary>
+    public Core.Blocking.BlockList Blocked { get; init; } = Core.Blocking.BlockList.Empty;
 }

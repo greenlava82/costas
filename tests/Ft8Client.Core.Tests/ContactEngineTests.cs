@@ -1214,4 +1214,55 @@ public class ContactEngineTests
         s.Step().Should().Be("<PJ4/K1ABC> W7LIT RR73");
         s.Sent.Should().OnlyContain(x => FtxEncoder.Encode(x.Message, Mode.Ft8).Ok);
     }
+
+    [Fact]
+    public void UnansweredCqs_CqsWithNoAnswer_CountsEachCq()
+    {
+        var s = new Sim();
+        s.E.CallCq(SlotParity.Even, Sim.T0);
+        s.Steps(6);
+
+        s.E.UnansweredCqs.Should().Be(3);
+    }
+
+    [Fact]
+    public void UnansweredCqs_StationAnswers_BackToZeroThenCountsAgain()
+    {
+        var s = new Sim();
+        s.E.CallCq(SlotParity.Even, Sim.T0);
+        s.Step();
+        s.E.UnansweredCqs.Should().Be(1);
+        s.Step("W7LIT K1ABC FN42");
+        s.Step().Should().Be("K1ABC W7LIT -12");
+        s.E.UnansweredCqs.Should().Be(0);
+        s.Step("W7LIT K1ABC R-08");
+        s.Step().Should().Be("K1ABC W7LIT RR73");
+        s.Step();
+        s.Step().Should().Be("CQ W7LIT DN40");
+        s.E.UnansweredCqs.Should().Be(1);
+    }
+
+    [Fact]
+    public void UnansweredCqs_NewCqRun_StartsFromZero()
+    {
+        var s = new Sim();
+        s.E.CallCq(SlotParity.Even, Sim.T0);
+        s.Steps(4);
+        s.E.UnansweredCqs.Should().Be(2);
+        s.E.StopCq(s.Now);
+        s.E.CallCq(SlotParity.Even, s.Now);
+
+        s.E.UnansweredCqs.Should().Be(0);
+    }
+
+    [Fact]
+    public void UnansweredCqs_CallCqWhileRunning_KeepsCount()
+    {
+        var s = new Sim();
+        s.E.CallCq(SlotParity.Even, Sim.T0);
+        s.Steps(4);
+        s.E.CallCq(SlotParity.Even, s.Now);
+
+        s.E.UnansweredCqs.Should().Be(2);
+    }
 }

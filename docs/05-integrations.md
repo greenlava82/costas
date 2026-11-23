@@ -365,7 +365,7 @@ Privacy. Owner decision 2026-10-15.
   back off up to 30 minutes; whatever is waiting at exit gets one 3-second attempt and is then dropped.
 - Events: `app_started` (settings snapshot, see `UsageEvents`), `app_running` (once a UTC day for long runs),
   `band_changed`, `view_opened`, `window_opened`, `cq_started`, `station_called`, `caller_answered`, `caller_dismissed`, `call_when_free`, `auto_call_started`, `tune`,
-  `hunt_go`, `cluster_go`, `hunt_added`, `contact_logged`, `contest_start`, `contest_export`. Never a callsign, grid, name, frequency, port, address or log content.
+  `hunt_go`, `cluster_go`, `hunt_added`, `call_blocked`, `contact_logged`, `contest_start`, `contest_export`. Never a callsign, grid, name, frequency, port, address or log content.
 - Added 2026-11-21 (owner request: evaluate what each feature is worth):
   - `app_started` also carries `install` (velopack, classic, deb, appimage, folder), `channel` (release, dev), `layout`,
     `profiles`, `remote_sign_in`, `install_age` (range: 0d, 1-7d, 8-30d, 31-90d, 91-365d, 365d+), `active_days_30` and

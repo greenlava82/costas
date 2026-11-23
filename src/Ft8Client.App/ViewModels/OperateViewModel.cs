@@ -259,6 +259,10 @@ public sealed partial class OperateViewModel : ObservableObject
     /// </summary>
     public bool ShowStrip => Compact && !InContact && Summary is not null && (SideCollapsed || SideTab != BandTab);
 
+    /// <summary>The block link in a station's details: "Block on 20 m".</summary>
+    [ObservableProperty]
+    public partial string BlockText { get; set; } = "Block on this band";
+
     /// <summary>The band on the folded side column's rail: "20 m · 198 you need".</summary>
     [ObservableProperty]
     public partial string RailBand { get; set; } = "Band";
@@ -289,10 +293,19 @@ public sealed partial class OperateViewModel : ObservableObject
     /// <summary>What the contact card at the top shows: the contact, or the idle card when there is none.</summary>
     public ContactPanelViewModel Panel => Contact ?? (_snap switch
     {
-        { CallingCq: true } => ContactPanelViewModel.IdleCallingCq,
+        { CallingCq: true } s => CqCard(s.UnansweredCqs),
         { AutoCall: true } => ContactPanelViewModel.IdleAutoCall,
         _ => ContactPanelViewModel.Idle,
     });
+
+    private (int Count, ContactPanelViewModel Card)? _cqCard;
+
+    // The idle CQ card, made again only when the count changes so the card is not rebuilt on every refresh.
+    private ContactPanelViewModel CqCard(int unanswered)
+    {
+        if (_cqCard is not { } c || c.Count != unanswered) _cqCard = c = (unanswered, ContactPanelViewModel.CallingCq(unanswered));
+        return c.Card;
+    }
 
     /// <summary>Selected line row.</summary>
     [ObservableProperty]
@@ -603,6 +616,7 @@ public sealed partial class OperateViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowSummaryCard));
         OnPropertyChanged(nameof(FoldIdleCard));
         RailBand = s.Summary is null ? "Band" : $"{BandPlan.Display(s.Summary.Band)} · {s.Summary.YouNeed} you need";
+        BlockText = $"Block on {BandPlan.Display(s.Band)}";
         OnPropertyChanged(nameof(Panel));
         Calling = s.Contact is null ? null : DetailsFor(s.Contact.DxCall, s, now);
         // A lookup may have arrived since the details strip opened.
@@ -832,6 +846,18 @@ public sealed partial class OperateViewModel : ObservableObject
     private void HuntCall(StationDetailsViewModel? d)
     {
         if (d is not null) _commands.Hunt(new Core.Hunting.HuntTarget(Core.Hunting.HuntTargetKind.Call, Callsign.Normalize(d.Call), null));
+    }
+
+    /// <summary>Puts the station's call on the block list for this band: hidden, never answered or auto-called here.</summary>
+    [RelayCommand]
+    private void BlockCall(StationDetailsViewModel? d)
+    {
+        if (d is null || _snap is null) return;
+        if (Core.Blocking.BlockedCall.Create(d.Call, _snap.Band, null, out _) is { } b)
+        {
+            Details = null;
+            _commands.Block(b);
+        }
     }
 
     /// <summary>Adds the station's country to the Hunt list.</summary>

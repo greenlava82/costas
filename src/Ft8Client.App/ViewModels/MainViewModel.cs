@@ -144,6 +144,16 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
             case Integrations.Wsjtx.WsjtxHaltTx:
                 Halt();
                 break;
+            case Integrations.Wsjtx.WsjtxConfigure c when Callsign.IsValid(Callsign.Normalize(c.DxCall)):
+                // DXLab SpotCollector sends this when a spot is double-clicked (WSJT-X fills in DX Call and DX Grid and
+                // generates its messages but does not transmit). Costas selects the station; calling stays the operator's click.
+                var dx = Callsign.Normalize(c.DxCall);
+                SelectTab(0);
+                StatusText = Operate.SelectCall(dx)
+                    ? $"Another program picked {dx}; it is selected in Next in line. Click Call to call it."
+                    : $"Another program picked {dx}, which is not in Next in line on this band right now.";
+                StatusKind = TextKind.Normal;
+                break;
             case Integrations.Wsjtx.WsjtxHighlight h:
                 Raw.Highlight(h);
                 Dispatch(Raw.ApplyHighlights);
@@ -924,6 +934,21 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         StatusKind = TextKind.Normal;
     }
 
+    /// <inheritdoc />
+    public void Block(Core.Blocking.BlockedCall entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (SettingsMapper.BlockList(_host.Settings.Current).Entries.Contains(entry))
+        {
+            StatusText = $"{entry.Describe()} is already blocked.";
+            return;
+        }
+        _host.Settings.Update(s => s.Blocked.Add(SettingsMapper.ToEntry(entry)));
+        _host.Usage.Track("call_blocked");
+        StatusText = $"Blocked {entry.Describe()}: Costas hides it and never answers it there. Undo in Settings, Blocked calls.";
+        StatusKind = TextKind.Normal;
+    }
+
     // A Hunt list entry was heard: the bar, mini mode and the phone say so; a desktop notification, the chime and the
     // taskbar flash when wanted.
     private void ShowHunt(HuntSighting s)
@@ -1567,7 +1592,12 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         }
         // Shown while the ended contact stays in the top slot: "ZL2RPA answered K1ABC instead. Stopped calling."
         if (s.Contact is { Outcome: ContactOutcome.AnsweredOther } other) return (other.StatusText, TextKind.Caution);
-        if (s.CallingCq) return (s.Transmitting ? "Transmitting CQ." : "Calling CQ.", s.Transmitting ? TextKind.Critical : TextKind.Normal);
+        if (s.CallingCq)
+        {
+            // How many CQs in a row went unanswered (owner request 2026-11-22): "Calling CQ. 5 CQs with no answer."
+            var none = s.UnansweredCqs switch { <= 0 => string.Empty, 1 => " 1 CQ with no answer.", var n => $" {n} CQs with no answer." };
+            return ((s.Transmitting ? "Transmitting CQ." : "Calling CQ.") + none, s.Transmitting ? TextKind.Critical : TextKind.Normal);
+        }
         if (s.KeyboardTx.Active) return ("Transmitting.", TextKind.Critical);
         if (s.Contact is { Outcome: ContactOutcome.NoReply, Flow: ContactFlow.Hound } fox) return (fox.StatusText, TextKind.Caution);
         var top = s.Rank.Line.FirstOrDefault();

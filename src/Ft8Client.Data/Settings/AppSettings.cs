@@ -38,6 +38,9 @@ public sealed class AppSettings
     /// <summary>The Hunt list.</summary>
     public HuntOptions Hunt { get; set; } = new();
 
+    /// <summary>Calls that are hidden and never answered, per band and mode.</summary>
+    public List<BlockEntry> Blocked { get; set; } = [];
+
     /// <summary>Desktop notifications for Hunt list alerts and callers.</summary>
     public NotificationOptions Notifications { get; set; } = new();
 

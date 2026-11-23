@@ -46,7 +46,7 @@ public static class WsjtxMessages
 
     /// <summary>Decode.</summary>
     public static byte[] Decode(string id, WsjtxDecode d) => Header(WsjtxMessageType.Decode, id)
-        .Bool(true)
+        .Bool(d.IsNew)
         .Time(d.TimeUtc)
         .Int32(d.Snr)
         .Double(d.Dt)

@@ -57,6 +57,7 @@ public sealed class ContactEngine
     private string? _extraMessage;
     private SlotParity _extraParity;
     private bool _lastBeforeWatchdog;
+    private int _unansweredCqs;
 
     /// <summary>Creates the engine.</summary>
     public ContactEngine(string myCall, string myGrid, ContactSettings settings, DateTime nowUtc)
@@ -87,6 +88,13 @@ public sealed class ContactEngine
 
     /// <summary>Parity used for CQ.</summary>
     public SlotParity CqParity => _cqParity;
+
+    /// <summary>
+    /// CQs sent in a row with no answer (owner request 2026-11-22, from user feedback). Counts each CQ that went out;
+    /// back to 0 when a message goes to a station (someone answered, or the operator called one) and when a new CQ run
+    /// starts.
+    /// </summary>
+    public int UnansweredCqs => _unansweredCqs;
 
     /// <summary>Why transmitting stopped by itself (the watchdog), until the operator acts again.</summary>
     public string? StopReason { get; private set; }
@@ -199,6 +207,7 @@ public sealed class ContactEngine
     public void CallCq(SlotParity parity, DateTime nowUtc)
     {
         OperatorActivity(nowUtc);
+        if (!_cqRunning) _unansweredCqs = 0;
         _cqRunning = true;
         _cqParity = parity;
         if (_c is { Held: true })
@@ -207,6 +216,13 @@ public sealed class ContactEngine
             _stopped = _stopped! with { ListenForSignoff = true };
         }
         if (_c is null) _finished = null;
+    }
+
+    /// <summary>Drops waiting callers whose call matches (a call just put on the block list). A contact in progress is kept.</summary>
+    public void RemoveWaiting(Func<string, bool> match)
+    {
+        ArgumentNullException.ThrowIfNull(match);
+        _waiting.RemoveAll(w => match(w.Call));
     }
 
     /// <summary>Stops calling CQ. A contact in progress continues.</summary>
@@ -480,9 +496,15 @@ public sealed class ContactEngine
             _extraMessage = null;
             return;
         }
+        if (plan.DxCall is null && plan.Message.StartsWith("CQ ", StringComparison.Ordinal))
+        {
+            _unansweredCqs++;
+            return;
+        }
         if (_c is null || plan.DxCall is null || !Callsign.EqualsCall(plan.DxCall, _c.DxCall)) return;
         var step = _c.Steps[_c.Phase];
         if (plan.Message != step.Message) return;
+        _unansweredCqs = 0;
         _c.TimeOnUtc ??= startedUtc;
         if (_c.StepTxCount == 0) _c.StepStartedUtc = startedUtc;
         _c.StepTxCount++;

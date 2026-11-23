@@ -1,7 +1,7 @@
 # Settings
 
 Open **☰ › Settings**. Pages are listed on the left in groups: **Station** (Station, Transmitting, Contacts, PSK and
-RTTY), **Finding stations** (Who to call, Hunt list), **Connections** (Logbooks, PSK Reporter and RBN, Mobile
+RTTY), **Finding stations** (Who to call, Hunt list, Blocked calls, Notifications), **Connections** (Logbooks, PSK Reporter and RBN, Mobile
 connection, Other programs) and **Costas** (Appearance, Updates, Privacy, Advanced, and Developer when developer mode
 is on). Press **Save** to keep changes or **Cancel** to drop them.
 
@@ -228,6 +228,13 @@ What you are looking for, and how you are told. See [Hunt list and alerts](hunt.
 - **Also watch the bands I am not on, through PSK Reporter**: on. **Count receivers within** 620 miles (1,000 km).
 - **Play the chime and flash Costas in the taskbar**: on.
 
+## Blocked calls
+
+Calls you do not want to work. See [Blocking a call](contacts.md#blocking-a-call).
+
+- **Blocked**: the entries (*ON4XYZ on 20 m*, *ON4XYZ on every band in FT8*), each with **Remove**.
+- **Add**: the call, a band or *Every band*, and a mode or *Every mode*.
+
 ## Notifications
 
 ![Settings: Notifications](images/settings-notifications.png)
@@ -392,9 +399,33 @@ The page is called **PSK Reporter and RBN** in Settings.
 
 ![Settings: Other programs](images/settings-other-programs.png)
 
-- **WSJT-X UDP › Send decodes, status and logged contacts**: on, to `127.0.0.1` port `2237`. Works with GridTracker
-  and JTAlert on the same computer.
+- **WSJT-X UDP › Send decodes, status and logged contacts**: on, to `127.0.0.1` port `2237`. Works with GridTracker,
+  JTAlert and DXLab SpotCollector on the same computer.
+- **Also send to a second program**: off, `127.0.0.1` port `2238`. Two programs cannot listen on one port, so to run
+  DXLab SpotCollector alongside JTAlert or GridTracker, set one of them to `2237` and the other to `2238`, here and in
+  each program. Both get the same decodes, status and logged contacts, and either can call a station or halt transmit.
+- **ALL.TXT › Write every decode and transmission to ALL.TXT, one folder per month**: off. When on, Costas also writes
+  each decode and transmission in WSJT-X's `ALL.TXT` line layout to a folder for each month, such as
+  `Documents\Costas\2026-11\ALL.TXT`, for programs and scripts that read it. **Folder** changes where the month
+  folders go; **Open folder** shows it. Not written in simulation.
 - **Save received audio**: none, only slots with decodes, or all, as WAV files, kept for 30 days by default.
+
+### DXLab Suite {#dxlab}
+
+Costas speaks to the DXLab Suite the way WSJT-X does, so DXLab's own WSJT-X settings apply.
+
+- **Radio**: choose **DXLab › Commander** in [Station setup](setup.md#2-radio-cat-and-ptt). Commander keeps the
+  radio, and Costas sets frequency, mode and split and keys through it.
+- **SpotCollector**: point it at the WSJT-X UDP port above (2237, or the second program's port when JTAlert or
+  GridTracker has 2237). Every decode goes to SpotCollector as a spot. Double-clicking a spot in SpotCollector
+  selects that station in Next in line; Costas does not call it until you click **Call**. When SpotCollector starts
+  after Costas, it asks for the decodes it missed and Costas sends the last 15 minutes again.
+- **DXKeeper**: each logged contact goes to SpotCollector as a full ADIF record, and SpotCollector passes it to
+  DXKeeper, so DXKeeper's duplicate and award checks see it at once.
+- **DXView and Pathfinder**: the station you are working is sent in Costas's status, so SpotCollector can look it up
+  in DXView and Pathfinder as it does for WSJT-X.
+- **Highlights**: when a program sends WSJT-X's *Highlight Callsign* message for a needed station, the colours show on
+  the [Raw decodes](raw-decodes.md) page.
 
 ## Mobile connection
 

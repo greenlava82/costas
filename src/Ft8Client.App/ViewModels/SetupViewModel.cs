@@ -359,6 +359,12 @@ public sealed partial class SetupViewModel : ObservableObject
         var text = reachable
             ? $"{address} accepted the connection, but the radio did not answer through it. {problem} The program there may not answer the commands Hamlib starts with, or may not be connected to the radio."
             : $"Nothing is listening at {address}: the program that should run the {serverName} server is not running, or listens on another address or port.";
+        if (HamlibModel.IsDxLabCommander(model))
+        {
+            return reachable
+                ? $"DXLab Commander accepted the connection at {address}, but did not report the radio's frequency. {problem} Check that Commander itself is connected to the radio (its main window shows the frequency)."
+                : $"Nothing is listening at {address}. Start DXLab Commander first, and check its Network Service settings: the port is Commander's Base Port plus 2 (52002 for the default 52000).";
+        }
         if (model == 2)
         {
             text += reachable
@@ -705,13 +711,15 @@ public sealed partial class SetupViewModel : ObservableObject
             Check(false, ConfigProblem);
             return;
         }
-        var exe = HamlibModels.Find("rigctld", _host.Settings.Current.Paths.HamlibDir);
-        if (exe is null)
+        // DXLab Commander is reached directly, without rigctld.
+        var commander = HamlibModel.IsDxLabCommander(Model.Number);
+        var exe = commander ? null : HamlibModels.Find("rigctld", _host.Settings.Current.Paths.HamlibDir);
+        if (exe is null && !commander)
         {
             Check(false, HamlibMissing);
             return;
         }
-        Check(true, "Found rigctld (Hamlib).");
+        if (!commander) Check(true, "Found rigctld (Hamlib).");
         Busy = true;
         Readback = string.Empty;
         var scan = new CancellationTokenSource();
@@ -722,8 +730,8 @@ public sealed partial class SetupViewModel : ObservableObject
             if (IsNetwork)
             {
                 Message = $"Connecting to {ServerName} at {NetworkAddress.Trim()}…";
-                // Costas reaches the server through its own rigctld, whose errors are about that hop; a plain connection
-                // first tells "nothing there" apart from "there, but not answering".
+                // Costas reaches the server through its own rigctld (or, for Commander, directly), whose errors are about
+                // that hop; a plain connection first tells "nothing there" apart from "there, but not answering".
                 var reachable = await CanConnectAsync(NetworkAddress.Trim(), ct);
                 if (!reachable)
                 {
@@ -778,7 +786,7 @@ public sealed partial class SetupViewModel : ObservableObject
                     }
                 }
                 var progress = new Progress<(string Port, int Baud)>(t => Message = $"Trying {t.Port} at {t.Baud} baud…");
-                var hit = await RigctldRig.ScanAsync(exe, Model.Number, ports, bauds, _host.Guard, _host.Clock, ct, progress, NormalizedConfig);
+                var hit = await RigctldRig.ScanAsync(exe!, Model.Number, ports, bauds, _host.Guard, _host.Clock, ct, progress, NormalizedConfig);
                 Message = string.Empty;
                 if (hit is not { } h)
                 {
@@ -1229,7 +1237,7 @@ public sealed partial class SetupViewModel : ObservableObject
             MainViewModel.Dispatch(() => ModelListProblem = $"The radio list could not be read from Hamlib ({rigctl}): {ex.Message}");
             return;
         }
-        if (_allModels.Count == 0)
+        if (_allModels.All(m => HamlibModel.IsDxLabCommander(m.Number)))
         {
             MainViewModel.Dispatch(() => ModelListProblem = $"Hamlib ({rigctl}) listed no radios. Reinstall Costas, or set the Hamlib folder in Settings › Advanced.");
             return;

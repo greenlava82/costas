@@ -9,6 +9,8 @@ Costas only tells you. It never changes band, calls anyone or transmits because 
 ## Adding entries
 
 - In a station's details (click a station's call in Next in line), choose **Hunt this call** or **Hunt** *country*.
+  The same details have **Block on** *band* for the opposite: a call you never want to see or answer there (see
+  [Blocking a call](contacts.md#blocking-a-call)).
 - Or open [Settings › Hunt list](settings.md#hunt-list), pick what kind of entry it is, type it, choose a band or
   *Any band*, and click **Add**. A country can be typed as a prefix (`KL7`, `VK9X`) or a name (`Alaska`); a state as
   `TX` or `Texas`; a grid as `FN31`.

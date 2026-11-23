@@ -77,6 +77,21 @@ public class WsjtxInboundTests
     }
 
     [Fact]
+    public void Parse_Configure_DxCallAndGrid()
+    {
+        var d = Header(15).Utf8("FT8").UInt32(uint.MaxValue).Utf8(string.Empty).Bool(false).UInt32(15).UInt32(uint.MaxValue)
+            .Utf8("JA1QRS").Utf8("PM95").Bool(true).ToArray();
+
+        WsjtxInbound.Parse(d).Should().Be(new WsjtxConfigure("Costas", "FT8", "JA1QRS", "PM95", true));
+    }
+
+    [Fact]
+    public void Parse_Replay_IdOnly()
+    {
+        WsjtxInbound.Parse(Header(7).ToArray()).Should().Be(new WsjtxReplay("Costas"));
+    }
+
+    [Fact]
     public void Parse_TruncatedOrForeign_ReturnsNull()
     {
         var reply = Header(4).UInt32(0).Int32(-12).ToArray();
@@ -89,7 +104,7 @@ public class WsjtxInboundTests
     public void Parse_TypesThisAppIgnores_ReturnsNull()
     {
         WsjtxInbound.Parse(Header(9).Utf8("TNX 73").Bool(true).ToArray()).Should().BeNull(); // Free text
-        WsjtxInbound.Parse(Header(7).ToArray()).Should().BeNull(); // Replay
+        WsjtxInbound.Parse(Header(11).Utf8("DN40").ToArray()).Should().BeNull(); // Location
     }
 
     [Fact]

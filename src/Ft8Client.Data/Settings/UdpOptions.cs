@@ -19,4 +19,16 @@ public sealed class UdpOptions
 
     /// <summary>Destination port.</summary>
     public int Port { get; set; } = 2237;
+
+    /// <summary>
+    /// Also send everything to a second program (owner request 2026-11-22: DXLab SpotCollector and JTAlert cannot both
+    /// listen on one address and port).
+    /// </summary>
+    public bool SecondEnabled { get; set; }
+
+    /// <summary>The second program's address (unicast or multicast).</summary>
+    public string SecondAddress { get; set; } = "127.0.0.1";
+
+    /// <summary>The second program's port.</summary>
+    public int SecondPort { get; set; } = 2238;
 }

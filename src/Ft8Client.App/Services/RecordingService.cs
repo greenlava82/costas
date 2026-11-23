@@ -17,8 +17,8 @@ using Serilog;
 namespace Ft8Client.App.Services;
 
 /// <summary>
-/// Writes the decode journal and saves slot audio per the Files setting, pruning old WAV files daily. Neither runs in
-/// simulation, so replayed recordings do not mix with what was heard on the air.
+/// Writes the decode journal (and its ALL.TXT copy when that is on) and saves slot audio per the Files setting, pruning
+/// old WAV files daily. None of it runs in simulation, so replayed recordings do not mix with what was heard on the air.
 /// </summary>
 public sealed class RecordingService : IDisposable
 {
@@ -27,8 +27,10 @@ public sealed class RecordingService : IDisposable
     private readonly DecodeJournal _journal;
     private readonly WavArchive _wav;
     private readonly IClock _clock;
+    private AllTxtWriter? _allTxt;
     private readonly Timer _prune;
     private bool _warned;
+    private bool _allTxtWarned;
 
     /// <summary>Creates the service.</summary>
     public RecordingService(Session session, AppSettingsAccessor settings, string journalFolder, string wavFolder, IClock clock)
@@ -54,7 +56,9 @@ public sealed class RecordingService : IDisposable
     {
         var dial = _session.Snapshot.DialHz;
         var name = ModeInfo.Name(mode);
-        Guard(() => _journal.Append(slot, decodes.Select(d => DecodeJournal.Format(slot, dial, false, name, d.Snr, d.Dt, d.OffsetHz, d.Text))));
+        var lines = decodes.Select(d => DecodeJournal.Format(slot, dial, false, name, d.Snr, d.Dt, d.OffsetHz, d.Text)).ToList();
+        Guard(() => _journal.Append(slot, lines));
+        if (AllTxt() is { } all) Guard(() => all.Append(slot, lines), ref _allTxtWarned);
     }
 
     private void OnTransmitting(PreparedTx tx, DateTime startedUtc)
@@ -62,6 +66,25 @@ public sealed class RecordingService : IDisposable
         var slot = SlotMath.SlotStart(startedUtc, tx.Mode);
         var line = DecodeJournal.Format(slot, _session.Snapshot.DialHz, true, ModeInfo.Name(tx.Mode), 0, 0, tx.OffsetHz, tx.Plan.Message);
         Guard(() => _journal.Append(slot, [line]));
+        if (AllTxt() is { } all) Guard(() => all.Append(slot, [line]), ref _allTxtWarned);
+    }
+
+    /// <summary>Where ALL.TXT month folders go when the setting is blank: Documents\Costas.</summary>
+    public static string DefaultAllTxtFolder() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Costas");
+
+    /// <summary>The ALL.TXT folder a setting means: the typed folder, or <see cref="DefaultAllTxtFolder"/> when blank.</summary>
+    public static string AllTxtFolder(string setting) => string.IsNullOrWhiteSpace(setting) ? DefaultAllTxtFolder() : setting.Trim();
+
+    // The ALL.TXT writer for the folder in settings, or null when ALL.TXT is off.
+    private AllTxtWriter? AllTxt()
+    {
+        var files = _settings.Current.Files;
+        if (!files.AllTxt) return null;
+        var folder = AllTxtFolder(files.AllTxtFolder);
+        var w = _allTxt;
+        if (w is null || !string.Equals(w.Folder, folder, StringComparison.Ordinal)) _allTxt = w = new AllTxtWriter(folder);
+        return w;
     }
 
     private void OnSlotAudio(SlotAudio audio, int decodes)
@@ -78,18 +101,21 @@ public sealed class RecordingService : IDisposable
         });
     }
 
-    private void Guard(Action a)
+    private void Guard(Action a) => Guard(a, ref _warned);
+
+    // Runs a write; logs the first failure of a run of failures, then stays quiet until one succeeds.
+    private static void Guard(Action a, ref bool warned)
     {
         try
         {
             a();
-            _warned = false;
+            warned = false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            if (_warned) return;
-            _warned = true;
-            Log.Warning(ex, "Could not write the journal or a WAV file");
+            if (warned) return;
+            warned = true;
+            Log.Warning(ex, "Could not write the journal, ALL.TXT or a WAV file");
         }
     }
 

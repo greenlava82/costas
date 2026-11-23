@@ -855,7 +855,7 @@ public class RigTests
               1049  Yaesu                  FT-710                  20230328.3      Stable      RIG_MODEL_FT710
               1035  Yaesu                  FT-991                  20230328.15     Stable      RIG_MODEL_FT991
             """);
-        HamlibModels.ForPicker(all, false).Select(m => m.Display).Should().Equal("Hamlib NET rigctl", "Icom IC-7300", "Yaesu FT-710", "Yaesu FT-991");
+        HamlibModels.ForPicker(all, false).Select(m => m.Display).Should().Equal("DXLab Commander (DX Lab Suite)", "Hamlib NET rigctl", "Icom IC-7300", "Yaesu FT-710", "Yaesu FT-991");
         HamlibModels.ForPicker(all, true).Select(m => m.Number).Should().Contain([1, 6]);
         all.Single(m => m.Number == 1049).Display.Should().Be("Yaesu FT-710");
     }
