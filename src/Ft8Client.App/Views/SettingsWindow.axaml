@@ -1108,7 +1108,7 @@
               <TextBlock Classes="label" Text="jt9 decoder" />
               <StackPanel Grid.Column="1">
                 <TextBox Text="{Binding Jt9Path}" PlaceholderText="Found automatically" />
-                <TextBlock Classes="help" Text="Full path to jt9.exe from WSJT-X." />
+                <TextBlock Classes="help" Text="Leave empty to use the jt9 that comes with Costas. Otherwise the full path to jt9 (jt9.exe on Windows), or a WSJT-X folder." />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">

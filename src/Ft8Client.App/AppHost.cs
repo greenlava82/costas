@@ -386,11 +386,19 @@ public sealed class AppHost : IAsyncDisposable
         }
         Jt9Decoder.CleanTempRoot(Paths.Temp);
 
-        Jt9Path = Jt9Locator.Find(s.Paths.Jt9);
+        // Each jt9 found is tried until one starts, so a bundled copy that cannot run here gives way to an installed one.
+        Jt9Path = Jt9Locator.Find(s.Paths.Jt9, path =>
+        {
+            if (Jt9Locator.Runs(path)) return true;
+            Log.Warning("jt9 at {Path} does not start here; looking for another", path);
+            return false;
+        });
         IDecoder decoder;
         if (Jt9Path is null)
         {
-            decoder = new NullDecoder("jt9 not found. Install WSJT-X or set its path in Settings.");
+            decoder = new NullDecoder(Jt9Locator.IsAppImage(s.Paths.Jt9)
+                ? "jt9 not found. Costas cannot run jt9 from inside the WSJT-X AppImage: clear the jt9 decoder path in Settings to use the one that comes with Costas."
+                : "jt9 not found. Reinstall Costas, or set the path to jt9 in Settings.");
         }
         else
         {

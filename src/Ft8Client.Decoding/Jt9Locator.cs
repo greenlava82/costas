@@ -18,13 +18,62 @@ public static class Jt9Locator
     /// Returns the first existing candidate: the configured path, the bundled <c>third_party/wsjtx/bin</c>
     /// beside the app or in the repository, an installed WSJT-X, then the PATH. Null if none exists.
     /// </summary>
-    public static string? Find(string? configuredPath = null)
+    public static string? Find(string? configuredPath = null) => Find(configuredPath, static _ => true);
+
+    /// <summary>
+    /// Returns the first existing candidate that <paramref name="usable"/> accepts, such as <see cref="Runs"/>, so a
+    /// copy that cannot start (on Linux, the bundled jt9 on a system whose C library is too old for it) gives way to
+    /// the next one, such as the distribution's. Null if none is accepted.
+    /// </summary>
+    public static string? Find(string? configuredPath, Func<string, bool> usable)
     {
+        ArgumentNullException.ThrowIfNull(usable);
         foreach (var candidate in Candidates(configuredPath))
         {
-            if (File.Exists(candidate)) return Path.GetFullPath(candidate);
+            // An AppImage starts its whole program (WSJT-X's opens its main window), never jt9 alone.
+            if (IsAppImage(candidate) || !File.Exists(candidate)) continue;
+            var full = Path.GetFullPath(candidate);
+            if (usable(full)) return full;
         }
         return null;
+    }
+
+    /// <summary>True when <paramref name="path"/> names an AppImage, which cannot be run as jt9.</summary>
+    public static bool IsAppImage(string? path) =>
+        path is not null && path.Trim().EndsWith(".AppImage", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Where <c>--appimage-extract</c>, run in the AppImage's own folder, puts jt9:
+    /// <c>squashfs-root/usr/bin/jt9</c> beside it.
+    /// </summary>
+    public static string ExtractedFromAppImage(string appImagePath) =>
+        Path.Combine(Path.GetDirectoryName(Path.GetFullPath(appImagePath.Trim())) ?? ".", "squashfs-root", "usr", "bin", ExecutableName);
+
+    /// <summary>
+    /// True when this jt9 starts: the program loader found every library it needs. It is asked for its help text;
+    /// a library that cannot be loaded makes the loader stop it at once (exit 127 on Linux), and a file that is not an
+    /// executable for this computer cannot be started at all.
+    /// </summary>
+    public static bool Runs(string jt9Path)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(jt9Path, "-h")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            // Still running after the wait: it started, so its libraries loaded.
+            if (Probe(psi) is not { } result) return true;
+            if (result.ExitCode is 127 or DllNotFound or EntryPointNotFound) return false;
+            return !result.Text.Contains("error while loading shared libraries", StringComparison.Ordinal);
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -84,7 +133,21 @@ public static class Jt9Locator
     {
         if (!string.IsNullOrWhiteSpace(configuredPath))
         {
-            yield return Directory.Exists(configuredPath) ? Path.Combine(configuredPath, ExecutableName) : configuredPath;
+            if (IsAppImage(configuredPath))
+            {
+                yield return ExtractedFromAppImage(configuredPath);
+            }
+            else if (Directory.Exists(configuredPath))
+            {
+                // The folder jt9 is in, or a WSJT-X folder: an installed one (bin) or an extracted AppImage (usr/bin).
+                yield return Path.Combine(configuredPath, ExecutableName);
+                yield return Path.Combine(configuredPath, "bin", ExecutableName);
+                yield return Path.Combine(configuredPath, "usr", "bin", ExecutableName);
+            }
+            else
+            {
+                yield return configuredPath;
+            }
         }
 
         var env = Environment.GetEnvironmentVariable("COSTAS_JT9") ?? Environment.GetEnvironmentVariable("FT8CLIENT_JT9");
@@ -115,9 +178,17 @@ public static class Jt9Locator
         }
     }
 
-    // Runs a probe for at most 5 s and returns what it printed. Reading to the end before waiting made the timeout
-    // useless: a probe that hung froze Costas's start-up.
-    private static string? Run(System.Diagnostics.ProcessStartInfo psi)
+    // Windows exit codes for a program whose DLL, or a function in one, is missing.
+    private const int DllNotFound = unchecked((int)0xC0000135);
+    private const int EntryPointNotFound = unchecked((int)0xC0000139);
+
+    private static string? Run(System.Diagnostics.ProcessStartInfo psi) => Probe(psi)?.Text;
+
+    private readonly record struct ProbeResult(int ExitCode, string Text);
+
+    // Runs a probe for at most 5 s and returns its exit code and what it printed. Reading to the end before waiting
+    // made the timeout useless: a probe that hung froze Costas's start-up.
+    private static ProbeResult? Probe(System.Diagnostics.ProcessStartInfo psi)
     {
         using var p = System.Diagnostics.Process.Start(psi);
         if (p is null) return null;
@@ -134,6 +205,6 @@ public static class Jt9Locator
             }
             return null;
         }
-        return Task.WaitAll([output, error], 1000) ? output.Result + error.Result : null;
+        return Task.WaitAll([output, error], 1000) ? new ProbeResult(p.ExitCode, output.Result + error.Result) : null;
     }
 }
