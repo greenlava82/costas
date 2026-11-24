@@ -38,7 +38,7 @@ public static class BandSummaryCalculator
             if (s.Continent is { } c && heardFrom.ContainsKey(c)) heardFrom[c]++;
         }
 
-        var needed = recent.Count(s => log.Need(s.Call, s.EntityKey, s.Grid, band, modeKey, settings.TierOrder, settings.ConfirmedOnly).Tag != NeedTag.Worked);
+        var needed = recent.Count(s => log.Need(s.Call, s.EntityKey, s.Grid, band, modeKey, settings.TierOrder, settings.ConfirmedOnly, settings.CallWorkedSince(nowUtc)).Tag != NeedTag.Worked);
 
         var last = slotDecodeCounts.Count == 0 ? 0 : slotDecodeCounts.MaxBy(x => x.SlotStartUtc).Decodes;
         var hour = slotDecodeCounts.Where(x => nowUtc - x.SlotStartUtc <= TimeSpan.FromHours(1)).ToList();

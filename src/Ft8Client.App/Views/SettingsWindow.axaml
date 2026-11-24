@@ -511,6 +511,14 @@
                 <TextBlock Classes="help" Text="How long a station calling CQ stays in Next in line after it was last heard, so a missed slot does not drop it. It leaves the list as soon as it is heard working someone else." />
               </StackPanel>
             </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Worked stations count as new again" />
+              <StackPanel Grid.Column="1">
+                <ComboBox ItemsSource="{Binding NewAgainAfterChoices}" SelectedItem="{Binding NewAgainAfter}" MinWidth="200"
+                          AutomationProperties.Name="Worked stations count as new again" />
+                <TextBlock Classes="help" TextWrapping="Wrap" Text="A station you have worked on this band and mode is a repeat and is listed in Repeats. Pick a time to have it count as a new call again once your last contact with it on this band and mode is that old: it moves into Next in line (and Auto-call), tagged New call, with Last worked showing when. Never keeps every past contact a repeat." />
+              </StackPanel>
+            </Grid>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

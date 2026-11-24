@@ -50,6 +50,31 @@ public class LogIndexTests
     }
 
     [Fact]
+    public void Need_CallWorkedBeforeTheCutoff_IsNewCallAgain()
+    {
+        Index().Need("K1ABC", "K", "FN42", "20m", "FT8", callWorkedSinceUtc: D.AddDays(1)).Should().Be(new NeedResult(NeedTag.NewCall, 4));
+    }
+
+    [Fact]
+    public void Need_CallWorkedOnOrAfterTheCutoff_StaysWorked()
+    {
+        Index().Need("K1ABC", "K", "FN42", "20m", "FT8", callWorkedSinceUtc: D).Tag.Should().Be(NeedTag.Worked);
+    }
+
+    [Fact]
+    public void CallWorkedSince_RecentContactOnAnotherBandOnly_False()
+    {
+        var log = LogIndex.Build(
+        [
+            new LogContact("K1ABC", "20m", "FT8", "FN42", "K", null, false, D),
+            new LogContact("K1ABC", "40m", "FT8", "FN42", "K", null, false, D.AddDays(300)),
+        ]);
+
+        log.CallWorkedSince("K1ABC", "20m", "FT8", D.AddDays(100)).Should().BeFalse();
+        log.CallWorkedSince("K1ABC", "40m", "FT8", D.AddDays(100)).Should().BeTrue();
+    }
+
+    [Fact]
     public void Need_TiersOneToThreeIgnoreMode()
     {
         // Australia was worked on SSB on 20 m, so it is not a new band for FT8.

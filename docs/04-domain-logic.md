@@ -130,7 +130,7 @@ A **Fox** (a station heard sending a multi-answer message `CALL1 RR73; CALL2 <FO
 - **Already worked**: tier 5 and not at a new park, kept out of Next in line and Watching and shown in the Repeats panel (callable first, then not confirmed on this band and mode).
 - **Calling me**: stations in state `CallingMe` go to "Waiting for you" and are shown in the line with "Calling you" in Doing now, ranked first within their tier.
 
-Filters (ranking settings): prefer stations that hear me (when off, chance is ignored in ordering), only stations calling CQ, skip long shots. Stations worked on this band and mode always go to Repeats, never Next in line (except a new park); Show Repeats only hides the Repeats card.
+Filters (ranking settings): prefer stations that hear me (when off, chance is ignored in ordering), only stations calling CQ, skip long shots. Stations worked on this band and mode always go to Repeats, never Next in line (except a new park); Show Repeats only hides the Repeats card. "Worked stations count as new again" (default never) makes a call worked only by a contact on this band and mode within that many days, so an older one is a new call again (owner decision 2026-11-24, issue #205).
 
 The ranker is a pure function: `(stations, logIndex, hearsMe, settings, myEntity, parks) -> (line, watching, workedCount)`. Test it with table-driven cases; the sample data in the mockups is one such case.
 

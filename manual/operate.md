@@ -263,7 +263,9 @@ or someone you owe a better report. At most 8 rows; the rest are counted underne
 
 A station moves into Repeats as soon as you log it: work EA1A, call CQ again, and EA1A is in Repeats if it is still
 on the air. Calling a station from Repeats works it again and logs a second contact. If you never want to see them,
-turn off **Show Repeats** in [Settings › Who to call](settings.md#who-to-call).
+turn off **Show Repeats** in [Settings › Who to call](settings.md#who-to-call). To have stations you last worked a
+long time ago count as new again, set **Worked stations count as new again** there (for example *After 1 year*):
+they then come back into Next in line as a *New call*.
 
 It has the same columns as Next in line, lined up under them (including the amber *calling* tag under a busy station's call), with two differences:
 

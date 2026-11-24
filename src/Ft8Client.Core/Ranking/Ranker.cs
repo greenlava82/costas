@@ -28,7 +28,8 @@ public static class Ranker
 
         foreach (var s in input.Stations)
         {
-            var need = input.Log.Need(s.Call, s.EntityKey, s.Grid, input.Band, input.ModeKey, settings.TierOrder, settings.ConfirmedOnly);
+            var need = input.Log.Need(s.Call, s.EntityKey, s.Grid, input.Band, input.ModeKey, settings.TierOrder, settings.ConfirmedOnly,
+                settings.CallWorkedSince(input.NowUtc));
             var hears = input.HearsMe?.For(s, input.NowUtc) ?? HearsYou.Unavailable;
             var chance = HearsMe.ChanceOf(hears, s.LastSnr);
             var reason = NotCallableReason(s, input);

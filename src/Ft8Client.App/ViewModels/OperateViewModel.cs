@@ -1163,6 +1163,9 @@ public sealed partial class OperateViewModel : ObservableObject
         if (r.KeepCqCallers > TimeSpan.Zero)
             parts.Add(r.KeepCqCallers.TotalMinutes == 1 ? "CQ callers stay listed for 1 minute after they were last heard."
                 : $"CQ callers stay listed for {r.KeepCqCallers.TotalMinutes:0} minutes after they were last heard.");
+        if (r.NewAgainAfter is { } again)
+            parts.Add(again.TotalDays == 1 ? "A station last worked on this band over 1 day ago counts as new again."
+                : $"A station last worked on this band over {again.TotalDays:0} days ago counts as new again.");
         return string.Join(" ", parts);
     }
 

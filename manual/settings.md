@@ -194,6 +194,11 @@ line*.
 - **Keep CQ callers listed**: 2 minutes. How long a station calling CQ stays in Next in line after it was last heard.
   Choices run from *Only while heard every slot* (the list drops a station the first slot it is missed) to 15
   minutes. A station heard working someone else leaves the list straight away whatever this says.
+- **Worked stations count as new again**: *Never (any contact makes it a repeat)*. A station you have worked on this
+  band and mode goes to Repeats. Pick *After 7 days*, *30 days*, *90 days*, *6 months*, *1 year*, *2 years* or
+  *5 years* to have it count as a new call again once your last contact with it on this band and mode is that old:
+  it moves back into Next in line (and so into Auto-call) tagged *New call*, and its **Last worked** column shows
+  when you last worked it. A contact on another band or mode doesn't count either way.
 - **Parks on the Air: Show which park a station is activating (POTA spots)**: on. Costas reads the public spot list
   at pota.app every two minutes while it runs and shows *New park* or *Park* with the reference under **Why**
   ([Operate](operate.md#next-in-line)). When you log a contact with a spotted activator, the park goes into the log

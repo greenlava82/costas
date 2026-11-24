@@ -22,6 +22,16 @@ public sealed record RankingSettings
     /// <summary>When off, stations that just finished a contact are callable too.</summary>
     public bool OnlyCallingCq { get; init; } = true;
 
+    /// <summary>
+    /// How long after the last contact on this band and mode a station counts as a new call again, moving from Repeats
+    /// to Next in line. Null (the default) never: any contact ever makes it a repeat (owner decision 2026-11-24, issue #205).
+    /// </summary>
+    public TimeSpan? NewAgainAfter { get; init; }
+
+    /// <summary>The earliest contact time that still makes a call worked, or null when any contact counts.</summary>
+    /// <param name="nowUtc">Now, UTC.</param>
+    public DateTime? CallWorkedSince(DateTime nowUtc) => NewAgainAfter is { } after ? nowUtc - after : null;
+
     /// <summary>Leave long shots out of the line.</summary>
     public bool SkipLongShots { get; init; }
 
