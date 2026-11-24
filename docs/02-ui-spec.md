@@ -228,7 +228,7 @@ Below the map, **Band activity, last hour**: one bar per minute with the average
 
 **Worked this session**: title with count, subline "N new DXCC · N new band DXCC". The three newest contacts: call · where, upload status ("Uploaded to QRZ", "Waiting to upload · retrying", "Upload failed · Retry"), need tag at the time of the contact, time. Link "Show all N in the log".
 
-**How the line is ordered**: one sentence and a "Change" link that opens the ranking settings flyout: tier order (drag to reorder), and checkboxes Prefer stations that hear me (on), Only stations calling CQ (on), Hide stations worked on this band (on), Skip long shots (off).
+**How the line is ordered**: one sentence and a "Change" link that opens the ranking settings flyout: tier order (drag to reorder), and checkboxes Prefer stations that hear me (on), Only stations calling CQ (on), Show Repeats (on; stations worked on this band are never in the line, this only hides the Repeats card), Skip long shots (off).
 
 ## Mini mode
 

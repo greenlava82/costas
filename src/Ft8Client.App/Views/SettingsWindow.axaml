@@ -465,7 +465,8 @@
               <StackPanel Grid.Column="1" Spacing="6">
                 <CheckBox Content="Rank stations that hear me higher (from PSK Reporter)" IsChecked="{Binding PreferHearsMe}" />
                 <CheckBox Content="Only list stations that are calling CQ" IsChecked="{Binding OnlyCallingCq}" />
-                <CheckBox Content="Hide stations I have already worked on this band" IsChecked="{Binding HideWorked}" />
+                <CheckBox Content="Show Repeats: stations I have already worked on this band" IsChecked="{Binding ShowRepeats}" />
+                <TextBlock Classes="help" Margin="24,0,0,0" TextWrapping="Wrap" Text="Stations already in your log on this band and mode are never in Next in line (except one at a park you have not worked). Repeats lists them under Next in line so you can work a friend or a regular again; calling one logs another contact. Off hides Repeats on the desk and the phone." />
                 <CheckBox Content="Leave out long shots (signals too weak to likely complete)" IsChecked="{Binding SkipLongShots}" />
                 <CheckBox Content="Count a country or state as worked only when confirmed" IsChecked="{Binding ConfirmedOnly}" />
                 <CheckBox Content="Count only LoTW confirmations (what DXCC and WAS credit)" IsChecked="{Binding ConfirmedByLotw}" Margin="24,0,0,0" />

@@ -22,9 +22,6 @@ public sealed record RankingSettings
     /// <summary>When off, stations that just finished a contact are callable too.</summary>
     public bool OnlyCallingCq { get; init; } = true;
 
-    /// <summary>Hide stations already worked on this band.</summary>
-    public bool HideWorked { get; init; } = true;
-
     /// <summary>Leave long shots out of the line.</summary>
     public bool SkipLongShots { get; init; }
 

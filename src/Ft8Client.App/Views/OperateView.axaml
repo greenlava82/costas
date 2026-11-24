@@ -689,7 +689,7 @@
         </Border>
 
         <!-- Repeats: stations heard now that are already in the log on this band and mode -->
-        <Border Classes="card" Padding="0,10,0,6" AutomationProperties.Name="Repeats">
+        <Border Classes="card" Padding="0,10,0,6" AutomationProperties.Name="Repeats" IsVisible="{Binding ShowRepeats}">
           <StackPanel>
             <TextBlock Text="Repeats" Classes="title" Margin="14,0" />
             <TextBlock Text="{Binding RepeatsSubtitle}" Classes="secondary" Margin="14,2,14,6" />

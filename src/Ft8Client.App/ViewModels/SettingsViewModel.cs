@@ -99,7 +99,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         foreach (var t in SettingsMapper.ToRanking(s.Ranking).TierOrder) TierOrder.Add(new TierItem(t, StationText.Need(t)));
         PreferHearsMe = s.Ranking.PreferHearsMe;
         OnlyCallingCq = s.Ranking.OnlyCallingCq;
-        HideWorked = s.Ranking.HideWorked;
+        ShowRepeats = s.Ranking.ShowRepeats;
         SkipLongShots = s.Ranking.SkipLongShots;
         ConfirmedOnly = s.Ranking.ConfirmedOnly;
         ConfirmedByLotw = !string.Equals(s.Ranking.ConfirmedBy, "any", StringComparison.OrdinalIgnoreCase);
@@ -762,9 +762,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool OnlyCallingCq { get; set; }
 
-    /// <summary>Hide worked.</summary>
+    /// <summary>Show the Repeats list of stations already worked on this band.</summary>
     [ObservableProperty]
-    public partial bool HideWorked { get; set; }
+    public partial bool ShowRepeats { get; set; }
 
     /// <summary>Skip long shots.</summary>
     [ObservableProperty]
@@ -1825,7 +1825,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Ranking.TierOrder = SettingsMapper.TierNames(TierOrder.Select(t => t.Tag));
             s.Ranking.PreferHearsMe = PreferHearsMe;
             s.Ranking.OnlyCallingCq = OnlyCallingCq;
-            s.Ranking.HideWorked = HideWorked;
+            s.Ranking.ShowRepeats = ShowRepeats;
             s.Ranking.SkipLongShots = SkipLongShots;
             s.Ranking.ConfirmedOnly = ConfirmedOnly;
             s.Ranking.ConfirmedBy = ConfirmedByLotw ? "lotw" : "any";

@@ -261,6 +261,10 @@ Directly under Next in line: stations you can hear now that are already in your 
 line leaves them out because you do not need them, but you may still want to work them again: a friend, a regular,
 or someone you owe a better report. At most 8 rows; the rest are counted underneath.
 
+A station moves into Repeats as soon as you log it: work EA1A, call CQ again, and EA1A is in Repeats if it is still
+on the air. Calling a station from Repeats works it again and logs a second contact. If you never want to see them,
+turn off **Show Repeats** in [Settings › Who to call](settings.md#who-to-call).
+
 It has the same columns as Next in line, lined up under them (including the amber *calling* tag under a busy station's call), with two differences:
 
 - **Why** says whether your contact with them on this band and mode is confirmed: ***Not confirmed*** or *Confirmed*.

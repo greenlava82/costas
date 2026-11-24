@@ -163,7 +163,6 @@ public static class SettingsMapper
             TierOrder = order,
             PreferHearsMe = r.PreferHearsMe,
             OnlyCallingCq = r.OnlyCallingCq,
-            HideWorked = r.HideWorked,
             SkipLongShots = r.SkipLongShots,
             ConfirmedOnly = r.ConfirmedOnly,
             PreferNewParks = r.PreferNewParks,

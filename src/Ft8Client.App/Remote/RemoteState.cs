@@ -119,6 +119,9 @@ public sealed record RemoteState
     /// <summary>The band summary, or null before the first decode.</summary>
     public RemoteSummary? Summary { get; init; }
 
+    /// <summary>Whether the phone shows the Repeats card (Settings › Who to call › Show Repeats).</summary>
+    public bool ShowRepeats { get; init; } = true;
+
     /// <summary>Repeats: heard now and already worked on this band and mode.</summary>
     public IReadOnlyList<RemoteStation> Repeats { get; init; } = [];
 

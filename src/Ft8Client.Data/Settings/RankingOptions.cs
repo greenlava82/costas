@@ -20,8 +20,12 @@ public sealed class RankingOptions
     /// <summary>Only stations calling CQ.</summary>
     public bool OnlyCallingCq { get; set; } = true;
 
-    /// <summary>Hide stations worked on this band.</summary>
-    public bool HideWorked { get; set; } = true;
+    /// <summary>
+    /// Show the Repeats list (stations heard now that are already worked on this band and mode) under Next in line, on
+    /// the desk and the phone. Worked stations are never in Next in line either way. Replaces <c>hideWorked</c>, which
+    /// did nothing; a stored <c>hideWorked</c> is ignored.
+    /// </summary>
+    public bool ShowRepeats { get; set; } = true;
 
     /// <summary>Skip long shots.</summary>
     public bool SkipLongShots { get; set; }

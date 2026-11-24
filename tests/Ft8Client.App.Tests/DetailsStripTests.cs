@@ -316,6 +316,18 @@ public class DetailsStripTests
     }
 
     [Fact]
+    public void ShowRepeats_TurnedOffWithARepeatsStripOpen_StripCloses()
+    {
+        var vm = Build("A", "r:K1ABC");
+        Click(vm, Repeat(vm, "K1ABC"));
+
+        vm.ShowRepeats = false;
+
+        OpenRepeats(vm).Should().BeEmpty();
+        vm.Details.Should().BeNull();
+    }
+
+    [Fact]
     public void RepeatClicked_LineRowSelected_LineRowDeselectedAndItsStripCloses()
     {
         var vm = Build("A", "r:K1ABC");

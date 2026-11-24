@@ -66,6 +66,16 @@ public class RemoteStateBuilderTests
     }
 
     [Fact]
+    public void Build_ShowRepeatsOff_SendsNoRepeats()
+    {
+        var s = RemoteStateBuilder.Build(Snap(), Now, Ctx with { ShowRepeats = false }, "you", null);
+
+        s.ShowRepeats.Should().BeFalse();
+        s.Repeats.Should().BeEmpty();
+        s.Line.Should().ContainSingle();
+    }
+
+    [Fact]
     public void Build_BandAdvice_CarriedInTheSummary()
     {
         var advice = new BandAdvice(BandAdviceKind.OpenFromArea, "15m", [new BandAdviceContinent("EU", 23, 6, Now.AddMinutes(-2))], []);
