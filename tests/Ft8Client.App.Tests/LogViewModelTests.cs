@@ -246,4 +246,117 @@ public class LogViewModelTests
         File.ReadAllText(Path.Combine(folder, "log-W7LIT.adi")).Should().Contain("K1ABC").And.NotContain("VK3ABC");
         File.ReadAllText(Path.Combine(folder, "log-K0GST.adi")).Should().Contain("VK3ABC");
     }
+
+    [Fact]
+    public void ParseRangeTime_DatesAndTimes_EndIsExclusive()
+    {
+        var day = new DateTime(2026, 11, 20, 0, 0, 0, DateTimeKind.Utc);
+        LogViewModel.ParseRangeTime("2026-11-20", end: false).Should().Be(day);
+        LogViewModel.ParseRangeTime("2026-11-20", end: true).Should().Be(day.AddDays(1), "a date alone includes the whole day");
+        LogViewModel.ParseRangeTime("2026-11-20 14:30", end: false).Should().Be(day.AddHours(14).AddMinutes(30));
+        LogViewModel.ParseRangeTime("20261120 1430", end: true).Should().Be(day.AddHours(14).AddMinutes(31), "a time includes that minute");
+        LogViewModel.ParseRangeTime("20.11.2026 14:30:15", end: true).Should().Be(day.AddHours(14).AddMinutes(30).AddSeconds(16));
+        LogViewModel.ParseRangeTime("2026-11-20T14:30Z", end: false).Should().Be(day.AddHours(14).AddMinutes(30));
+        LogViewModel.ParseRangeTime("", end: false).Should().BeNull();
+        LogViewModel.ParseRangeTime("next tuesday", end: false).Should().BeNull();
+        LogViewModel.ParseRangeTime("2026-11-20 25:00", end: false).Should().BeNull();
+    }
+
+    [Fact]
+    public void BuildFilter_CustomRange_UsesFromAndTo()
+    {
+        var from = new DateTime(2026, 11, 20, 0, 0, 0, DateTimeKind.Utc);
+        var to = from.AddDays(2);
+
+        var f = LogViewModel.BuildFilter("", LogViewModel.AllBands, LogViewModel.AllModes, LogViewModel.CustomRange, LogViewModel.AnyConfirmation, Now, null, from, to);
+
+        f.FromUtc.Should().Be(from);
+        f.ToUtc.Should().Be(to);
+        LogViewModel.BuildFilter("", LogViewModel.AllBands, LogViewModel.AllModes, LogViewModel.Today, LogViewModel.AnyConfirmation, Now, null, from, to)
+            .ToUtc.Should().BeNull("the typed range applies only to the custom range choice");
+    }
+
+    [Fact]
+    public async Task ExportAsync_CustomRange_WritesOnlyContactsInTheRange()
+    {
+        var db = SqliteDatabase.InMemory(out var keep);
+        using var _ = keep;
+        var repo = new QsoRepository(db);
+        var day = new DateTime(2026, 11, 20, 0, 0, 0, DateTimeKind.Utc);
+        foreach (var (call, on) in new[] { ("DL1OLD", day.AddHours(-1)), ("DL2IN", day.AddHours(10)), ("DL3IN", day.AddDays(1).AddHours(23).AddMinutes(59)), ("DL4NEW", day.AddDays(2)) })
+            repo.Insert(new QsoRecord { ProfileId = "p", Call = call, QsoDateOn = on, Band = "20m", Mode = "FT8", StationCallsign = "W7LIT", CreatedUtc = on, ModifiedUtc = on });
+        var vm = NewVm(repo);
+        vm.DateFilter = LogViewModel.CustomRange;
+        vm.RangeFrom = "2026-11-20";
+        vm.RangeTo = "2026-11-21";
+        vm.Rows.Select(r => r.Call).Should().Equal("DL3IN", "DL2IN");
+        var path = Path.Combine(Directory.CreateTempSubdirectory("costas-export").FullName, "log.adi");
+
+        await vm.ExportAsync(path);
+
+        var text = File.ReadAllText(path);
+        text.Should().Contain("DL2IN").And.Contain("DL3IN").And.NotContain("DL1OLD").And.NotContain("DL4NEW");
+        text.Should().Contain("Filtered: digital modes, from 2026-11-20 00:00 to before 2026-11-22 00:00 UTC.", "the header says which contacts the file holds");
+        vm.Message.Should().Be("Exported 2 contacts made as W7LIT. The filters left out 2 contacts.");
+    }
+
+    [Fact]
+    public async Task ExportAsync_BandFilter_WritesOnlyThatBand()
+    {
+        var db = SqliteDatabase.InMemory(out var keep);
+        using var _ = keep;
+        var repo = new QsoRepository(db);
+        var on = DateTime.UtcNow.Date.AddHours(1);
+        foreach (var (call, band) in new[] { ("K1TWENTY", "20m"), ("K1FORTY", "40m") })
+            repo.Insert(new QsoRecord { ProfileId = "p", Call = call, QsoDateOn = on, Band = band, Mode = "FT8", StationCallsign = "W7LIT", CreatedUtc = on, ModifiedUtc = on });
+        var vm = NewVm(repo);
+        vm.Refresh();
+        vm.BandFilter = "40m";
+        var path = Path.Combine(Directory.CreateTempSubdirectory("costas-export").FullName, "log.adi");
+
+        await vm.ExportAsync(path);
+
+        File.ReadAllText(path).Should().Contain("K1FORTY").And.NotContain("K1TWENTY");
+    }
+
+    [Fact]
+    public async Task ExportAsync_UnreadableRange_RefusesWithReason()
+    {
+        var db = SqliteDatabase.InMemory(out var keep);
+        using var _ = keep;
+        var vm = NewVm(new QsoRepository(db));
+        vm.DateFilter = LogViewModel.CustomRange;
+        vm.RangeFrom = "yesterday";
+        var path = Path.Combine(Directory.CreateTempSubdirectory("costas-export").FullName, "log.adi");
+
+        await vm.ExportAsync(path);
+
+        File.Exists(path).Should().BeFalse();
+        vm.Message.Should().StartWith("Not exported: Cannot read the From date \"yesterday\"");
+    }
+
+    [Fact]
+    public async Task ExportAsync_DxKeeperChoices_ReportedAndKeptBySetting()
+    {
+        var db = SqliteDatabase.InMemory(out var keep);
+        using var _ = keep;
+        var repo = new QsoRepository(db);
+        var on = DateTime.UtcNow.Date.AddHours(1);
+        repo.Insert(new QsoRecord { ProfileId = "p", Call = "DL1ABC", QsoDateOn = on, Band = "20m", Mode = "FT8", StationCallsign = "W7LIT", Name = "Jürgen", Qth = "Köln", CreatedUtc = on, ModifiedUtc = on });
+        (bool, bool)? saved = null;
+        var vm = new LogViewModel(repo, CountryFile.Parse("United States:  05:  08:  NA:   37.53:    91.67:     5.0:  K:\n    K,W;\n"), () => ("p", "W7LIT"),
+            _ => Task.FromResult(""), () => null, () => { }) { ExportOptionsChanged = (a, l) => saved = (a, l) };
+        vm.ExportPlainAscii = true;
+        saved.Should().Be((true, false));
+        var path = Path.Combine(Directory.CreateTempSubdirectory("costas-export").FullName, "log.adi");
+
+        await vm.ExportAsync(path);
+
+        File.ReadAllText(path).Should().Contain("<name:7>Juergen").And.Contain("<qth:5>Koeln");
+        vm.Message.Should().EndWith(" Plain ASCII text.");
+        vm.ExportWithoutNameQthComment = true;
+        await vm.ExportAsync(path);
+        File.ReadAllText(path).Should().NotContain("<name:").And.NotContain("<qth:");
+        vm.Message.Should().EndWith(" Plain ASCII text; name, QTH and comment left out.");
+    }
 }
