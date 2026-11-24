@@ -27,7 +27,7 @@ The row under the buttons narrows the list. The filters combine with each other 
 | Station | Your callsign (the current station profile's log: the default), or All stations. Contacts made under another callsign, such as another operator's profile or a log imported from an old call, show only with All stations |
 | Band | All bands, or any band you have a contact on |
 | Mode | All digital (the default: everything but phone and CW), All modes, FT8, FT4, PSK (PSK31 and PSK63) or RTTY |
-| Date | All time, Today (UTC), Last 7 days, Last 30 days, This year. Days are UTC days, as the log shows them |
+| Date | All time, Today (UTC), Last 7 days, Last 30 days, This year, or Custom range (UTC). Days are UTC days, as the log shows them. Custom range shows a **From** and a **to** box: type a UTC date (`2026-11-20`) or a date and time (`2026-11-20 14:30`); `20261120 1430` and `20.11.2026` work too. A date alone in the to box includes that whole day, and a time includes that minute. Leave a box empty for "from the start" or "up to now". A date Costas cannot read is named in amber under the filters |
 | Confirmed | Confirmed or not, Confirmed (by QRZ, the ADIF you imported, or LoTW), Not confirmed |
 
 Your callsign and All digital are the starting point, so they do not count as filters, and Clear filters leaves the station as it is; the totals count your station's contacts only. While another filter is set, the status line says *Showing 120 of 3,400 contacts* and **Clear filters** puts them all back.
@@ -40,10 +40,43 @@ The search text is kept. The list shows the newest 5,000 matching contacts; the 
 | **Edit** | Opens the selected contact to correct it (call, grid, reports, name, power, comment). Your corrections stay: a later QRZ sync adds confirmations but does not change what you edited. The change is not sent to QRZ; correct it there too if you want both to match |
 | **Delete** | Removes the selected contact from the local log. Press it twice to confirm. It is **not** deleted from QRZ, but QRZ syncs and LoTW downloads will not bring it back. Importing an ADIF file that holds it does |
 | **Import ADIF** | Reads an `.adi` file (from WSJT-X, another logger, or a QRZ export). Duplicates are merged, not added twice; Costas reports how many were imported, merged and skipped |
-| **Export ADIF** | Writes your station's contacts to an `.adi` file, or every station's when the Station filter is All stations, with each contact's LoTW, eQSL and QRZ sent and received state (and the paper QSL and Club Log fields of contacts you imported). An export with more than one station callsign is written as one file per callsign, named after the one you chose (`log-W7LIT.adi`, `log-VE3_W7LIT.adi`), so each can be uploaded to that callsign's logbook |
+| **Export ADIF ▾** | **Export the contacts shown…** writes the contacts the list shows to an `.adi` file: the station, band, mode, date and confirmed filters and the search box all apply (see [Exporting part of the log](#export-part)). Each contact carries its LoTW, eQSL and QRZ sent and received state (and the paper QSL and Club Log fields of contacts you imported). An export with more than one station callsign is written as one file per callsign, named after the one you chose (`log-W7LIT.adi`, `log-VE3_W7LIT.adi`), so each can be uploaded to that callsign's logbook. The two ticks in the menu shape the file for another logger (see [Exporting for DXKeeper](#export-dxkeeper)) |
 | **Sync with QRZ now** | Reads your QRZ logbook and uploads anything waiting |
 | **LoTW ▾** | Downloads new LoTW confirmations, or signs and uploads new contacts with TQSL (see [LoTW](#lotw)) |
 | **Wavelog ▾** | Shown only when your profile uses Wavelog or Cloudlog. **Download new contacts** fetches what is new in your Wavelog log now instead of waiting for the 15-minute check (needs the download switched on, see [Using Wavelog as your logbook](settings.md#using-wavelog-as-your-logbook-for-worked-before)). **Upload waiting contacts now** sends contacts that are waiting or retrying without waiting for their retry time |
+
+## Exporting part of the log {#export-part}
+
+Export ADIF writes exactly the contacts the list shows. To send another logger only what you worked in Costas since
+your last import:
+
+1. Set **Date** to **Custom range (UTC)**.
+2. In **From**, type the date and UTC time of your first contact not yet in the other logger, for example
+   `2026-11-20 06:00`. Leave **to** empty for "up to now".
+3. Set **Mode** to **All modes** if the log also holds phone or CW contacts you want (the default, All digital, leaves
+   them out).
+4. Check the list, then choose **Export ADIF ▾ › Export the contacts shown…**.
+
+The line under the filters says how many contacts went into the file and how many the filters left out, and the
+first line of the file says which filters made it (*Filtered: digital modes, from 2026-11-20 06:00 to now UTC.*).
+To write the whole log, clear the filters and set **Mode** to **All modes**.
+
+### Exporting for DXKeeper and other loggers {#export-dxkeeper}
+
+Two ticks in the **Export ADIF ▾** menu change what the file holds. Costas remembers them for the next export.
+
+- **Plain ASCII text (for DXKeeper and older loggers).** Costas normally writes names and places as they are spelled
+  (UTF-8), which QRZ, LoTW, Club Log, Wavelog and Costas itself read correctly. DXLab DXKeeper and some older loggers
+  read the file as Windows text, so *Müller* would arrive as *MÃ¼ller*. With this ticked, umlauts and ß are spelled
+  out (*Mueller*, *Weiss*), other accented letters lose their accent (*José* becomes *Jose*, *Łódź* becomes *Lodz*),
+  anything else becomes `?`, and line breaks become spaces. This is the plain text the ADIF standard asks for in
+  `.adi` files.
+- **Leave out name, QTH and comment.** The file has no `NAME`, `QTH` or `COMMENT` fields, so the logger you import
+  into fills name and QTH from its own callbook lookup (in DXKeeper, tick *Query Callbook… for missing items* on the
+  Import QSOs tab) and the comment Costas writes (*FT8 Sent: -08 Rcvd: -13*) does not land in your log.
+
+To log each contact into DXKeeper as you make it, with no export at all, connect SpotCollector to Costas: see
+[DXLab Suite](settings.md#dxlab).
 
 ## What Costas logs
 
