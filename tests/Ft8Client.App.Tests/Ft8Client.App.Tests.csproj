@@ -9,6 +9,7 @@
     <ProjectReference Include="..\..\src\Ft8Client.App\Ft8Client.App.csproj" />
     <!-- The stand-in FlexRadio API, shared with the Rig tests. -->
     <Compile Include="..\Ft8Client.Rig.Tests\Flex\FakeFlexRadio.cs" Link="Flex\FakeFlexRadio.cs" />
+    <Compile Include="..\Ft8Client.Integrations.Tests\QDataStreamReader.cs" Link="Wsjtx\QDataStreamReader.cs" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

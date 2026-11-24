@@ -189,6 +189,29 @@ public sealed class QrzTests : IDisposable
     }
 
     [Fact]
+    public async Task Upload_NonAsciiNameAndFt4_ArriveIntact()
+    {
+        var on = new DateTime(2026, 1, 4, 2, 54, 0, DateTimeKind.Utc);
+        var db = Db();
+        var repo = new QsoRepository(db);
+        var q = Local("DL1ABC", on);
+        q.Name = "Jürgen Weiß";
+        q.Qth = "Köln";
+        q.Mode = "MFSK";
+        q.Submode = "FT4";
+        var id = repo.Insert(q);
+        var svc = new QrzUploadService(Client(), repo, new UploadQueueRepository(db), _clock, delay: (_, _) => Task.CompletedTask);
+        svc.Enqueue(id);
+
+        (await svc.ProcessDueAsync(Key, TestContext.Current.CancellationToken)).Should().Be(1);
+
+        var adif = _server.Requests.Last(r => r.TryGetValue("ACTION", out var a) && a == "INSERT")["ADIF"];
+        adif.Should().Contain("<name:13>Jürgen Weiß", "the length counts UTF-8 bytes, as QRZ reads it")
+            .And.Contain("<qth:5>Köln").And.Contain("<mode:4>MFSK").And.Contain("<submode:3>FT4");
+        Ft8Client.Data.Adif.AdifReader.Read(adif).Single()["name"].Should().Be("Jürgen Weiß");
+    }
+
+    [Fact]
     public async Task Upload_Duplicate_CountsAsUploaded()
     {
         var on = new DateTime(2026, 1, 4, 2, 54, 0, DateTimeKind.Utc);
