@@ -535,7 +535,7 @@ public sealed partial class LogViewModel : ObservableObject
         Message = $"Importing {Path.GetFileName(path)}…";
         try
         {
-            var r = await Task.Run(() => AdifImporter.Import(_qsos, File.ReadAllText(path), profileId, call, _countries));
+            var r = await Task.Run(() => AdifImporter.Import(_qsos, AdifFile.ReadText(path), profileId, call, _countries));
             Message = $"Imported {r.Imported}, merged {r.Merged} duplicates, skipped {r.Skipped}.";
         }
         catch (Exception e) when (IsFileError(e))
