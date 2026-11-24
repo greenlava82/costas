@@ -421,7 +421,10 @@ Costas speaks to the DXLab Suite the way WSJT-X does, so DXLab's own WSJT-X sett
   selects that station in Next in line; Costas does not call it until you click **Call**. When SpotCollector starts
   after Costas, it asks for the decodes it missed and Costas sends the last 15 minutes again.
 - **DXKeeper**: each logged contact goes to SpotCollector as a full ADIF record, and SpotCollector passes it to
-  DXKeeper, so DXKeeper's duplicate and award checks see it at once.
+  DXKeeper, so DXKeeper's duplicate and award checks see it at once. SpotCollector's WSJT-X *Enable* box must be
+  ticked and DXKeeper running. A contact logged while either was closed can be sent again from the Log: select it and
+  press **Send to loggers again**. For a batch of older contacts, export them with a date range and import the file
+  into DXKeeper (see [Exporting for DXKeeper](log.md#export-dxkeeper)).
 - **DXView and Pathfinder**: the station you are working is sent in Costas's status, so SpotCollector can look it up
   in DXView and Pathfinder as it does for WSJT-X.
 - **Highlights**: when a program sends WSJT-X's *Highlight Callsign* message for a needed station, the colours show on

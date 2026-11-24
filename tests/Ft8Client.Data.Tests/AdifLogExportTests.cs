@@ -135,6 +135,49 @@ public sealed class AdifLogExportTests : IDisposable
     }
 
     [Fact]
+    public void Document_PlainAscii_SpellsOutUmlautsAndCountsOneBytePerCharacter()
+    {
+        var q = Contact("DL1ABC", 0);
+        q.Name = "Jürgen Weiß";
+        q.Qth = "Köln-Mülheim";
+        q.Comment = "Café\r\nline two";
+
+        var text = AdifLogExport.Document(AdifLogExport.ByStation([q]).Single(), Now, "ADIF export", new AdifExportOptions(PlainAscii: true));
+
+        text.Should().Contain("<name:13>Juergen Weiss").And.Contain("<qth:14>Koeln-Muelheim").And.Contain("<comment:14>Cafe  line two");
+        text.All(c => c is '\n' || c is >= ' ' and <= '~').Should().BeTrue("every character of a plain ASCII export is printable ASCII");
+    }
+
+    [Fact]
+    public void Document_LeaveOutNameQthComment_DropsOnlyThoseFields()
+    {
+        var q = Contact("DL1ABC", 0);
+        q.Name = "Jürgen";
+        q.Qth = "Köln";
+
+        var r = AdifReader.Read(AdifLogExport.Document(AdifLogExport.ByStation([q]).Single(), Now, "ADIF export",
+            new AdifExportOptions(LeaveOutNameQthComment: true))).Single();
+
+        r["name"].Should().BeNull();
+        r["qth"].Should().BeNull();
+        r["comment"].Should().BeNull();
+        r["call"].Should().Be("DL1ABC");
+        r["rst_sent"].Should().Be("-08");
+        r["gridsquare"].Should().Be("JO22");
+    }
+
+    [Fact]
+    public void ToAscii_AccentsAndUnknownCharacters_PlainFormOrQuestionMark()
+    {
+        AdifExportOptions.ToAscii("Łódź Ærøskøbing São Paulo").Should().Be("Lodz AEroskobing Sao Paulo");
+        AdifExportOptions.ToAscii("Москва").Should().Be("??????");
+        AdifExportOptions.ToAscii("plain <text>").Should().Be("plain <text>");
+        AdifExportOptions.ToAscii("ŽžŻżŰűČčŠšŘřĘęĄąŃńŚśĆćŒœſ").Should().Be("ZzZzUuCcSsRrEeAaNnSsCcOEoes");
+        var latin = string.Concat(Enumerable.Range(0xC0, 0x180 - 0xC0).Select(c => (char)c));
+        AdifExportOptions.ToAscii(latin).Should().NotContain("?", "every Latin-1 and Latin Extended-A letter has a plain form");
+    }
+
+    [Fact]
     public void Read_NonAsciiLengthInCharacters_StillReadsWholeValue()
     {
         // Written by a logger that counts characters (HAMRS, Xlog).

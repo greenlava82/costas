@@ -94,16 +94,26 @@ public sealed class UdpInteropService : IDisposable
     // True when both datagrams went out.
     private bool SendLogged(QsoRecord q)
     {
-        var first = Send(WsjtxMessages.QsoLogged(ClientId, new WsjtxQso
+        var (logged, adif) = LoggedMessages(q, DateTime.UtcNow);
+        var first = Send(logged);
+        var second = Send(adif);
+        return first && second;
+    }
+
+    /// <summary>
+    /// The two datagrams WSJT-X sends for a logged contact, built from the log row: QSO Logged (what DXLab SpotCollector
+    /// passes to DXKeeper, and what JTAlert, Log4OM and GridTracker read) and Logged ADIF (one ADIF record, as uploads
+    /// and exports write it).
+    /// </summary>
+    internal static (byte[] QsoLogged, byte[] LoggedAdif) LoggedMessages(QsoRecord q, DateTime nowUtc) =>
+        (WsjtxMessages.QsoLogged(ClientId, new WsjtxQso
         {
             TimeOnUtc = q.QsoDateOn, TimeOffUtc = q.QsoDateOff ?? q.QsoDateOn, DxCall = q.Call, DxGrid = q.Gridsquare ?? string.Empty,
             FrequencyHz = q.FreqHz ?? 0, Mode = q.Submode ?? q.Mode, ReportSent = q.RstSent ?? string.Empty,
             ReportReceived = q.RstRcvd ?? string.Empty, TxPower = q.TxPwr ?? string.Empty, Comments = q.Comment ?? string.Empty, Name = q.Name ?? string.Empty,
             MyCall = q.StationCallsign ?? string.Empty, MyGrid = q.MyGridsquare ?? string.Empty,
-        }));
-        var second = Send(WsjtxMessages.LoggedAdif(ClientId, AdifWriter.Document([AdifMapper.ToAdif(q)], DateTime.UtcNow)));
-        return first && second;
-    }
+        }),
+        WsjtxMessages.LoggedAdif(ClientId, AdifWriter.Document([AdifMapper.ToAdif(q)], nowUtc)));
 
     private void Reconfigure(AppSettings s)
     {

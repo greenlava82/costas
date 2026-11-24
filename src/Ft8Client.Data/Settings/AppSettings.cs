@@ -68,6 +68,9 @@ public sealed class AppSettings
     /// <summary>Files.</summary>
     public FilesOptions Files { get; set; } = new();
 
+    /// <summary>Log view Export ADIF choices.</summary>
+    public LogExportOptions LogExport { get; set; } = new();
+
     /// <summary>Appearance.</summary>
     public AppearanceOptions Appearance { get; set; } = new();
 

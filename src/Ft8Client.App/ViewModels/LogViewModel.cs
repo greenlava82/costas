@@ -45,6 +45,9 @@ public sealed partial class LogViewModel : ObservableObject
     /// <summary>Contacts since 1 January.</summary>
     public const string ThisYear = "This year";
 
+    /// <summary>Contacts between two UTC times the operator types (<see cref="RangeFrom"/>, <see cref="RangeTo"/>).</summary>
+    public const string CustomRange = "Custom range (UTC)";
+
     /// <summary>The confirmation choice that shows every contact.</summary>
     public const string AnyConfirmation = "Confirmed or not";
 
@@ -120,7 +123,7 @@ public sealed partial class LogViewModel : ObservableObject
     public IReadOnlyList<string> ModeChoices { get; } = ModeGroups.Choices;
 
     /// <summary>Date filter choices.</summary>
-    public IReadOnlyList<string> DateChoices { get; } = [AllTime, Today, Last7Days, Last30Days, ThisYear];
+    public IReadOnlyList<string> DateChoices { get; } = [AllTime, Today, Last7Days, Last30Days, ThisYear, CustomRange];
 
     /// <summary>Confirmation filter choices.</summary>
     public IReadOnlyList<string> ConfirmedChoices { get; } = [AnyConfirmation, ConfirmedOnly, NotConfirmed];
@@ -146,6 +149,42 @@ public sealed partial class LogViewModel : ObservableObject
     /// <summary>Selected date filter.</summary>
     [ObservableProperty]
     public partial string DateFilter { get; set; } = AllTime;
+
+    /// <summary>True when the date choice is <see cref="CustomRange"/>: the From and To boxes show.</summary>
+    [ObservableProperty]
+    public partial bool IsCustomRange { get; set; }
+
+    /// <summary>
+    /// Start of the custom range, UTC, as typed: <c>2026-11-20</c> or <c>2026-11-20 14:30</c>. Blank for no start.
+    /// </summary>
+    [ObservableProperty]
+    public partial string RangeFrom { get; set; } = string.Empty;
+
+    /// <summary>
+    /// End of the custom range, UTC, as typed. A date alone includes that whole day; a time includes that minute. Blank
+    /// for no end.
+    /// </summary>
+    [ObservableProperty]
+    public partial string RangeTo { get; set; } = string.Empty;
+
+    /// <summary>Why the custom range is not used (a date that cannot be read), or empty.</summary>
+    [ObservableProperty]
+    public partial string RangeError { get; set; } = string.Empty;
+
+    /// <summary>Export ADIF writes plain ASCII text, for DXKeeper and other loggers that read the file as Windows text.</summary>
+    [ObservableProperty]
+    public partial bool ExportPlainAscii { get; set; }
+
+    /// <summary>Export ADIF leaves out name, QTH and comment, so the receiving logger fills them from its own lookup.</summary>
+    [ObservableProperty]
+    public partial bool ExportWithoutNameQthComment { get; set; }
+
+    /// <summary>Called with the two export choices when either changes, to keep them in the settings.</summary>
+    public Action<bool, bool>? ExportOptionsChanged { get; init; }
+
+    partial void OnExportPlainAsciiChanged(bool value) => ExportOptionsChanged?.Invoke(value, ExportWithoutNameQthComment);
+
+    partial void OnExportWithoutNameQthCommentChanged(bool value) => ExportOptionsChanged?.Invoke(ExportPlainAscii, value);
 
     /// <summary>Selected confirmation filter.</summary>
     [ObservableProperty]
@@ -232,7 +271,21 @@ public sealed partial class LogViewModel : ObservableObject
 
     partial void OnModeFilterChanged(string value) => Refresh();
 
-    partial void OnDateFilterChanged(string value) => Refresh();
+    partial void OnDateFilterChanged(string value)
+    {
+        IsCustomRange = value == CustomRange;
+        Refresh();
+    }
+
+    partial void OnRangeFromChanged(string value)
+    {
+        if (IsCustomRange) Refresh();
+    }
+
+    partial void OnRangeToChanged(string value)
+    {
+        if (IsCustomRange) Refresh();
+    }
 
     partial void OnConfirmedFilterChanged(string value) => Refresh();
 
@@ -266,7 +319,7 @@ public sealed partial class LogViewModel : ObservableObject
     {
         RefreshBandChoices();
         var station = Station();
-        var filter = BuildFilter(Search, BandFilter, ModeFilter, DateFilter, ConfirmedFilter, DateTime.UtcNow, station);
+        var filter = CurrentFilter(station);
         // "All digital" is the default, so it alone is not a filter to clear.
         Filtered = BandFilter != AllBands || ModeFilter != AllDigital || DateFilter != AllTime || ConfirmedFilter != AnyConfirmation;
         var rows = _qsos.List(filter, MaxRows);
@@ -297,6 +350,51 @@ public sealed partial class LogViewModel : ObservableObject
         SyncText = (rows.Count < shown.Contacts ? $"Newest {rows.Count.ToString("N0", inv)} listed · " : string.Empty) + char.ToUpperInvariant(sync[0]) + sync[1..];
     }
 
+    // The filter the list shows; also what Export ADIF writes. Sets RangeError for a custom range that cannot be read.
+    private LogFilter CurrentFilter(string? station)
+    {
+        DateTime? from = null, to = null;
+        var error = string.Empty;
+        if (DateFilter == CustomRange)
+        {
+            from = ParseRangeTime(RangeFrom, end: false);
+            to = ParseRangeTime(RangeTo, end: true);
+            if (from is null && !string.IsNullOrWhiteSpace(RangeFrom)) error = $"Cannot read the From date \"{RangeFrom.Trim()}\". Type it as 2026-11-20 or 2026-11-20 14:30 (UTC).";
+            else if (to is null && !string.IsNullOrWhiteSpace(RangeTo)) error = $"Cannot read the To date \"{RangeTo.Trim()}\". Type it as 2026-11-20 or 2026-11-20 18:00 (UTC).";
+            else if (from is not null && to is not null && to <= from) error = "The To date is before the From date.";
+        }
+        RangeError = error;
+        return BuildFilter(Search, BandFilter, ModeFilter, DateFilter, ConfirmedFilter, DateTime.UtcNow, station, from, to);
+    }
+
+    private static readonly string[] RangeDateFormats = ["yyyy-MM-dd", "yyyyMMdd", "yyyy/MM/dd", "dd.MM.yyyy"];
+
+    private static readonly string[] RangeTimeFormats = ["HH:mm", "HHmm", "H:mm", "HH:mm:ss", "HHmmss"];
+
+    /// <summary>
+    /// Reads a custom range time typed as a UTC date, with or without a time: <c>2026-11-20</c>, <c>20261120</c>,
+    /// <c>20.11.2026</c>, then optionally <c>14:30</c> or <c>1430</c> (also with seconds, or a <c>T</c> between). For the
+    /// range end (<paramref name="end"/>) the result is the first moment after it, since the end is exclusive: a date
+    /// alone covers its whole day and a time without seconds covers that minute. Null for blank or unreadable text.
+    /// </summary>
+    public static DateTime? ParseRangeTime(string? text, bool end)
+    {
+        var t = (text ?? string.Empty).Trim().Replace('T', ' ');
+        if (t.EndsWith('Z') || t.EndsWith('z')) t = t[..^1].TrimEnd();
+        if (t.EndsWith("UTC", StringComparison.OrdinalIgnoreCase)) t = t[..^3].TrimEnd();
+        if (t.Length == 0) return null;
+        var parts = t.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length > 2) return null;
+        const DateTimeStyles utc = DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal;
+        if (!DateTime.TryParseExact(parts[0], RangeDateFormats, CultureInfo.InvariantCulture, utc, out var date)) return null;
+        date = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        if (parts.Length == 1) return end ? date.AddDays(1) : date;
+        if (!DateTime.TryParseExact(parts[1], RangeTimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time)) return null;
+        var at = date + time.TimeOfDay;
+        if (!end) return at;
+        return parts[1].Length is 6 || parts[1].Count(c => c == ':') == 2 ? at.AddSeconds(1) : at.AddMinutes(1);
+    }
+
     /// <summary>Clears the band, mode, date and confirmation filters (the search text stays).</summary>
     [RelayCommand]
     private void ClearFilters()
@@ -305,17 +403,23 @@ public sealed partial class LogViewModel : ObservableObject
         ModeFilter = AllDigital;
         DateFilter = AllTime;
         ConfirmedFilter = AnyConfirmation;
+        RangeFrom = string.Empty;
+        RangeTo = string.Empty;
     }
 
     /// <summary>The filter for the chosen search text and filter choices.</summary>
+    /// <remarks>
+    /// <paramref name="rangeFrom"/> and <paramref name="rangeTo"/> (exclusive) are used only with <see cref="CustomRange"/>.
+    /// </remarks>
     public static LogFilter BuildFilter(string search, string band, string mode, string date, string confirmed, DateTime nowUtc,
-                                        string? station = null) => new(
+                                        string? station = null, DateTime? rangeFrom = null, DateTime? rangeTo = null) => new(
         string.IsNullOrWhiteSpace(search) ? null : search,
         band == AllBands || string.IsNullOrEmpty(band) ? null : band,
         mode == AllModes || string.IsNullOrEmpty(mode) ? null : mode,
-        FromFor(date, nowUtc),
+        date == CustomRange ? rangeFrom : FromFor(date, nowUtc),
         confirmed switch { ConfirmedOnly => true, NotConfirmed => false, _ => null },
-        station);
+        station,
+        date == CustomRange ? rangeTo : null);
 
     /// <summary>The earliest time a date choice includes, or null for all time. Days are UTC days, as the log shows them.</summary>
     public static DateTime? FromFor(string date, DateTime nowUtc) => date switch
@@ -431,7 +535,7 @@ public sealed partial class LogViewModel : ObservableObject
         Message = $"Importing {Path.GetFileName(path)}…";
         try
         {
-            var r = await Task.Run(() => AdifImporter.Import(_qsos, File.ReadAllText(path), profileId, call, _countries));
+            var r = await Task.Run(() => AdifImporter.Import(_qsos, AdifFile.ReadText(path), profileId, call, _countries));
             Message = $"Imported {r.Imported}, merged {r.Merged} duplicates, skipped {r.Skipped}.";
         }
         catch (Exception e) when (IsFileError(e))
@@ -448,32 +552,46 @@ public sealed partial class LogViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Exports the log to ADIF with QSL state, one file per station callsign (<see cref="AdifLogExport"/>): the contacts
-    /// made as the current profile's callsign, or every station's when <see cref="AllStations"/> is chosen (another
-    /// operator's export holds only their own contacts). One callsign goes to <paramref name="path"/>; with several, each
-    /// goes beside it with the callsign added to the name (<c>log-W7LIT.adi</c>), so no file mixes callsigns. The work runs
-    /// on a worker thread; a file or database error is reported in <see cref="Message"/> rather than thrown.
+    /// Exports the contacts the list shows to ADIF with QSL state, one file per station callsign
+    /// (<see cref="AdifLogExport"/>): the station, band, mode, date (including a custom range) and confirmation filters
+    /// and the search text all apply, so a date range exports just those contacts. Every station's contacts are written
+    /// when <see cref="AllStations"/> is chosen (another operator's export holds only their own contacts). One callsign
+    /// goes to <paramref name="path"/>; with several, each goes beside it with the callsign added to the name
+    /// (<c>log-W7LIT.adi</c>), so no file mixes callsigns. <see cref="ExportPlainAscii"/> and
+    /// <see cref="ExportWithoutNameQthComment"/> shape the file for loggers such as DXKeeper. The work runs on a worker
+    /// thread; a file or database error is reported in <see cref="Message"/> rather than thrown.
     /// </summary>
     public async Task ExportAsync(string path)
     {
         if (Syncing) return;
-        Syncing = true;
-        Message = $"Exporting to {Path.GetFileName(path)}…";
         var callsign = _profile().Callsign;
         var station = Station();
+        var filter = CurrentFilter(station);
+        if (RangeError.Length > 0)
+        {
+            Message = $"Not exported: {RangeError}";
+            return;
+        }
+        var options = new AdifExportOptions(ExportPlainAscii, ExportWithoutNameQthComment);
+        var narrowed = filter != new LogFilter(StationCallsign: station);
+        var detail = narrowed ? ExportDetail(filter) : null;
+        Syncing = true;
+        Message = $"Exporting to {Path.GetFileName(path)}…";
         try
         {
             Message = await Task.Run(() =>
             {
                 var now = DateTime.UtcNow;
-                var groups = AdifLogExport.ByStation(_qsos.List(new LogFilter(StationCallsign: station)));
+                var groups = AdifLogExport.ByStation(_qsos.List(filter));
+                var count = groups.Sum(g => g.Contacts.Count);
+                var note = ExportNote(narrowed ? _qsos.Totals(new LogFilter(StationCallsign: station)).Contacts - count : 0, options);
                 if (groups.Count <= 1)
                 {
                     var only = groups.Count == 1 ? groups[0] : new AdifLogExport.Group(station ?? callsign, []);
-                    Ft8Client.Data.Files.AtomicFile.WriteAllText(path, AdifLogExport.Document(only, now, "ADIF export"));
-                    return station is null
+                    Ft8Client.Data.Files.AtomicFile.WriteAllText(path, AdifLogExport.Document(only, now, "ADIF export", options, detail));
+                    return (station is null
                         ? $"Exported {only.Contacts.Count} contacts."
-                        : $"Exported {only.Contacts.Count} contacts made as {station}.";
+                        : $"Exported {only.Contacts.Count} contacts made as {station}.") + note;
                 }
                 var folder = Path.GetDirectoryName(path) ?? ".";
                 var stem = Path.GetFileNameWithoutExtension(path);
@@ -482,10 +600,10 @@ public sealed partial class LogViewModel : ObservableObject
                 foreach (var g in groups)
                 {
                     var name = AdifLogExport.FileName(stem, g.StationCallsign, ext);
-                    Ft8Client.Data.Files.AtomicFile.WriteAllText(Path.Combine(folder, name), AdifLogExport.Document(g, now, "ADIF export"));
+                    Ft8Client.Data.Files.AtomicFile.WriteAllText(Path.Combine(folder, name), AdifLogExport.Document(g, now, "ADIF export", options, detail));
                     names.Add(name);
                 }
-                return $"Exported {groups.Sum(g => g.Contacts.Count)} contacts to {names.Count} files, one per callsign: {string.Join(", ", names)}.";
+                return $"Exported {count} contacts to {names.Count} files, one per callsign: {string.Join(", ", names)}." + note;
             });
         }
         catch (Exception e) when (IsFileError(e))
@@ -496,6 +614,35 @@ public sealed partial class LogViewModel : ObservableObject
         {
             Syncing = false;
         }
+    }
+
+    // " The filters left out 1,180 contacts. Plain ASCII text; name, QTH and comment left out." or empty.
+    private static string ExportNote(int leftOut, AdifExportOptions options)
+    {
+        var note = leftOut > 0 ? $" The filters left out {leftOut.ToString("N0", CultureInfo.InvariantCulture)} {(leftOut == 1 ? "contact" : "contacts")}." : string.Empty;
+        var how = new List<string>();
+        if (options.PlainAscii) how.Add("plain ASCII text");
+        if (options.LeaveOutNameQthComment) how.Add("name, QTH and comment left out");
+        if (how.Count > 0) note += " " + char.ToUpperInvariant(how[0][0]) + string.Join("; ", how)[1..] + ".";
+        return note;
+    }
+
+    /// <summary>The header line's account of a filtered export: "Filtered: 20m, FT8, 2026-11-20 00:00 to 2026-11-23 00:00 UTC."</summary>
+    public static string ExportDetail(LogFilter f)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        var parts = new List<string>();
+        if (f.Search is { } q) parts.Add($"search \"{q.Trim()}\"");
+        if (f.Band is { } b) parts.Add(b);
+        if (f.ModeKey is { } m) parts.Add(m == AllDigital ? "digital modes" : m);
+        if (f.FromUtc is not null || f.ToUtc is not null)
+        {
+            var fromText = f.FromUtc is { } t1 ? t1.ToString("yyyy-MM-dd HH:mm", inv) : "the start";
+            var toText = f.ToUtc is { } t2 ? "before " + t2.ToString("yyyy-MM-dd HH:mm", inv) : "now";
+            parts.Add($"from {fromText} to {toText} UTC");
+        }
+        if (f.Confirmed is { } c) parts.Add(c ? "confirmed" : "not confirmed");
+        return parts.Count == 0 ? string.Empty : "Filtered: " + string.Join(", ", parts) + ".";
     }
 
     /// <summary>

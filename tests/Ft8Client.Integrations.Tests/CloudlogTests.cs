@@ -90,6 +90,23 @@ public class CloudlogTests
     }
 
     [Fact]
+    public async Task Upload_NonAsciiName_JsonCarriesUtf8AndByteLength()
+    {
+        string? adif = null;
+        using var handler = new Handler(async (request, ct) =>
+        {
+            adif = JsonSerializer.Deserialize<Dictionary<string, string>>(await request.Content!.ReadAsStringAsync(ct))!["string"];
+            return new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("""{"status":"created"}""") };
+        });
+        using var http = HttpFactory.Create("W7LIT", handler);
+        var record = new Ft8Client.Data.Adif.AdifRecord { ["call"] = "DL1ABC", ["name"] = "Jürgen Weiß", ["mode"] = "FT8" };
+
+        (await new CloudlogClient(http).UploadAsync(Site, "key1", "3", record, TestContext.Current.CancellationToken)).Accepted.Should().BeTrue();
+
+        adif.Should().Contain("<name:13>Jürgen Weiß");
+    }
+
+    [Fact]
     public async Task Queue_KeyRefusedThenFixed_WaitsAnHourThenUploads()
     {
         var db = SqliteDatabase.InMemory(out var keepAlive);

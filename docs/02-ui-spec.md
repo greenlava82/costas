@@ -295,7 +295,7 @@ Layout (owner request): the map card with the plot and the by-band stats fills t
 
 ## Log view
 
-Grid of all contacts, newest first: date, time, call, band, mode, sent, received, grid, country, name, need tag at the time, QRZ status. Search box. Edit and delete (delete asks once; QRZ deletion is a separate explicit action). Buttons: Import ADIF, Export ADIF, Sync with QRZ now. Status line: "2,418 contacts · last synced 02:50 UTC".
+Grid of all contacts, newest first: date, time, call, band, mode, sent, received, grid, country, name, need tag at the time, QRZ status. Search box. Edit and delete (delete asks once; QRZ deletion is a separate explicit action). Buttons: Import ADIF, Export ADIF (writes the contacts the filters show, including a custom UTC date range; options for plain ASCII text and leaving out name, QTH and comment), Sync with QRZ now. Status line: "2,418 contacts · last synced 02:50 UTC".
 
 ## Awards view
 

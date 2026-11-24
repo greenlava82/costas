@@ -31,12 +31,19 @@ public static class AdifLogExport
             .Select(g => new Group(g.Key, g.OrderBy(q => q.QsoDateOn).ThenBy(q => q.Id).ToList()))
             .ToList();
 
-    /// <summary>The ADIF text of one group.</summary>
-    public static string Document(Group group, DateTime nowUtc, string purpose)
+    /// <summary>
+    /// The ADIF text of one group, written as <paramref name="options"/> asks (UTF-8 with every field when null).
+    /// <paramref name="detail"/>, when given, is added to the header line (for example the date range exported).
+    /// </summary>
+    public static string Document(Group group, DateTime nowUtc, string purpose, AdifExportOptions? options = null, string? detail = null)
     {
+        options ??= AdifExportOptions.Default;
         var header = string.Create(CultureInfo.InvariantCulture,
             $"{AppInfo.ProductName} {purpose} for {Display(group.StationCallsign)}, {group.Contacts.Count} contacts, written {nowUtc:yyyy-MM-dd HH:mm} UTC.");
-        return AdifWriter.FileText(group.Contacts.Select(AdifMapper.ToFileAdif), nowUtc, header);
+        if (!string.IsNullOrEmpty(detail)) header += " " + detail;
+        if (options.PlainAscii) header = AdifExportOptions.ToAscii(header);
+        header = header.Replace('<', '(').Replace('>', ')');
+        return AdifWriter.FileText(group.Contacts.Select(q => options.Apply(AdifMapper.ToFileAdif(q))), nowUtc, header);
     }
 
     /// <summary>

@@ -21,14 +21,15 @@ namespace Ft8Client.Data.Log;
 /// <param name="FromUtc">Only contacts on or after this time.</param>
 /// <param name="Confirmed">True for confirmed only (by QRZ, the ADIF or LoTW), false for unconfirmed only.</param>
 /// <param name="StationCallsign">Only contacts made as this callsign (one station profile's log), ignoring case.</param>
+/// <param name="ToUtc">Only contacts before this time (exclusive).</param>
 public sealed record LogFilter(string? Search = null, string? Band = null, string? ModeKey = null, DateTime? FromUtc = null, bool? Confirmed = null,
-                               string? StationCallsign = null)
+                               string? StationCallsign = null, DateTime? ToUtc = null)
 {
     /// <summary>No filter: every contact.</summary>
     public static LogFilter All { get; } = new();
 
     /// <summary>True when anything other than the search text narrows the list.</summary>
-    public bool Narrowed => Band is not null || ModeKey is not null || FromUtc is not null || Confirmed is not null;
+    public bool Narrowed => Band is not null || ModeKey is not null || FromUtc is not null || ToUtc is not null || Confirmed is not null;
 
     /// <summary>1 when QRZ (or the ADIF) or LoTW confirms the contact, else 0.</summary>
     internal const string ConfirmedSql = "(CASE WHEN confirmed = 1 OR lotw_confirmed = 1 THEN 1 ELSE 0 END)";
@@ -46,10 +47,11 @@ public sealed record LogFilter(string? Search = null, string? Band = null, strin
         else if (ModeKey == "PSK") parts.Add($"UPPER(mode) IN ('PSK', {Quoted(ModeGroups.OldPskModes)})");
         else if (ModeKey is not null) parts.Add("UPPER(mode) = @mode AND NOT (UPPER(mode) = 'MFSK' AND UPPER(COALESCE(submode, '')) = 'FT4')");
         if (FromUtc is not null) parts.Add("qso_date_on >= @from");
+        if (ToUtc is not null) parts.Add("qso_date_on < @to");
         if (Confirmed is not null) parts.Add($"{ConfirmedSql} = @confirmed");
         if (StationCallsign is not null) parts.Add("station_callsign = @station COLLATE NOCASE");
         var sql = parts.Count == 0 ? "1=1" : string.Join(" AND ", parts);
-        return (sql, new { like, band = Band, mode = ModeKey, from = FromUtc, confirmed = Confirmed, station = StationCallsign });
+        return (sql, new { like, band = Band, mode = ModeKey, from = FromUtc, to = ToUtc, confirmed = Confirmed, station = StationCallsign });
     }
 
     // Fixed mode names from ModeGroups, never operator text.

@@ -82,7 +82,14 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
             WavelogState = host.Cloudlog.LogState,
             WavelogLastDownload = () => host.Cloudlog.LastDownloadUtc,
             SendToLoggers = q => host.Udp?.Resend(q) ?? "Sending to other programs is not available.",
+            ExportOptionsChanged = (ascii, leaveOut) => host.Settings.Update(s =>
+            {
+                s.LogExport.PlainAscii = ascii;
+                s.LogExport.LeaveOutNameQthComment = leaveOut;
+            }),
         };
+        LogView.ExportPlainAscii = host.Settings.Current.LogExport.PlainAscii;
+        LogView.ExportWithoutNameQthComment = host.Settings.Current.LogExport.LeaveOutNameQthComment;
         var heard = new HeardHistoryService(host.Paths.Journal, host.Countries, host.Clock);
         Awards = new AwardsViewModel(() => host.Session.LogIndex, host.Countries, heard, () => host.Clock.UtcNow, a => Dispatch(a))
         {
