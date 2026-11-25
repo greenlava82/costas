@@ -188,7 +188,7 @@ the warning.
 
 The top of the page shows the band and frequency (tap it to change band or offset), the link to the station and
 the radio, the clock and the decoder, and who is in control. Below it, five tabs cover what the desk's Operate view
-shows, and a sixth, **Radio**, holds the radio's own controls. **HALT TX** is always at the bottom of the screen.
+shows, and a sixth, **Radio**, holds the radio's own controls. **HALT TX** is always on screen: at the bottom in portrait, at the right of the top bar in landscape.
 
 The phone's **Operate** tab is a set of tiles built for a small screen rather than a copy of the desk:
 
@@ -239,7 +239,7 @@ desk's Operate view. There are two tabs, **Operate** and **Decodes**. Next in li
 with the desk's columns (Call, Where, Doing now, Signal, Chance, Last heard, Last worked). The contact card shows all
 five messages under the strip. In landscape the band summary, your signal and this session's contacts sit in a column on
 the right; in portrait they follow below. Buttons are sized for fingers, station details open in a panel on the
-right, and **HALT TX** sits in the bottom right corner. Turning the tablet switches layouts straight away.
+right, and **HALT TX** sits at the right of the top bar, so it stays on screen on every tab. A phone turned to landscape gets this layout too. Turning the tablet switches layouts straight away.
 
 ![The tablet layout in landscape](images/phone-tablet.png)
 

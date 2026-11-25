@@ -87,6 +87,7 @@ main{padding:12px 14px 120px;display:flex;flex-direction:column;gap:12px;flex:1}
 .halt{width:100%;background:var(--halt);color:#fff;border-radius:14px;padding:14px;font-size:19px;font-weight:800;letter-spacing:1px}
 .halt span{display:block;font-size:12px;font-weight:400;letter-spacing:0;opacity:.9;margin-top:2px}
 .halt.idle{background:#555}
+.halt.top-halt{display:none}
 .pair{max-width:360px;margin:12vh auto 0;padding:0 20px;display:flex;flex-direction:column;gap:14px}
 .pair input{font:inherit;font-size:28px;letter-spacing:6px;text-align:center;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--tx)}
 .pair form{display:flex;flex-direction:column;gap:10px}
@@ -207,7 +208,7 @@ body.dashon #onair{display:none!important}
   .top{padding:calc(14px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-right)) 12px calc(24px + env(safe-area-inset-left))}
   .tabs{padding:10px 24px 0}.tabs button{flex:0 0 auto;padding:10px 22px;font-size:15px}
   .tabs button[data-phone]{display:none}
-  main{padding:14px 24px 130px}
+  main{padding:14px 24px 28px}
   button{min-height:44px;padding:10px 16px}
   .thead,.trow{display:grid;grid-template-columns:minmax(104px,1.1fr) 1.7fr 1.3fr 58px 1.6fr 1fr 1fr 104px;gap:0 10px;align-items:center}
   .thead{font-size:12px;color:var(--mut);padding:6px 0;border-bottom:1px solid var(--line)}
@@ -229,9 +230,13 @@ body.dashon #onair{display:none!important}
   .sheet{width:440px;max-height:none;height:100%;border-radius:16px 0 0 16px;padding-top:calc(16px + env(safe-area-inset-top))}
   .dec{font-size:14px;grid-template-columns:4.2em 3em 3.6em 1fr 12em;padding:6px 0}
   .dec .cty{grid-column:5;font-size:13px;align-self:center}
-  .haltbar{padding:10px 24px calc(14px + env(safe-area-inset-bottom));display:flex;justify-content:flex-end;pointer-events:none}
-  .halt{width:420px;padding:12px;font-size:18px;pointer-events:auto;box-shadow:0 4px 18px rgba(0,0,0,.35)}
-  .note,.logged{left:auto;right:24px;width:420px}
+  /* Halt Tx lives in the sticky top bar here (phone landscape, tablet, desktop browser): always on screen, and the
+     bottom edge stays free for content. */
+  .haltbar{display:none}
+  .top{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;align-items:center}
+  .top > .row,.top > .slot{grid-column:1}
+  .halt.top-halt{display:block;grid-column:2;grid-row:1 / span 3;width:170px;padding:0;font-size:18px;min-height:60px;border-radius:12px}
+  .note,.logged{left:auto;right:24px;bottom:24px;width:420px}
 }
 @media (min-width:760px) and (max-width:1079px){
   .thead:not(.wide2) > :nth-child(7),.trow:not(.wide2) > :nth-child(7){display:none}
@@ -261,6 +266,7 @@ body.dashon #onair{display:none!important}
   <div class="top">
     <div class="row"><button id="freq" class="freq tunebtn" title="Band, mode and Tx offset">—</button><span class="pill"><span id="linkDot" class="dot"></span><span id="link">Connecting…</span><span id="radioDot" class="dot" style="margin-left:6px"></span>Radio</span></div>
     <div class="row" style="margin-top:3px"><span><span id="station"></span><span id="health"></span></span><span id="control"></span></div>
+    <button id="haltTop" class="halt top-halt" aria-label="Halt transmit">HALT TX</button>
     <div id="slot" class="slot"><span id="slotLabel">Receiving</span><div class="track"><div id="slotFill" class="fill"></div></div><span id="slotLeft"></span></div>
   </div>
   <div id="onair" class="onair hidden"></div>
@@ -483,6 +489,7 @@ function note(text) {
 }
 
 $("halt").onclick = () => cmd("halt");
+$("haltTop").onclick = () => cmd("halt");
 
 function render() {
   const s = state; if (!s) return;
@@ -539,7 +546,8 @@ function render() {
   const busy = s.transmitting || s.callingCq || (s.contact && s.contact.active);
   const h = $("halt");
   h.classList.toggle("idle", !busy);
-  h.firstChild.textContent = busy ? "HALT TX" : "NOT TRANSMITTING";
+  $("haltTop").classList.toggle("idle", !busy);
+  h.firstChild.textContent = "HALT TX";
   h.lastChild.textContent = busy ? "Stops transmitting now. Receive keeps running." : "Radio is receiving only";
 }
 
