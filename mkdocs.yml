@@ -77,6 +77,7 @@ nav:
       - Hunt list and alerts: hunt.md
       - Contests: contests.md
       - Operating from a phone: phone.md
+      - MQTT and Home Assistant: mqtt.md
   - Your log:
       - Log, QRZ, LoTW and ADIF: log.md
       - Awards and when to look: awards.md

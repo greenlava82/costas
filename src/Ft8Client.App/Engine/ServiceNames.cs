@@ -53,6 +53,9 @@ public static class ServiceNames
     /// <summary>The connection to a FlexRadio's API for its paired amplifier and tuner.</summary>
     public const string Accessories = "accessories";
 
+    /// <summary>Publishing station events to the operator's MQTT broker; shown only once turned on.</summary>
+    public const string Mqtt = "mqtt";
+
     /// <summary>The ADIF log copy in the backups folder; shown in the bottom bar only when it cannot be written.</summary>
     public const string LogCopy = "logcopy";
 }

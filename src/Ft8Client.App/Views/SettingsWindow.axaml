@@ -1255,6 +1255,72 @@
         </ScrollViewer>
       </TabItem>
 
+      <!-- MQTT publishing (owner request 2026-11-24): last in the XAML so the page numbers above stay put. -->
+      <TabItem Header="MQTT">
+        <ScrollViewer>
+          <StackPanel>
+            <TextBlock Classes="page" Text="MQTT" />
+            <TextBlock Classes="intro" Text="Costas can publish what your station is doing to an MQTT broker, for Home Assistant, Node-RED, OpenHAB or your own scripts: when you are on the air, when you transmit, your band, frequency and mode, and each contact you log. It only publishes. Nothing on the broker can change Costas or make it transmit." />
+            <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Publishing" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <CheckBox Content="Publish station events to an MQTT broker" IsChecked="{Binding MqttEnabled}" />
+                <TextBlock Classes="help" Text="{Binding MqttTopicBase, StringFormat='Topics start with {0}/. The manual lists every topic and what is in it.'}" />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*" IsEnabled="{Binding MqttEnabled}">
+              <TextBlock Classes="label" Text="Broker" />
+              <StackPanel Grid.Column="1" Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="Address" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding MqttHost}" Width="220" PlaceholderText="homeassistant.local" AutomationProperties.Name="MQTT broker address" />
+                  <TextBlock Text="Port" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding MqttPort}" Width="80" AutomationProperties.Name="MQTT broker port" />
+                  <CheckBox Content="TLS" IsChecked="{Binding MqttTls}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="User name" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding MqttUsername}" Width="160" AutomationProperties.Name="MQTT user name" />
+                  <TextBlock Text="Password" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding MqttPassword}" Width="160" PasswordChar="•" AutomationProperties.Name="MQTT password" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Test connection" Command="{Binding TestMqttCommand}" />
+                  <TextBlock Text="{Binding MqttTestResult}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="420" />
+                </StackPanel>
+                <TextBlock Classes="help" Text="Port 1883 is the usual plain port, 8883 the usual TLS port. With Home Assistant's Mosquitto broker app, use your Home Assistant address and a Home Assistant user. The password is kept in the system's credential store." />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*" IsEnabled="{Binding MqttEnabled}">
+              <TextBlock Classes="label" Text="Home Assistant" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <CheckBox Content="Announce Costas to Home Assistant" IsChecked="{Binding MqttHomeAssistant}" />
+                <TextBlock Classes="help" Text="Adds a Costas device with its sensors in Home Assistant, with no setup there. Untick to remove the device. Other programs read the same topics either way." />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*" IsEnabled="{Binding MqttEnabled}">
+              <TextBlock Classes="label" Text="On-air session" />
+              <StackPanel Grid.Column="1" Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="Ends after" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding MqttIdleMinutes}" Width="60" AutomationProperties.Name="Session idle minutes" />
+                  <TextBlock Text="minutes without transmitting, and at most after" VerticalAlignment="Center" />
+                  <TextBox Text="{Binding MqttMaxHours}" Width="60" AutomationProperties.Name="Session maximum hours" />
+                  <TextBlock Text="hours" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Classes="help" Text="The session starts when Costas is about to transmit and stays on across every over, so a load switched by it changes twice per operating session, not every 15 seconds. Use it to turn off things RF upsets. The transmitting topic follows PTT exactly, for an on-air light." />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*" IsEnabled="{Binding MqttEnabled}">
+              <TextBlock Classes="label" Text="Contacts" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <CheckBox Content="Publish each logged contact (call, band, mode, time)" IsChecked="{Binding MqttPublishContacts}" />
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
     </TabControl>
 
     <Border Grid.Row="1" Grid.ColumnSpan="2" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0">

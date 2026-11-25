@@ -65,6 +65,9 @@ public sealed class AppSettings
     /// <summary>Remote control from a phone.</summary>
     public RemoteOptions Remote { get; set; } = new();
 
+    /// <summary>Publishing station events to an MQTT broker.</summary>
+    public MqttOptions Mqtt { get; set; } = new();
+
     /// <summary>Files.</summary>
     public FilesOptions Files { get; set; } = new();
 

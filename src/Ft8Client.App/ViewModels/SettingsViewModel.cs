@@ -145,6 +145,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         ClusterEnabled = s.DxCluster.Enabled;
         ClusterHost = s.DxCluster.Host;
         ClusterPort = s.DxCluster.Port.ToString(CultureInfo.InvariantCulture);
+        LoadMqtt(s);
         UdpEnabled = s.Udp.Enabled;
         UdpAddress = s.Udp.Address;
         UdpPort = s.Udp.Port.ToString(CultureInfo.InvariantCulture);
@@ -1870,9 +1871,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
         var removedRemote = _host.Settings.Current.Remote.Users.Select(u => u.Id).Where(id => RemoteUsers.All(r => r.Id != id)).ToList();
         var removed = _host.Settings.Current.Profiles.Select(p => p.Id).Where(id => Profiles.All(d => d.Id != id)).ToList();
+        SaveMqttPassword();
         _host.Settings.Update(s =>
         {
             ApplyProfiles(s, Profiles, activeId);
+            StoreMqtt(s);
             s.Ranking.TierOrder = SettingsMapper.TierNames(TierOrder.Select(t => t.Tag));
             s.Ranking.PreferHearsMe = PreferHearsMe;
             s.Ranking.OnlyCallingCq = OnlyCallingCq;

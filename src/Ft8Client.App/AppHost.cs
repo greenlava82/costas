@@ -219,6 +219,9 @@ public sealed class AppHost : IAsyncDisposable
     /// <summary>Optional Club Log real-time uploads.</summary>
     public ClubLogService ClubLog { get; private set; } = null!;
 
+    /// <summary>Publishing station events to the operator's MQTT broker.</summary>
+    public MqttService Mqtt { get; private set; } = null!;
+
     /// <summary>
     /// Costas's Club Log application key, from the build (CI's CLUBLOG_API_KEY secret; Club Log asks that keys stay out of
     /// public repositories). Null in a build without it, where Club Log uploads cannot run.
@@ -526,6 +529,8 @@ public sealed class AppHost : IAsyncDisposable
         Cloudlog.Start();
         ClubLog = new ClubLogService(Session, Settings, Secrets, Qsos, Uploads, Clock, ClubLogApiKey, uploadsAllowed: !Simulating);
         ClubLog.Start();
+        Mqtt = new MqttService(Session, Transmitter, Settings, Secrets, Clock, allowed: !Simulating);
+        Mqtt.Start();
 
         Psk = new PskReporterService(Session, Settings, Spots, Countries, Frequencies, Clock, uploadsAllowed: !Simulating);
         Psk.Start();
@@ -1768,6 +1773,7 @@ public sealed class AppHost : IAsyncDisposable
         if (Eqsl is not null) await Eqsl.DisposeAsync().ConfigureAwait(false);
         if (Cloudlog is not null) await Cloudlog.DisposeAsync().ConfigureAwait(false);
         if (ClubLog is not null) await ClubLog.DisposeAsync().ConfigureAwait(false);
+        if (Mqtt is not null) await Mqtt.DisposeAsync().ConfigureAwait(false);
         Udp?.Dispose();
         Updates?.Dispose();
         if (Usage is not null)

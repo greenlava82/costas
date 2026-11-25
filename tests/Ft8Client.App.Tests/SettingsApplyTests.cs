@@ -201,6 +201,31 @@ public class SettingsApplyTests
         host.Settings.Current.Profiles[0].Rig.FlexAddress.Should().Be("192.168.1.20");
     });
 
+    [Fact]
+    public Task Apply_MqttSettings_SavedWithPasswordOnlyInCredentialStore() => WithSettings((host, vm, _) =>
+    {
+        vm.MqttEnabled = true;
+        vm.MqttHost = " broker.lan ";
+        vm.MqttPort = "8883";
+        vm.MqttTls = true;
+        vm.MqttUsername = "costas";
+        vm.MqttPassword = "s3cret";
+        vm.MqttIdleMinutes = "500";
+        vm.MqttMaxHours = "2";
+        vm.ApplyCommand.Execute(null);
+
+        var m = host.Settings.Current.Mqtt;
+        m.Enabled.Should().BeTrue();
+        m.Host.Should().Be("broker.lan");
+        m.Port.Should().Be(8883);
+        m.Tls.Should().BeTrue();
+        m.Username.Should().Be("costas");
+        m.SessionIdleMinutes.Should().Be(60, "clamped to the allowed range");
+        m.SessionMaxMinutes.Should().Be(120);
+        host.Secrets.Get(Ft8Client.Data.Secrets.SecretNames.MqttPassword).Should().Be("s3cret");
+        System.Text.Json.JsonSerializer.Serialize(host.Settings.Current, SettingsStore.Json).Should().NotContain("s3cret");
+    });
+
     // A simulated host in a temporary folder (TestHost: an in-memory credential store, so nothing here touches the
     // operator's saved passwords).
     private static async Task WithSettings(Action<AppHost, SettingsViewModel, Func<int>> test)

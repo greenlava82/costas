@@ -93,6 +93,18 @@ public sealed class Transmitter
     public event Action<string>? Fault;
 
     /// <summary>
+    /// A transmission was committed: an FT8/FT4 message queued for a slot, a keyboard over or Tune about to key. Raised
+    /// before PTT, so MQTT subscribers get warning of RF. Handlers must return at once.
+    /// </summary>
+    public event Action? Committed;
+
+    /// <summary>
+    /// A PTT edge: true just before PTT is asserted, false once it has been released. Every key and unkey Costas makes
+    /// passes through here (FT8/FT4, PSK, RTTY, Tune). Handlers must return at once.
+    /// </summary>
+    public event Action<bool>? PttChanged;
+
+    /// <summary>
     /// Raised when a transmission or tune is refused by a guard, with the kind of reason: disabled, no_audio, output_dead,
     /// output_muted, radio_fault, clock, band_edge or message. For the usage statistics; the text still goes to the caller.
     /// </summary>
@@ -152,6 +164,7 @@ public sealed class Transmitter
             _ptt = true;
             _streamAudioDueUtc = _clock.UtcNow + pttLead;
         }
+        Committed?.Invoke();
         var ptt = KeyOn(epoch);
         // A radio that refuses PTT at once has already halted the over: say why instead of reporting it started.
         if (ptt.IsCompletedSuccessfully && ptt.Result is { } failed) return failed;
@@ -293,6 +306,7 @@ public sealed class Transmitter
             _next = tx;
             _hold = hold;
         }
+        Committed?.Invoke();
         return tx;
     }
 
@@ -612,6 +626,7 @@ public sealed class Transmitter
             _current = tx;
             _pttOffDueUtc = _clock.UtcNow + tx.Duration + Tail;
         }
+        Committed?.Invoke();
         var failed = await KeyOn(epoch).ConfigureAwait(false);
         if (failed is not null) return failed; // halted: PTT released, nothing to play
         lock (_gate)
@@ -677,7 +692,9 @@ public sealed class Transmitter
     {
         try
         {
+            if (on) PttChanged?.Invoke(true); // before keying: RF follows
             await _rig.SetPttAsync(on, CancellationToken.None).ConfigureAwait(false);
+            if (!on) PttChanged?.Invoke(false); // only once the radio has released
             return null;
         }
         catch (Exception ex)

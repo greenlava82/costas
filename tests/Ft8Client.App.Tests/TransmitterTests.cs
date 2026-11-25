@@ -340,4 +340,31 @@ public class TransmitterTests
         r.Radio.PttLog.Should().BeEmpty();
         r.Out.Played.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Prepare_OneOver_CommittedBeforePttThenPttEdgesInOrder()
+    {
+        var r = new Rig();
+        var events = new List<string>();
+        r.Tx.Committed += () => events.Add("commit");
+        r.Tx.PttChanged += on => events.Add(on ? "ptt-on" : "ptt-off");
+
+        r.Tx.Prepare(new TxPlan(Slot, "CQ W7LIT DN40", null, null), Mode.Ft8, 1500, Guard(), out _);
+        r.Run(TimeSpan.FromSeconds(16));
+
+        events.Should().Equal("commit", "ptt-on", "ptt-off");
+    }
+
+    [Fact]
+    public void Prepare_Refused_NotCommitted()
+    {
+        var r = new Rig();
+        var committed = 0;
+        r.Tx.Committed += () => committed++;
+
+        r.Tx.Prepare(new TxPlan(Slot, "CQ W7LIT DN40", null, null), Mode.Ft8, 1500, Guard(band: "20m", dial: 14_500_000), out var refusal);
+
+        refusal.Should().NotBeNull();
+        committed.Should().Be(0);
+    }
 }
