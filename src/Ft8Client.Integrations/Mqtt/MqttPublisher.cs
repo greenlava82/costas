@@ -221,18 +221,19 @@ public sealed class MqttPublisher : IAsyncDisposable
                 };
                 _client = client;
                 await ConnectAsync(client, BuildOptions(_options, _topics, withWill: true), ct).ConfigureAwait(false);
-                // The caller's current state replaces anything queued while offline; changes from here on queue again.
+                // The caller's current state replaces anything queued while offline; changes from here on queue again,
+                // events included: one raised while the state and "online" are going out is sent right after them.
                 lock (_gate)
                 {
                     _events.Clear();
                     _retained.Clear();
                     _retainedOrder.Clear();
+                    _connected = true;
                 }
                 // Current state first, overwriting anything a crash left retained, and only then "online".
                 foreach (var m in _stateOnConnect()) await SendAsync(client, m, ct).ConfigureAwait(false);
                 await SendAsync(client, Availability(MqttPayloads.Online), ct).ConfigureAwait(false);
                 LastPublishUtc = DateTime.UtcNow;
-                _connected = true;
                 _backoff.Reset();
                 StatusChanged?.Invoke(new ServiceStatus(ServiceHealth.Ok, $"Publishing to {_options}", DateTime.UtcNow));
                 await PumpAsync(client, disconnected.Task, ct).ConfigureAwait(false);

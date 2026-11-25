@@ -138,6 +138,22 @@ public class MqttPublisherTests
     }
 
     [Fact]
+    public async Task Publish_EventAsOnlineGoesOut_SentAfterIt()
+    {
+        await using var broker = await MqttTestBroker.StartAsync();
+        await using var p = new MqttPublisher(Options(broker.Port), Topics, () => State());
+        // The broker has "online" but the publisher is still waiting for its acknowledgement: an event raised now used
+        // to be dropped as if Costas were offline.
+        broker.AcknowledgeSlowly(Topics.Availability, TimeSpan.FromSeconds(1));
+        p.Start();
+        await broker.WaitForAsync(m => m.Topic == Topics.Availability && m.Payload == MqttPayloads.Online);
+
+        p.Publish(new MqttOutgoing(Topics.QsoEvent, "{\"event_type\":\"qso_logged\"}", false));
+
+        await broker.WaitForAsync(m => m.Topic == Topics.QsoEvent);
+    }
+
+    [Fact]
     public async Task Start_BrokerStartsLate_ConnectsAfterBackoff()
     {
         var port = MqttTestBroker.FreePort();
