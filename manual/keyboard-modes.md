@@ -21,7 +21,7 @@ passband at once (up to 20).
   for two minutes after its CQ, and the list refreshes every few seconds.
 - **The waterfall** labels each signal with its station's call, "?" until Costas has read a call, and the station you
   are in contact with in red. Click a signal to read it, even before Costas has noticed it; it stays read while that
-  station is quiet. When a reply comes back a little off that frequency, the same channel moves onto it. For RTTY, click either of its two tones or between them.
+  station is quiet. When a reply comes back a little off that frequency, the same channel moves onto it. For RTTY, click either of its two tones or between them. **Calls** at the top right of the waterfall hides or shows the labels.
 - **Reading a signal.** When you are not in a contact, the box under the contact card (the conversation box) shows the
   signal you last clicked, live, letter by letter as it is read, with its call, audio frequency, strength and country
   on top. Clicking a station in Next in line reads its signal the same way. Click another signal to switch. It is how

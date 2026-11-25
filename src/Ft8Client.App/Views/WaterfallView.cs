@@ -21,6 +21,8 @@ namespace Ft8Client.App.Views;
 /// <summary>
 /// Receive history with a clickable transmit-channel marker. The compact strip stretches its newest 32 rows; a taller
 /// view shows more time at about 1.6 pixels a row, up to <see cref="MaxRows"/>, with faint lines at slot boundaries.
+/// FT8 and FT4 callsign tags are kept with the row that was newest when their decode arrived, so they scroll down with
+/// the signal they belong to (<see cref="AddCallTags"/>).
 /// </summary>
 public sealed class WaterfallView : Control
 {
@@ -29,6 +31,8 @@ public sealed class WaterfallView : Control
     private const int CompactRows = 32;
     private const double PixelsPerRow = 1.6;
     private const double ScaleHeight = 18;
+    private const double CallTagFont = 10;
+    private const int CallTagCacheLimit = 512;
 
     private static readonly IBrush TagBackground = new SolidColorBrush(Color.FromArgb(170, 7, 18, 30));
     private static readonly IBrush ContactTag = new SolidColorBrush(Color.FromRgb(196, 43, 28));
@@ -56,6 +60,47 @@ public sealed class WaterfallView : Control
     private int _offset = 1500;
     private IReadOnlyList<(int Hz, string Label, bool InContact)> _tags = [];
     private int? _passband;
+    private readonly WaterfallTag[]?[] _rowTags = new WaterfallTag[]?[MaxRows];
+    private bool _showCallTags = true;
+    private readonly Dictionary<(string, WaterfallTagKind), FormattedText> _callTagText = [];
+    private static readonly Typeface CallTagFace = new("Inter", FontStyle.Normal, FontWeight.SemiBold);
+
+    // Colours for the tags over the always-dark waterfall, the same in every theme; hues follow the station list.
+    private static readonly IBrush NormalText = Brushes.White;
+    private static readonly IBrush WorkedText = new SolidColorBrush(Color.Parse("#9AA6B2"));
+    private static readonly IBrush NewBandText = new SolidColorBrush(Color.Parse("#8CC4FF"));
+    private static readonly IBrush NewCountryText = new SolidColorBrush(Color.Parse("#FFB65C"));
+
+    /// <summary>
+    /// True to draw callsigns on the waterfall: FT8 and FT4 decodes over their signals, and the keyboard-mode tags.
+    /// The tags are kept while hidden, so switching back on shows those still in view.
+    /// </summary>
+    public bool ShowCallTags
+    {
+        get => _showCallTags;
+        set
+        {
+            if (value == _showCallTags) return;
+            _showCallTags = value;
+            InvalidateVisual();
+        }
+    }
+
+    /// <summary>
+    /// Puts FT8 or FT4 callsign tags on the newest row, which then scrolls down with the signals the decodes came from.
+    /// Ignored before the first row of audio, when there is nothing to put them on.
+    /// </summary>
+    public void AddCallTags(IReadOnlyList<WaterfallTag> tags)
+    {
+        if (tags.Count == 0 || _count == 0) return;
+        var row = _rowTags[_head];
+        _rowTags[_head] = row is null ? [.. tags] : [.. row, .. tags];
+        if (_showCallTags) InvalidateVisual();
+    }
+
+    /// <summary>The callsign tags on each visible row, newest row first; for tests.</summary>
+    public IReadOnlyList<IReadOnlyList<WaterfallTag>> CallTagRows(int rows) =>
+        Enumerable.Range(0, Math.Min(rows, _count)).Select(i => (IReadOnlyList<WaterfallTag>)(_rowTags[(_head + i) % MaxRows] ?? [])).ToList();
 
     /// <summary>
     /// The radio's receive filter width in hertz (Aurora comparison, owner request 2026-11-07). Audio above it is dimmed
@@ -105,10 +150,12 @@ public sealed class WaterfallView : Control
                 _head = 0;
                 _count = 0;
                 _floor.Reset();
+                Array.Clear(_rowTags);
                 _bitmap?.Dispose();
                 _bitmap = null;
             }
             _head = (_head + MaxRows - 1) % MaxRows;
+            _rowTags[_head] = null;
             var start = _head * _bins;
             var (first, last) = NoiseRange(_bins, _passband);
             var floor = _floor.Update(row, first, last);
@@ -172,6 +219,7 @@ public sealed class WaterfallView : Control
     {
         _floor.Reset();
         _count = 0;
+        Array.Clear(_rowTags);
         _dirty = true;
         InvalidateVisual();
     }
@@ -188,6 +236,8 @@ public sealed class WaterfallView : Control
         for (var i = 0; i < _levels.Length; i++) _pixels[i] = WaterfallPalette.For(_colours, _scale, _levels[i]);
         _floor.CopyFrom(other._floor);
         Array.Copy(other._slotStart, _slotStart, MaxRows);
+        Array.Copy(other._rowTags, _rowTags, MaxRows);
+        _showCallTags = other._showCallTags;
         _head = other._head;
         _count = other._count;
         _offset = other._offset;
@@ -226,6 +276,9 @@ public sealed class WaterfallView : Control
                     var y = ScaleHeight + (i + 1) * rowHeight;
                     context.DrawLine(SlotPen, new Point(0, y), new Point(width, y));
                 }
+            if (_showCallTags)
+                using (context.PushClip(new Rect(0, ScaleHeight, width, plotHeight)))
+                    DrawCallTags(context, width, plotHeight, rowHeight, shown);
         }
         var right = Math.Max(2, width - LabelInset);
         for (var hz = 0; hz <= 3000; hz += 500)
@@ -238,7 +291,7 @@ public sealed class WaterfallView : Control
             context.DrawText(text, new Point(x, 1));
         }
         var lastRight = double.MinValue;
-        foreach (var (hz, label, inContact) in _tags.OrderBy(t => t.Hz))
+        foreach (var (hz, label, inContact) in (_showCallTags ? _tags : []).OrderBy(t => t.Hz))
         {
             var text = new FormattedText(label, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface("Inter", FontStyle.Normal, FontWeight.SemiBold),
                 11, Brushes.White);
@@ -267,6 +320,87 @@ public sealed class WaterfallView : Control
                 FlowDirection.LeftToRight, new Typeface("Inter"), 11, Brushes.LightGray);
             context.DrawText(text, new Point(Math.Max(4, (width - text.Width) / 2), 22));
         }
+    }
+
+    private void DrawCallTags(DrawingContext context, double width, double plotHeight, double rowHeight, int shown)
+    {
+        List<CallTagBox>? boxes = null;
+        List<(FormattedText Text, WaterfallTagKind Kind)>? texts = null;
+        for (var i = 0; i < shown; i++)
+        {
+            if (_rowTags[(_head + i) % MaxRows] is not { } row) continue;
+            boxes ??= [];
+            texts ??= [];
+            foreach (var tag in row)
+            {
+                var text = CallTagText(tag.Label, tag.Kind);
+                boxes.Add(new CallTagBox(tag.Hz / 3000.0 * width, ScaleHeight + i * rowHeight, text.Width, text.Height));
+                texts.Add((text, tag.Kind));
+            }
+        }
+        if (boxes is null || texts is null) return;
+        var placed = LayoutCallTags(boxes, width, ScaleHeight + plotHeight, CallTagLines(plotHeight));
+        for (var i = 0; i < placed.Count; i++)
+        {
+            if (placed[i] is not { } r) continue;
+            var (text, kind) = texts[i];
+            context.FillRectangle(kind == WaterfallTagKind.You ? ContactTag : TagBackground, r, 2);
+            context.DrawText(text, new Point(r.X + 2, r.Y + 1));
+        }
+    }
+
+    private FormattedText CallTagText(string label, WaterfallTagKind kind)
+    {
+        if (_callTagText.TryGetValue((label, kind), out var text)) return text;
+        if (_callTagText.Count >= CallTagCacheLimit) _callTagText.Clear();
+        var brush = kind switch
+        {
+            WaterfallTagKind.Worked => WorkedText,
+            WaterfallTagKind.NewBand => NewBandText,
+            WaterfallTagKind.NewCountry => NewCountryText,
+            _ => NormalText,
+        };
+        text = new FormattedText(label, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, CallTagFace, CallTagFont, brush);
+        _callTagText[(label, kind)] = text;
+        return text;
+    }
+
+    /// <summary>
+    /// Lines of tags allowed below a row whose neighbours crowd it: one on the compact strip, where a second would cover
+    /// most of it, and up to three on a taller waterfall.
+    /// </summary>
+    public static int CallTagLines(double plotHeight) => plotHeight < 80 ? 1 : plotHeight < 160 ? 2 : 3;
+
+    /// <summary>
+    /// Places callsign tags so none overlaps another. Each goes centred on its frequency at the top of its row, kept
+    /// inside the edges; one that would overlap a tag already placed moves down a line at a time, up to
+    /// <paramref name="lines"/> lines, and is left out when there is no room (the station list still shows it). Earlier
+    /// boxes win, so pass the newest row first and each row's tags from the lowest frequency.
+    /// </summary>
+    /// <returns>The background rectangle of each tag in input order (text inset 2 px across and 1 px down), or null for one left out.</returns>
+    public static IReadOnlyList<Rect?> LayoutCallTags(IReadOnlyList<CallTagBox> boxes, double width, double bottom, int lines)
+    {
+        var placed = new List<Rect>(boxes.Count);
+        var result = new Rect?[boxes.Count];
+        for (var i = 0; i < boxes.Count; i++)
+        {
+            var b = boxes[i];
+            var w = b.Width + 4;
+            var h = b.Height + 2;
+            var x = Math.Clamp(b.CenterX - w / 2, 0, Math.Max(0, width - w));
+            for (var line = 0; line < Math.Max(1, lines); line++)
+            {
+                var r = new Rect(x, b.Top + line * (h + 1), w, h);
+                // Below the bottom a tag would be cut off; the first line is always tried, as the clip shows its top.
+                if (line > 0 && r.Bottom > bottom) break;
+                // A 2 px gap is kept between tags side by side.
+                if (placed.Any(p => p.Intersects(r.Inflate(new Thickness(2, 0))))) continue;
+                placed.Add(r);
+                result[i] = r;
+                break;
+            }
+        }
+        return result;
     }
 
     // Copies the newest rows, newest first, into a bitmap one pixel per bin and per row.

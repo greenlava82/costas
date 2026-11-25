@@ -56,6 +56,12 @@ public sealed class WindowOptions
     /// <summary>Waterfall colours: "wsjtx" (WSJT-X's Default palette) or "costas" (blue to red).</summary>
     public string WaterfallPalette { get; set; } = "wsjtx";
 
+    /// <summary>
+    /// True to draw callsigns on the waterfall over the signals they were decoded from (and the keyboard-mode tags);
+    /// switched with the Calls button on the waterfall.
+    /// </summary>
+    public bool WaterfallCallsigns { get; set; } = true;
+
     /// <summary>Views popped out into their own windows, by view name ("Raw decodes", "Reach", "Log", "Awards").</summary>
     public Dictionary<string, PanelWindowOptions> Panels { get; set; } = [];
 

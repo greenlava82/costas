@@ -7,6 +7,7 @@
 // see the GNU General Public License in LICENSE for details.
 
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 
@@ -28,6 +29,9 @@ public partial class WaterfallWindow : Window
 
     /// <summary>The colour scale sliders behind this window's Levels button.</summary>
     public WaterfallLevelsPanel Levels => LevelsPanel;
+
+    /// <summary>The button that shows or hides callsigns on this window's waterfall.</summary>
+    public ToggleButton Calls => CallsButton;
 
     /// <summary>Esc does here what it does in the main window.</summary>
     public Action? Escape { get; init; }
