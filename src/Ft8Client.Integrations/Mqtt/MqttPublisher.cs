@@ -239,9 +239,12 @@ public sealed class MqttPublisher : IAsyncDisposable
                 if (!ct.IsCancellationRequested)
                     StatusChanged?.Invoke(new ServiceStatus(ServiceHealth.Degraded, "Broker connection lost; reconnecting", DateTime.UtcNow));
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            catch (Exception) when (ct.IsCancellationRequested)
             {
-                return; // StopAsync sends the final messages on this client
+                // Stopping. A publish cancelled while it waits for the broker's acknowledgement throws
+                // MqttCommunicationTimedOutException, not OperationCanceledException, but the connection is still
+                // good: leave the client for StopAsync, which sends the final messages on it.
+                return;
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {

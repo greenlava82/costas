@@ -117,6 +117,27 @@ public class MqttPublisherTests
     }
 
     [Fact]
+    public async Task StopAsync_WhileAPublishAwaitsItsAcknowledgement_StillSendsTheFinalMessages()
+    {
+        await using var broker = await MqttTestBroker.StartAsync();
+        var p = new MqttPublisher(Options(broker.Port), Topics, () => State("{\"state\":\"on\"}"));
+        p.Start();
+        await broker.WaitForAsync(m => m.Payload == MqttPayloads.Online);
+        // Stop while the publisher is waiting for the broker to acknowledge a message: cancelling that wait used to
+        // throw the connection away, so the session's end was never sent.
+        broker.AcknowledgeSlowly(Topics.Tx, TimeSpan.FromSeconds(1));
+        p.Publish(new(Topics.Tx, "ON", true));
+        await broker.WaitForAsync(m => m.Topic == Topics.Tx && m.Payload == "ON");
+
+        await p.StopAsync([new(Topics.SessionEvent, "{\"event\":\"session_ended\",\"reason\":\"app_closed\"}", false)], TimeSpan.FromSeconds(10));
+
+        await broker.WaitForAsync(m => m.Topic == Topics.SessionEvent && m.Payload.Contains("app_closed", StringComparison.Ordinal));
+        var events = broker.Published.ToList();
+        events.FindIndex(m => m.Topic == Topics.SessionEvent).Should().BeLessThan(
+            events.FindLastIndex(m => m.Topic == Topics.Availability && m.Payload == MqttPayloads.Offline), "Costas says offline itself after the final messages");
+    }
+
+    [Fact]
     public async Task Start_BrokerStartsLate_ConnectsAfterBackoff()
     {
         var port = MqttTestBroker.FreePort();

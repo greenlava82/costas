@@ -37,7 +37,8 @@ public sealed class MqttTestBroker : IAsyncDisposable
         _server.InterceptingPublishAsync += e =>
         {
             lock (_gate) _published.Add((e.ApplicationMessage.Topic, e.ApplicationMessage.ConvertPayloadToString(), e.ApplicationMessage.Retain));
-            return Task.CompletedTask;
+            // A slow broker: the acknowledgement for this topic goes back only after the delay.
+            return e.ApplicationMessage.Topic == _slowTopic ? Task.Delay(_slowDelay) : Task.CompletedTask;
         };
         _server.InterceptingSubscriptionAsync += _ =>
         {
@@ -47,6 +48,15 @@ public sealed class MqttTestBroker : IAsyncDisposable
     }
 
     private int _subscriptions;
+    private volatile string? _slowTopic;
+    private TimeSpan _slowDelay;
+
+    /// <summary>Holds back the acknowledgement of each publish on <paramref name="topic"/> by <paramref name="delay"/>.</summary>
+    public void AcknowledgeSlowly(string topic, TimeSpan delay)
+    {
+        _slowDelay = delay;
+        _slowTopic = topic;
+    }
 
     /// <summary>The port it listens on.</summary>
     public int Port { get; }
