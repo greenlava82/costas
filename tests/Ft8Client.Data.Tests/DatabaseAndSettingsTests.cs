@@ -308,4 +308,21 @@ public class DatabaseAndSettingsTests
         o.Land.Count.Should().BeGreaterThan(100);
         o.Borders.Count.Should().BeGreaterThan(100);
     }
+
+    [Fact]
+    public void SettingsStore_WaterfallCallsigns_OnUntilSwitchedOffAndRemembered()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");
+        // Settings saved before the switch existed have no value for it: the callsigns are shown.
+        File.WriteAllText(path, """{ "schema": 2, "profiles": [ { "id": "home", "callsign": "W7LIT" } ], "window": { "waterfallHeight": 200 } }""");
+        var store = new SettingsStore(path);
+        var s = store.Load();
+        s.Window.WaterfallCallsigns.Should().BeTrue();
+
+        s.Window.WaterfallCallsigns = false;
+        store.Save(s);
+
+        store.Load().Window.WaterfallCallsigns.Should().BeFalse();
+        store.Load().Window.WaterfallHeight.Should().Be(200);
+    }
 }

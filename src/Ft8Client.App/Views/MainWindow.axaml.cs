@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private string? _waterfallBand;
     private Audio.Timing.CapturePump? _waterfallPump;
     private long _waterfallSlot = -1;
+    private readonly WaterfallCallTagger _callTagger = new();
     private WaterfallWindow? _waterfallWindow;
     private readonly DispatcherTimer _levelsSave = new() { Interval = TimeSpan.FromMilliseconds(600) };
     private readonly Dictionary<int, PanelWindow> _panels = [];
@@ -84,6 +85,8 @@ public partial class MainWindow : Window
         if (w.X is { } x && w.Y is { } y) Position = new Avalonia.PixelPoint(x, y);
         SetWaterfallHeight(w.WaterfallHeight, save: false);
         ApplyLevels(new Core.Spectrum.WaterfallLevels(w.WaterfallFloorDb, w.WaterfallRangeDb), w.WaterfallPalette, save: false);
+        ShowCallTags(w.WaterfallCallsigns, save: false);
+        CallsButton.IsCheckedChanged += (_, _) => ShowCallTags(CallsButton.IsChecked == true, save: true);
         OperatePage.LoadColumns(w.ColumnWidths);
         OperatePage.ColumnsSaved += (name, widths) => vm.Host.Settings.Update(s => s.Window.ColumnWidths[name] = [.. widths]);
         vm.Operate.SideTab = Math.Clamp(w.SideTab, OperateViewModel.BandTab, OperateViewModel.SessionTab);
@@ -145,6 +148,10 @@ public partial class MainWindow : Window
             // Both views are fed so the strip and the window each have full history when switching between them.
             ReceiveWaterfall.Update(row, snapshot.TxOffsetHz, slotStart);
             _waterfallWindow?.View.Update(row, snapshot.TxOffsetHz, slotStart);
+            // FT8 and FT4 callsigns go on the newest row as their decodes arrive, kept even while hidden.
+            var callTags = _callTagger.Take(snapshot, vm.Host.Clock.UtcNow);
+            ReceiveWaterfall.AddCallTags(callTags);
+            _waterfallWindow?.View.AddCallTags(callTags);
             var tags = slotted ? [] : Tags(snapshot);
             ReceiveWaterfall.SetTags(tags);
             _waterfallWindow?.View.SetTags(tags);
@@ -255,6 +262,20 @@ public partial class MainWindow : Window
         _levelsSave.Start();
     }
 
+    // The Calls switch is shared by the strip and the popped-out window, and remembered.
+    private void ShowCallTags(bool show, bool save)
+    {
+        ReceiveWaterfall.ShowCallTags = show;
+        if (CallsButton.IsChecked != show) CallsButton.IsChecked = show;
+        if (_waterfallWindow is { } ww)
+        {
+            ww.View.ShowCallTags = show;
+            if (ww.Calls.IsChecked != show) ww.Calls.IsChecked = show;
+        }
+        if (save && Vm is { } vm && vm.Host.Settings.Current.Window.WaterfallCallsigns != show)
+            vm.Host.Settings.Update(s => s.Window.WaterfallCallsigns = show);
+    }
+
     private void SaveLevels()
     {
         _levelsSave.Stop();
@@ -286,6 +307,8 @@ public partial class MainWindow : Window
         window.View.CopyFrom(ReceiveWaterfall);
         window.Levels.Show(ReceiveWaterfall.Levels, ReceiveWaterfall.Palette);
         window.Levels.LevelsChanged += (l, p) => ApplyLevels(l, p, save: true);
+        window.Calls.IsChecked = ReceiveWaterfall.ShowCallTags;
+        window.Calls.IsCheckedChanged += (_, _) => ShowCallTags(window.Calls.IsChecked == true, save: true);
         window.View.ChannelSelected += SelectChannel;
         window.Closing += (_, _) =>
         {

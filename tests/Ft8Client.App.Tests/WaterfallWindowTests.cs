@@ -25,4 +25,18 @@ public class WaterfallWindowTests
             ToolTip.GetTip(waterfall).Should().BeNull("a tooltip over the waterfall hides the signals");
         }, CancellationToken.None);
     }
+
+    [Fact]
+    public async Task Calls_NewWindow_OnAndNamedForScreenReaders()
+    {
+        var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(WaterfallWindowTests).Assembly);
+        await session.Dispatch(() =>
+        {
+            var window = new WaterfallWindow();
+            window.Calls.IsChecked.Should().BeTrue();
+            window.Calls.Content.Should().Be("Calls");
+            Avalonia.Automation.AutomationProperties.GetName(window.Calls).Should().Be("Show callsigns on the waterfall");
+            window.View.LabelInset.Should().BeGreaterThan(118, "the scale's labels keep clear of the three buttons");
+        }, CancellationToken.None);
+    }
 }

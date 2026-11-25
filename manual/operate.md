@@ -396,6 +396,28 @@ remembers the strip's height, and whether the waterfall was popped out and where
 
 ![The waterfall in its own window](images/waterfall-window.png)
 
+### Callsigns on the waterfall
+
+Each FT8 or FT4 station decoded is labelled with its callsign on the waterfall, at the top of the signal it came
+from, as WSJT-X's Wide Graph does. The labels scroll down with their signals, so on a tall or popped-out waterfall
+you can see who was where over the last few slots. The colours follow the station list:
+
+- **Red**: calling you, or the station you are in a contact with.
+- **Amber**: a new country (DXCC).
+- **Blue**: a new band or a new grid.
+- **Grey**: worked before.
+- **White**: anyone else.
+
+When stations are too close together to label side by side, the labels stack in up to three rows; on the thin
+strip there is room for one row only, and a label that does not fit is left out (the station list still shows it).
+In PSK and RTTY the labels sit along the top of the waterfall over the stations being read.
+
+Click **Calls** at the top right of the waterfall, in the strip or the waterfall window, to hide the callsigns or
+show them again. Costas remembers your choice. Hiding them does not lose them: switching back on shows the labels
+still in view.
+
+![Callsigns on the waterfall](images/waterfall-callsigns.png)
+
 ## Other views on a second monitor
 
 **Raw decodes**, **Reach**, **Log** and **Awards** can each have their own window too, so you can keep the map or

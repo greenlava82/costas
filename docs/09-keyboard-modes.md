@@ -228,7 +228,7 @@ clickable (nothing to capture into). In a contact the box keeps the conversation
 reach the screen on the reader's next pass (about 100 ms) instead of when the line ends; Raw decodes and contact
 parsing still use finished lines.
 
-**Waterfall.** The same control. Each channel has a callsign tag above it ("?" until a callsign is found). The channel in contact is tagged in red. A click starts reading that signal and makes it the CQ offset.
+**Waterfall.** The same control. Each channel has a callsign tag above it ("?" until a callsign is found). The channel in contact is tagged in red. A click starts reading that signal and makes it the CQ offset. The waterfall's Calls switch (`Window.WaterfallCallsigns`) hides these tags with the FT8/FT4 ones.
 
 **Right column.**
 - *Heard here* and *Your signal* filter to the current band and mode.

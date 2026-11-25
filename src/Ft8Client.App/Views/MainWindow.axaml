@@ -551,9 +551,12 @@
         </Thumb.Styles>
       </Thumb>
       <Grid x:Name="WaterfallStrip" Grid.Row="2">
-        <v:WaterfallView x:Name="ReceiveWaterfall" Cursor="Cross" LabelInset="118"
+        <v:WaterfallView x:Name="ReceiveWaterfall" Cursor="Cross" LabelInset="162"
                          AutomationProperties.Name="Receive waterfall; click to select transmit channel" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+          <ToggleButton x:Name="CallsButton" Classes="wfoverlay" Content="Calls" IsChecked="True"
+                        ToolTip.Tip="Show callsigns on the waterfall over the signals they were decoded from"
+                        AutomationProperties.Name="Show callsigns on the waterfall" />
           <Button x:Name="LevelsButton" Classes="wfoverlay" Content="Levels"
                   ToolTip.Tip="Waterfall contrast: the darkest level and the range" AutomationProperties.Name="Waterfall levels">
             <Button.Flyout>
