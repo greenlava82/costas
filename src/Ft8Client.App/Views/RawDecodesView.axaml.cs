@@ -72,7 +72,16 @@ public partial class RawDecodesView : UserControl
 
     private async void OnCopy(object? sender, RoutedEventArgs e)
     {
-        if (List.SelectedItem is RawLineViewModel { IsBlank: false } line && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        if (List.SelectedItem is not RawLineViewModel { IsBlank: false } line || TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard) return;
+        // Another program holding the clipboard makes this throw. Left to the unexpected-error handler, that would also
+        // halt a transmission in progress; a copy that did not happen is only logged.
+        try
+        {
             await clipboard.SetTextAsync(line.Copy);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Serilog.Log.Warning(ex, "Copying a decode line to the clipboard failed");
+        }
     }
 }
