@@ -39,9 +39,10 @@ public sealed class MqttServiceMosquittoTests
         await MqttStation.Until(() => st.Status?.Health == ServiceHealth.Ok, "the status says publishing");
 
         // An over starts a session: the lamp in the shack comes on.
-        await st.TuneAsync();
+        await st.KeyTuneAsync();
         await broker.WaitForAsync(m => m.Topic == st.Topics.Tx && m.Payload == "ON" && m.Retain);
         await broker.WaitForAsync(m => m.Topic == st.Topics.SessionEvent && m.Payload.Contains("session_started", StringComparison.Ordinal) && !m.Retain);
+        st.FinishTune();
         await broker.RetainedAsync(st.Topics.Tx, v => v == "OFF");
         await broker.RetainedAsync(st.Topics.Session, v => v.Contains("\"state\":\"on\"", StringComparison.Ordinal));
 

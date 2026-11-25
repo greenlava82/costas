@@ -131,7 +131,20 @@ public sealed class MqttStation : IAsyncDisposable
     /// <summary>Keys a one-second tune and plays it to the end, as the audio device would.</summary>
     public async Task TuneAsync()
     {
+        await KeyTuneAsync();
+        FinishTune();
+    }
+
+    /// <summary>Keys a one-second tune and leaves it keyed until <see cref="FinishTune"/>.</summary>
+    public async Task KeyTuneAsync() =>
         (await Tx.TuneAsync(1500, 1.0, new TxGuardInput("20m", 14_074_000, null, 2.0, null, true))).Should().BeNull();
+
+    /// <summary>
+    /// Plays a keyed tune to its end. Retained state is coalesced (only the latest per topic is sent), so a test that
+    /// wants to see "ON" waits for it before calling this.
+    /// </summary>
+    public void FinishTune()
+    {
         for (var i = 0; i < 300 && Tx.Transmitting; i++)
         {
             Clock.Advance(TimeSpan.FromMilliseconds(10));
