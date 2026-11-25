@@ -188,4 +188,87 @@ public class MqttPublisherTests
     {
         Options(1883, "tony", "hunter2").ToString().Should().NotContain("hunter2");
     }
+
+    [Theory]
+    [InlineData(MQTTnet.MqttClientConnectResultCode.BadUserNameOrPassword, "The broker refused the user name or password.")]
+    [InlineData(MQTTnet.MqttClientConnectResultCode.NotAuthorized, "The broker refused the user name or password.")]
+    [InlineData(MQTTnet.MqttClientConnectResultCode.ClientIdentifierNotValid, "The broker refused the connection (ClientIdentifierNotValid).")]
+    public void Explain_BrokerRefused_PlainWords(MQTTnet.MqttClientConnectResultCode code, string expected)
+    {
+        MqttPublisher.Explain(new BrokerRefusedException(code), Options(1883)).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Explain_HostNotFound_NamesTheHost()
+    {
+        var o = Options(1883) with { Host = "brokr.local" };
+
+        MqttPublisher.Explain(new InvalidOperationException("wrapped", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound)), o)
+            .Should().Be("No computer called \"brokr.local\" was found on the network.");
+    }
+
+    [Fact]
+    public void Explain_ConnectionRefused_AsksIfTheBrokerIsRunning()
+    {
+        MqttPublisher.Explain(new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused), Options(1884))
+            .Should().Be("Nothing answered at 127.0.0.1 port 1884. Is the broker running?");
+    }
+
+    [Fact]
+    public void Explain_Timeout_SaysItDidNotAnswer()
+    {
+        MqttPublisher.Explain(new MQTTnet.Exceptions.MqttCommunicationTimedOutException(), Options(1883))
+            .Should().Be("127.0.0.1 port 1883 did not answer in time.");
+        MqttPublisher.Explain(new TimeoutException(), Options(1883)).Should().Be("127.0.0.1 port 1883 did not answer in time.");
+    }
+
+    [Fact]
+    public void Explain_UntrustedCertificate_SaysSo()
+    {
+        MqttPublisher.Explain(new System.Security.Authentication.AuthenticationException("bad cert"), Options(8883))
+            .Should().Be("The broker's TLS certificate is not trusted by this computer.");
+    }
+
+    [Fact]
+    public void Explain_SomethingElse_NeverShowsThePassword()
+    {
+        var text = MqttPublisher.Explain(new InvalidOperationException("odd"), Options(1883, "tony", "hunter2"));
+
+        text.Should().Contain("odd").And.Contain("127.0.0.1:1883").And.NotContain("hunter2");
+    }
+
+    [Fact]
+    public async Task TestAsync_UnknownHost_SaysNoSuchComputer()
+    {
+        var o = Options(1883) with { Host = "no-such-host.invalid" };
+
+        var r = await MqttPublisher.TestAsync(o, Topics, TestContext.Current.CancellationToken);
+
+        r.Ok.Should().BeFalse();
+        r.Message.Should().Contain("no-such-host.invalid");
+    }
+
+    [Fact]
+    public async Task TestAsync_TlsToAPlainBroker_FailsWithAReasonNotAHang()
+    {
+        await using var broker = await MqttTestBroker.StartAsync();
+        var o = Options(broker.Port) with { Tls = true };
+
+        var r = await MqttPublisher.TestAsync(o, Topics, TestContext.Current.CancellationToken);
+
+        r.Ok.Should().BeFalse();
+        r.Message.Should().NotBeNullOrWhiteSpace();
+        (await broker.RetainedAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task TestAsync_Cancelled_Throws()
+    {
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        var test = () => MqttPublisher.TestAsync(Options(MqttTestBroker.FreePort()), Topics, cts.Token);
+
+        await test.Should().ThrowAsync<OperationCanceledException>();
+    }
 }
