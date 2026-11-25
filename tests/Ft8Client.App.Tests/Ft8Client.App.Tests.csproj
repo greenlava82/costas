@@ -11,6 +11,7 @@
     <Compile Include="..\Ft8Client.Rig.Tests\Flex\FakeFlexRadio.cs" Link="Flex\FakeFlexRadio.cs" />
     <Compile Include="..\Ft8Client.Integrations.Tests\QDataStreamReader.cs" Link="Wsjtx\QDataStreamReader.cs" />
     <Compile Include="..\Ft8Client.Integrations.Tests\Mqtt\MqttTestBroker.cs" Link="Mqtt\MqttTestBroker.cs" />
+    <Compile Include="..\Ft8Client.Integrations.Tests\Mqtt\TcpProxy.cs" Link="Mqtt\TcpProxy.cs" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

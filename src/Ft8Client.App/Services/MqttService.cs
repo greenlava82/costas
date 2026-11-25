@@ -45,7 +45,13 @@ public sealed class MqttService : IAsyncDisposable
     private bool _publishContacts;
     private Timer? _timer;
     private long _lastHeartbeatTicks;
-    private bool _disposed;
+    private volatile bool _disposed;
+    // The discovery payload last queued, so a change of callsign (the device name) or version is sent again.
+    private string? _discoveryPayload;
+    // Discovery was turned off while running: the empty config that removes the device goes out on every connect, in
+    // case the broker was unreachable when it was turned off.
+    private bool _removeDiscovery;
+    private bool _started;
 
     /// <summary>Creates the service; nothing connects until <see cref="Start"/> and only when turned on.</summary>
     public MqttService(Session session, Transmitter tx, AppSettingsAccessor settings, ISecretStore secrets, IClock clock, bool allowed)
@@ -69,35 +75,67 @@ public sealed class MqttService : IAsyncDisposable
     /// <summary>Hooks up the transmitter and session and connects when publishing is on.</summary>
     public void Start()
     {
+        if (_started || _disposed) return;
+        _started = true;
         _onAir.Changed += OnAirChanged;
-        _tx.Committed += _onAir.Commit;
-        _tx.PttChanged += _onAir.Ptt;
+        _tx.Committed += OnCommitted;
+        _tx.PttChanged += OnPtt;
         // Belt and braces: an over that ends or faults without a clean release must not leave "transmitting" on.
-        _tx.Ended += (_, _) => _onAir.Ptt(false);
-        _tx.StreamEnded += _ => _onAir.Ptt(false);
-        _tx.Fault += _ => _onAir.Ptt(false);
+        _tx.Ended += OnTxEnded;
+        _tx.StreamEnded += OnStreamEnded;
+        _tx.Fault += OnTxFault;
         _session.Changed += OnSessionChanged;
         _settings.Changed += OnSettingsChanged;
         _timer = new Timer(_ => OnTick(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         _ = ConfigureAsync();
     }
 
+    // The transmitter raises these on its keying path, which must never fail because of MQTT: nothing escapes them.
+    private void OnCommitted() => Safely(_onAir.Commit);
+
+    private void OnPtt(bool keyed) => Safely(() => _onAir.Ptt(keyed));
+
+    private void OnTxEnded(PreparedTx tx, bool completed) => OnPtt(false);
+
+    private void OnStreamEnded(bool completed) => OnPtt(false);
+
+    private void OnTxFault(string why) => OnPtt(false);
+
+    private static void Safely(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Serilog.Log.Warning(ex, "MQTT publishing failed to queue a change");
+        }
+    }
+
     /// <summary>Connects once to test the settings, without disturbing the running connection.</summary>
     public Task<MqttTestResult> TestAsync(MqttOptions options, string? password, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(options);
-        var stationId = string.IsNullOrWhiteSpace(options.StationId) ? MqttStationId.From(_settings.Current.Profile.Callsign) : options.StationId;
+        var stationId = MqttStationId.From(string.IsNullOrWhiteSpace(options.StationId) ? _settings.Current.Profile.Callsign : options.StationId);
         var broker = new MqttBrokerOptions(options.Host.Trim(), options.Port, options.Tls, NullIfEmpty(options.Username), NullIfEmpty(password),
             string.IsNullOrEmpty(options.ClientId) ? NewClientId() : options.ClientId);
-        return MqttPublisher.TestAsync(broker, new MqttTopics(stationId, options.DiscoveryPrefix), ct);
+        return MqttPublisher.TestAsync(broker, new MqttTopics(stationId, DiscoveryPrefix(options)), ct);
     }
 
     /// <summary>A client id for a new install: "costas-" and 12 random characters.</summary>
     public static string NewClientId() => $"costas-{Guid.NewGuid():N}"[..19];
 
-    private void OnSettingsChanged(AppSettings changed) => _ = ConfigureAsync();
+    private static string DiscoveryPrefix(MqttOptions o) => string.IsNullOrWhiteSpace(o.DiscoveryPrefix) ? "homeassistant" : o.DiscoveryPrefix.Trim();
 
-    private void OnAirChanged(OnAirSnapshot s)
+    private void OnSettingsChanged(AppSettings changed)
+    {
+        if (!_disposed) _ = ConfigureAsync();
+    }
+
+    private void OnAirChanged(OnAirSnapshot s) => Safely(() => QueueOnAir(s));
+
+    private void QueueOnAir(OnAirSnapshot s)
     {
         // Raised under the session's lock: only queue.
         var p = _publisher;
@@ -117,7 +155,9 @@ public sealed class MqttService : IAsyncDisposable
 
     private bool _lastActive;
 
-    private void OnSessionChanged(SessionSnapshot s)
+    private void OnSessionChanged(SessionSnapshot s) => Safely(() => QueueSession(s));
+
+    private void QueueSession(SessionSnapshot s)
     {
         var rigUp = s.Services.TryGetValue(ServiceNames.Radio, out var radio) && radio.Health is ServiceHealth.Ok or ServiceHealth.Degraded;
         var activity = !rigUp ? StationActivity.Idle
@@ -152,8 +192,12 @@ public sealed class MqttService : IAsyncDisposable
             p.Publish(new MqttOutgoing(t.QsoEvent, MqttPayloads.QsoEvent(new LoggedQso(logged.Call, logged.Band, ModeInfo.Name(logged.Mode), s.DialHz, logged.LoggedUtc)), false));
     }
 
-    private void OnTick()
+    // A timer callback: an exception here would end the process.
+    private void OnTick() => Safely(Tick);
+
+    private void Tick()
     {
+        if (_disposed) return;
         _onAir.Tick();
         var now = _clock.Ticks;
         if (now - Interlocked.Read(ref _lastHeartbeatTicks) < TimeSpan.FromSeconds(HaDiscovery.HeartbeatSeconds).Ticks) return;
@@ -169,7 +213,8 @@ public sealed class MqttService : IAsyncDisposable
     {
         var t = _topics!;
         var list = new List<MqttOutgoing>();
-        if (_discovery) list.Add(new MqttOutgoing(t.Discovery, HaDiscovery.Build(t, _settings.Current.Profile.Callsign, AppInfo.Version), true));
+        if (_discovery) list.Add(new MqttOutgoing(t.Discovery, _discoveryPayload = Discovery(t), true));
+        else if (_removeDiscovery) list.Add(new MqttOutgoing(t.Discovery, string.Empty, true));
         list.AddRange(Current());
         return list;
     }
@@ -218,20 +263,28 @@ public sealed class MqttService : IAsyncDisposable
             }
             var password = _secrets.Get(SecretNames.MqttPassword);
             var broker = new MqttBrokerOptions(o.Host.Trim(), o.Port, o.Tls, NullIfEmpty(o.Username), NullIfEmpty(password), o.ClientId);
-            var topics = new MqttTopics(MqttStationId.From(o.StationId), string.IsNullOrWhiteSpace(o.DiscoveryPrefix) ? "homeassistant" : o.DiscoveryPrefix.Trim());
+            var topics = new MqttTopics(MqttStationId.From(o.StationId), DiscoveryPrefix(o));
             var key = $"{broker}|{broker.Username}|{password?.GetHashCode(StringComparison.Ordinal)}|{broker.ClientId}|{topics}";
             if (key == _publisherKey && _publisher is not null)
             {
                 if (_discovery != o.HomeAssistantDiscovery)
                 {
                     _discovery = o.HomeAssistantDiscovery;
+                    _removeDiscovery = !_discovery;
                     // An empty retained message removes the device from Home Assistant; a new one adds it back.
-                    _publisher.Publish(new MqttOutgoing(topics.Discovery,
-                        _discovery ? HaDiscovery.Build(topics, _settings.Current.Profile.Callsign, AppInfo.Version) : string.Empty, true));
+                    _discoveryPayload = _discovery ? Discovery(topics) : null;
+                    _publisher.Publish(new MqttOutgoing(topics.Discovery, _discoveryPayload ?? string.Empty, true));
+                }
+                else if (_discovery && Discovery(topics) is var payload && payload != _discoveryPayload)
+                {
+                    // The callsign (in the device name) changed: Home Assistant renames the device.
+                    _discoveryPayload = payload;
+                    _publisher.Publish(new MqttOutgoing(topics.Discovery, payload, true));
                 }
                 return;
             }
             await StopPublisherAsync().ConfigureAwait(false);
+            if (_topics is not null && _topics != topics) _removeDiscovery = false; // a different device now
             _topics = topics;
             _discovery = o.HomeAssistantDiscovery;
             _session.SetService(ServiceNames.Mqtt, new ServiceStatus(ServiceHealth.Degraded, $"Connecting to {broker}", _clock.UtcNow));
@@ -252,6 +305,8 @@ public sealed class MqttService : IAsyncDisposable
         }
     }
 
+    private string Discovery(MqttTopics t) => HaDiscovery.Build(t, _settings.Current.Profile.Callsign, AppInfo.Version);
+
     private async Task StopPublisherAsync()
     {
         var p = _publisher;
@@ -265,15 +320,19 @@ public sealed class MqttService : IAsyncDisposable
     /// <summary>Ends any session (reason app_closed), publishes it and "offline", and disconnects.</summary>
     public async ValueTask DisposeAsync()
     {
+        if (_disposed) return;
+        _disposed = true;
         await _configure.WaitAsync().ConfigureAwait(false);
         try
         {
-            _disposed = true;
             if (_timer is not null) await _timer.DisposeAsync().ConfigureAwait(false);
             _session.Changed -= OnSessionChanged;
             _settings.Changed -= OnSettingsChanged;
-            _tx.Committed -= _onAir.Commit;
-            _tx.PttChanged -= _onAir.Ptt;
+            _tx.Committed -= OnCommitted;
+            _tx.PttChanged -= OnPtt;
+            _tx.Ended -= OnTxEnded;
+            _tx.StreamEnded -= OnStreamEnded;
+            _tx.Fault -= OnTxFault;
             _onAir.Changed -= OnAirChanged;
             _onAir.Ptt(false);
             _onAir.End(SessionEndReason.AppClosed);
@@ -294,9 +353,9 @@ public sealed class MqttService : IAsyncDisposable
         }
         finally
         {
+            // Not disposed: a settings change already on its way waits on it, finds the service disposed and returns.
             _configure.Release();
         }
-        _configure.Dispose();
     }
 
     private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
