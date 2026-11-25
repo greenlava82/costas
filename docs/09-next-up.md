@@ -75,5 +75,5 @@ The item codes (T3, U4, D10 and so on) refer to the main and PSK/RTTY bug-hunt r
 - **Already rejected:** the "Why it didn't finish" replay, the Ctrl+K command bar, and standalone audio-offset or waterfall panels.
 - **Decided by the owner on October 20:** new POTA parks rank higher and in-app clock correction is built. The Fake It split stays off (not re-proposed).
 - **Dropped by the owner on October 13:** PSK Reporter graph, Hamlib error, globe spin, About box.
-- **Settled:** no first-run metrics notice, no extra wait cycles, waterfall/settings/log editing stay desk-only on the phone, Halt Tx stays in the bottom bar.
+- **Settled:** no first-run metrics notice, no extra wait cycles, waterfall/settings/log editing stay desk-only on the phone, Halt Tx stays in the bottom bar on the phone in portrait; in wider layouts (phone landscape, tablet, browser) it sits at the right of the top bar (owner decision 2026-11-25).
 - **Not planned yet:** other modes (Q65, WSPR, MSK144), macOS builds and translations stay in the spec's "later" list.
