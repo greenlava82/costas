@@ -33,8 +33,9 @@ public sealed record StartupPlan(string? ReplayFolder, bool Partner, bool Simula
         var folder = args.SimulateFolder ?? (dev.Enabled && dev.ReplaySamples ? samplesFolder : null);
         var replaying = folder is not null;
         var partner = replaying && (args.SimulatePartner || (dev.Enabled && dev.SimulatedPartner));
-        // --simulate keeps the in-process radio even when one is configured; developer replay uses the configured radio.
-        var simulatedRig = replaying && (args.SimulateFolder is not null || rig.Mode == RigModes.None);
+        // Replaying always uses the in-process radio, even when a real one is configured: a replayed contact with the
+        // simulated partner must never key real hardware (owner decision 2026-11-24, bug hunt M2).
+        var simulatedRig = replaying;
         var noRadio = !simulatedRig && rig.Mode == RigModes.None;
         return new StartupPlan(folder, partner, simulatedRig, noRadio);
     }

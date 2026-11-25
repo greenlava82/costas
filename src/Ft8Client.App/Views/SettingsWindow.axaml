@@ -1166,7 +1166,7 @@
         <ScrollViewer>
           <StackPanel>
             <TextBlock Classes="page" Text="Developer" />
-            <TextBlock Classes="intro" Text="Test tools. To test against Hamlib's test radio, choose Hamlib Dummy in Station setup; transmit audio is never played while a test radio is selected. Replay changes apply after a restart." />
+            <TextBlock Classes="intro" Text="Test tools. To test against Hamlib's test radio, choose Hamlib Dummy in Station setup; transmit audio is never played while a test radio is selected. Replay always uses a simulated radio, so the station's own radio is never keyed. Replay changes apply after a restart." />
             <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Replay" />
               <StackPanel Grid.Column="1" Spacing="6">

@@ -54,13 +54,18 @@ public class StartupPlanTests
         p.Partner.Should().BeTrue();
     }
 
-    [Fact]
-    public void Decide_DeveloperReplayWithHamlibDummy_KeepsConfiguredRigAndMutes()
+    [Theory]
+    [InlineData(RigModes.Hamlib, 1049)]
+    [InlineData(RigModes.Hamlib, 1)]
+    [InlineData(RigModes.Vox, null)]
+    public void Decide_DeveloperReplayWithRadioConfigured_UsesSimulatedRig(string mode, int? model)
     {
-        var s = Settings(RigModes.Hamlib, 1, dev: true, replay: true);
+        // A replayed contact with the simulated partner must never key the station's radio.
+        var s = Settings(mode, model, dev: true, replay: true, partner: true);
         var p = StartupPlan.Decide(new CommandLine(), s, Samples);
         p.Replaying.Should().BeTrue();
-        p.SimulatedRig.Should().BeFalse("the developer is testing against Hamlib's test radio");
+        p.SimulatedRig.Should().BeTrue();
+        p.NoRadio.Should().BeFalse();
         p.MutesTransmitAudio(s.Profile.Rig).Should().BeTrue();
     }
 
