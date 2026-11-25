@@ -639,7 +639,8 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             _slotCounts.RemoveAll(x => now - x.Slot > TimeSpan.FromHours(1));
             var modeKey = LogModeKey.Of(_config.Mode);
             var needed = _tracker.Stations.Where(st => st.LastHeardUtc == slot)
-                .Count(st => _logIndex.Need(st.Call, st.EntityKey, st.Grid, _config.Band, modeKey, _config.Ranking.TierOrder, _config.Ranking.ConfirmedOnly).Tag != NeedTag.Worked);
+                .Count(st => _logIndex.Need(st.Call, st.EntityKey, st.Grid, _config.Band, modeKey, _config.Ranking.TierOrder, _config.Ranking.ConfirmedOnly,
+                    _config.Ranking.CallWorkedSince(now)).Tag != NeedTag.Worked);
             _activity.Add(new SlotActivity(slot, result.Decodes.Count, needed));
             _activity.RemoveAll(x => now - x.SlotStartUtc > TimeSpan.FromHours(1));
             _lastDecodedSlot = slot;
@@ -878,8 +879,9 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
             // A caller can skip the grid exchange. Persist the same known grid that we index.
             entry = entry with { Grid = entry.Grid ?? s?.Grid ?? lk?.Grid };
             var entity = s?.Entity ?? _countries.Lookup(entry.Call);
+            // The same rule as the station list: a station that counts as new again (Settings) is logged as a new call.
             var need = _logIndex.Need(entry.Call, entity?.Entity.Key, entry.Grid, _config.Band, LogModeKey.Of(_config.Mode),
-                _config.Ranking.TierOrder, _config.Ranking.ConfirmedOnly);
+                _config.Ranking.TierOrder, _config.Ranking.ConfirmedOnly, _config.Ranking.CallWorkedSince(entry.TimeOnUtc));
             ctx = new LogContext(_config.Band, _config.Mode, frequencyHz, _config.MyCall, _config.MyGrid, _config.PowerWatts, need,
                 entity?.Entity.Key, entity?.Entity.Name, name ?? lk?.Name, lk?.State, entity?.Continent, qth ?? lk?.City,
                 entry.ExchangeSent is null ? null : ContestNow);

@@ -22,7 +22,18 @@ public partial class FeedbackWindow : Window
     private async void OnCopy(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not FeedbackViewModel vm || Clipboard is not { } clipboard) return;
-        await clipboard.SetTextAsync(vm.CopyText());
+        // Another program holding the clipboard makes this throw. Left to the unexpected-error handler, that would also
+        // halt a transmission in progress.
+        try
+        {
+            await clipboard.SetTextAsync(vm.CopyText());
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Serilog.Log.Warning(ex, "Copying the report to the clipboard failed");
+            vm.Status = $"Could not copy: {ex.Message} Try again in a moment.";
+            return;
+        }
         vm.Status = "Copied. Paste it into an email or a GitHub issue.";
     }
 

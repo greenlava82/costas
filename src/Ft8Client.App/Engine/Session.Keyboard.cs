@@ -391,7 +391,7 @@ public sealed partial class Session
         var modeKey = ModeInfo.Name(_config.Mode);
         var read = _tracker.Stations.Where(st => st.LastHeardUtc >= from).ToList();
         var needed = read.Count(st => _logIndex.Need(st.Call, st.EntityKey, st.Grid, _config.Band, modeKey, _config.Ranking.TierOrder,
-            _config.Ranking.ConfirmedOnly).Tag != NeedTag.Worked);
+            _config.Ranking.ConfirmedOnly, _config.Ranking.CallWorkedSince(utc)).Tag != NeedTag.Worked);
         _activity.Add(new SlotActivity(from, read.Count, needed));
         _activity.RemoveAll(x => utc - x.SlotStartUtc > TimeSpan.FromHours(1));
         _kbdActivityFrom = utc;

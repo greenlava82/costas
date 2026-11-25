@@ -1153,7 +1153,7 @@ public sealed partial class OperateViewModel : ObservableObject
             _ => "calls",
         };
         var order = r.TierOrder.ToList();
-        var head = $"New {Plural(order[0])} first, then {string.Join(", ", order.Skip(1).Take(order.Count - 2).Select(Plural))} and {Plural(order[^1])}.";
+        var head = $"Stations heard in the latest slot first. Within a slot, new {Plural(order[0])} first, then {string.Join(", ", order.Skip(1).Take(order.Count - 2).Select(Plural))} and {Plural(order[^1])}.";
         var parts = new List<string> { head };
         if (r.PreferHearsMe) parts.Add("Stations that hear you rank higher.");
         if (!r.OnlyCallingCq) parts.Add("Stations finishing a contact are included.");

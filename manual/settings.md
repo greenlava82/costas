@@ -591,7 +591,7 @@ folder and set the path to the AppImage or to `squashfs-root/usr/bin/jt9` beside
 
 Hidden by default. In **☰ › About**, click the product name seven times. Settings then has a **Developer** section
 (replay the sample recordings instead of the sound card, optionally with a simulated station that answers your
-calls), and Station setup lists Hamlib's test radio, *Hamlib Dummy*, which never plays transmit audio. This is for
+calls; replay always uses a simulated radio, so your own radio is never keyed), and Station setup lists Hamlib's test radio, *Hamlib Dummy*, which never plays transmit audio. This is for
 testing Costas, not for operating.
 
 Development builds used to be switched on here. The choice is now **Update channel** in [Updates](#updates), and
