@@ -75,6 +75,18 @@ public sealed class UpdateServiceTests
         UpdateService.ShouldOffer(Build("0.1.300", development: true), "0.1.305", leavingDevelopment: true).Should().BeFalse();
 
     [Fact]
+    public void OldCopyMessage_AllUsersInstall_SaysWhereAndWhy() =>
+        Ft8Client.App.ViewModels.UpdateBarViewModel.OldCopyMessage(new OldClassicInstall("0.1.474", @"C:\Program Files\Costas", @"C:\Program Files\Costas\unins000.exe"))
+            .Should().Be(@"An old copy of Costas (0.1.474) is still installed in C:\Program Files\Costas. Its shortcuts open that old version, "
+                         + "which reinstalls Costas in full each time, without the update screen.");
+
+    [Theory]
+    [InlineData(false, false, "Release. Updates to releases only; change this in Settings, Updates, Update channel.")]
+    [InlineData(true, true, "Development build. Updates to each new development build; change this in Settings, Updates, Update channel.")]
+    public void ChannelText_RunningAndFollowing_SaysWhereToChange(bool running, bool follows, string text) =>
+        Ft8Client.App.Views.AboutWindow.ChannelText(running, follows).Should().Be(text);
+
+    [Fact]
     public void BarText_DowngradeAndDevelopment_SayWhatTheyAre()
     {
         Ft8Client.App.ViewModels.UpdateBarViewModel.BarText(Build("0.1.300") with { IsDowngrade = true }, "0.1.305", "95 MB")

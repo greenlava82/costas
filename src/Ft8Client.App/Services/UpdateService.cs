@@ -26,7 +26,7 @@ namespace Ft8Client.App.Services;
 /// a Velopack install, or (for releases from before the move) the classic one. The Linux .deb and tarball open the release
 /// page instead.
 /// <para>
-/// With development builds on (Settings, Developer) the check follows the development release that CI replaces with each
+/// With development builds on (Settings, Updates) the check follows the development release that CI replaces with each
 /// green build of main (Velopack's <c>dev</c> channel). Turning them off offers the latest release even though it is
 /// older than the development build that is running, so the station goes back to what everyone else runs.
 /// </para>
@@ -161,6 +161,29 @@ public sealed class UpdateService : IDisposable
     public string? FailedUpdate { get; private set; }
 
     /// <summary>
+    /// An old classic Costas installed for all users beside this Velopack install, whose shortcuts still open the old
+    /// version; the update bar offers to remove it. Null when there is none, or once it has been removed.
+    /// </summary>
+    public OldClassicInstall? OldCopy { get; private set; }
+
+    /// <summary>Shows the old copy notice without one installed (tests).</summary>
+    internal void ShowOldCopyForTests(OldClassicInstall old)
+    {
+        OldCopy = old;
+        Changed?.Invoke();
+    }
+
+    /// <summary>Removes <see cref="OldCopy"/> (Windows' administrator prompt). Returns null when done, or what went wrong.</summary>
+    public async Task<string?> RemoveOldCopyAsync()
+    {
+        if (OldCopy is not { } old) return null;
+        var error = await old.RemoveAsync().ConfigureAwait(false);
+        if (error is null) OldCopy = null;
+        Changed?.Invoke();
+        return error;
+    }
+
+    /// <summary>
     /// Set at start when Costas closed for an update last time: "installed" when this is the version it was updating to,
     /// "failed" when it is not. Null when there was no update. Read for the usage statistics.
     /// </summary>
@@ -235,14 +258,20 @@ public sealed class UpdateService : IDisposable
                 }
             }
         }
-        _followedDevelopment = _settings.Current.Developer.FollowsDevelopmentBuilds;
+        _followedDevelopment = _settings.Current.Updates.DevelopmentBuilds;
         _settings.Changed += OnSettingsChanged;
         _timer.Change(TimeSpan.Zero, Interval);
         if (_velopack is not null)
         {
             _ = Task.Run(() =>
             {
-                if (OperatingSystem.IsWindows()) ClassicInstallCleanup.Run(AppContext.BaseDirectory);
+                if (!OperatingSystem.IsWindows()) return;
+                ClassicInstallCleanup.Run(AppContext.BaseDirectory);
+                if (OldClassicInstall.Find() is { } old && !Path.GetFullPath(AppContext.BaseDirectory).StartsWith(Path.GetFullPath(old.Folder), StringComparison.OrdinalIgnoreCase))
+                {
+                    OldCopy = old;
+                    Changed?.Invoke();
+                }
             });
         }
     }
@@ -258,7 +287,7 @@ public sealed class UpdateService : IDisposable
         if (!await _checking.WaitAsync(0, ct).ConfigureAwait(false)) return Available;
         try
         {
-            var development = _settings.Current.Developer.FollowsDevelopmentBuilds;
+            var development = _settings.Current.Updates.DevelopmentBuilds;
             var leaving = !development && RunningDevelopmentBuild;
             var latest = _velopack is not null
                 ? await CheckVelopackAsync(development, leaving).ConfigureAwait(false)
@@ -325,11 +354,11 @@ public sealed class UpdateService : IDisposable
                 AllowVersionDowngrade = allowDowngrade,
             });
 
-    // Turning development builds on or off (or developer mode, which they need) checks straight away, so the bar offers
+    // Turning development builds on or off checks straight away, so the bar offers
     // the development build, or the way back to the latest release, without waiting for the daily check.
     private void OnSettingsChanged(Ft8Client.Data.Settings.AppSettings s)
     {
-        var now = s.Developer.FollowsDevelopmentBuilds;
+        var now = s.Updates.DevelopmentBuilds;
         if (now == _followedDevelopment) return;
         _followedDevelopment = now;
         Log.Information("Development builds {State}; checking for updates", now ? "on" : "off");

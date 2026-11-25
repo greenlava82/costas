@@ -43,6 +43,7 @@ public partial class AboutWindow : Window
         _updates = updates;
         _bar = bar;
         Product.Text = $"{AppInfo.ProductName} {AppInfo.Version}";
+        Channel.Text = ChannelText(updates?.RunningDevelopmentBuild == true, settings?.Current.Updates.DevelopmentBuilds == true);
         Product.PointerPressed += OnProductPressed;
         CheckUpdates.IsEnabled = updates is not null;
         CheckUpdates.Click += OnCheckUpdates;
@@ -100,6 +101,12 @@ public partial class AboutWindow : Window
         if (r is not null && _bar is not null) InstallUpdate.IsVisible = true;
         RefreshInstall();
     }
+
+    /// <summary>Which kind of build this is and which updates it takes, with where to change that.</summary>
+    internal static string ChannelText(bool runningDevelopment, bool followsDevelopment) =>
+        (runningDevelopment ? "Development build. " : "Release. ")
+        + (followsDevelopment ? "Updates to each new development build" : "Updates to releases only")
+        + "; change this in Settings, Updates, Update channel.";
 
     private void OnProductPressed(object? sender, PointerPressedEventArgs e)
     {

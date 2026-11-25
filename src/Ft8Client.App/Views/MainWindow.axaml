@@ -319,6 +319,37 @@
         </DockPanel>
       </DockPanel>
     </Border>
+    <!-- An old all-users classic install whose shortcuts reopen it (owner report 2026-11-25: an update with no splash was
+         that old copy reinstalling Costas). Same look as the update bar. -->
+    <Border x:Name="OldCopyBar" IsVisible="{Binding Update.OldCopyVisible}" Classes.slim="{Binding Operate.Compact}" CornerRadius="6"
+            Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+      <Border.Styles>
+        <Style Selector="Border#OldCopyBar">
+          <Setter Property="Margin" Value="16,0,16,8" />
+          <Setter Property="Padding" Value="12,8" />
+        </Style>
+        <Style Selector="Border#OldCopyBar.slim">
+          <Setter Property="Margin" Value="16,0,16,6" />
+          <Setter Property="Padding" Value="10,2" />
+        </Style>
+        <Style Selector="Border#OldCopyBar.slim Button">
+          <Setter Property="Padding" Value="9,1" />
+          <Setter Property="MinHeight" Value="24" />
+          <Setter Property="FontSize" Value="12" />
+        </Style>
+      </Border.Styles>
+      <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+          <Button Content="Remove old copy" Classes="accent" Command="{Binding Update.RemoveOldCopyCommand}" IsEnabled="{Binding !Update.OldCopyBusy}"
+                  ToolTip.Tip="Uninstalls the old copy and its shortcuts. Windows asks for an administrator's OK. Your log and settings are kept." />
+          <Button Content="Not now" Command="{Binding Update.DismissOldCopyCommand}" IsEnabled="{Binding !Update.OldCopyBusy}" />
+        </StackPanel>
+        <DockPanel VerticalAlignment="Center" Margin="0,0,12,0">
+          <TextBlock DockPanel.Dock="Bottom" Text="{Binding Update.OldCopyDetail}" Classes="secondary" IsVisible="{Binding Update.OldCopyDetail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <TextBlock Text="{Binding Update.OldCopyText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        </DockPanel>
+      </DockPanel>
+    </Border>
     </StackPanel>
 
     <Panel Grid.Row="4">

@@ -57,8 +57,34 @@ public sealed partial class UpdateBarViewModel : ObservableObject
     [ObservableProperty]
     public partial string Detail { get; set; } = string.Empty;
 
+    /// <summary>Shown while an old all-users classic install is still there beside this one.</summary>
+    [ObservableProperty]
+    public partial bool OldCopyVisible { get; set; }
+
+    /// <summary>What the old copy is and why it matters.</summary>
+    [ObservableProperty]
+    public partial string OldCopyText { get; set; } = string.Empty;
+
+    /// <summary>The old copy's removal is running, or why it failed.</summary>
+    [ObservableProperty]
+    public partial string OldCopyDetail { get; set; } = string.Empty;
+
+    /// <summary>Removing the old copy (waiting for the administrator prompt and the uninstaller).</summary>
+    [ObservableProperty]
+    public partial bool OldCopyBusy { get; set; }
+
+    private bool _oldCopyDismissed;
+
+    /// <summary>The old copy notice: where it is, and that its shortcuts reinstall Costas the slow way.</summary>
+    internal static string OldCopyMessage(OldClassicInstall old) =>
+        $"An old copy of Costas{(old.Version.Length > 0 ? $" ({old.Version})" : string.Empty)} is still installed in {old.Folder}. "
+        + "Its shortcuts open that old version, which reinstalls Costas in full each time, without the update screen.";
+
     private void Refresh()
     {
+        var old = _updates.OldCopy;
+        OldCopyVisible = old is not null && !_oldCopyDismissed;
+        if (old is not null) OldCopyText = OldCopyMessage(old);
         var r = _updates.Available;
         Visible = r is not null;
         if (r is not null) Text = BarText(r, AppInfo.Version, DownloadSize(r.InstallerSize));
@@ -159,6 +185,31 @@ public sealed partial class UpdateBarViewModel : ObservableObject
             // Already gone.
         }
         splash.Dispose();
+    }
+
+    /// <summary>Removes the old all-users copy; Windows asks for an administrator's OK first.</summary>
+    [RelayCommand]
+    private async Task RemoveOldCopy()
+    {
+        if (OldCopyBusy) return;
+        OldCopyBusy = true;
+        OldCopyDetail = "Removing; Windows asks for an administrator's OK…";
+        try
+        {
+            OldCopyDetail = await _updates.RemoveOldCopyAsync() ?? string.Empty;
+        }
+        finally
+        {
+            OldCopyBusy = false;
+        }
+    }
+
+    /// <summary>Hides the old copy notice until Costas next starts.</summary>
+    [RelayCommand]
+    private void DismissOldCopy()
+    {
+        _oldCopyDismissed = true;
+        OldCopyVisible = false;
     }
 
     /// <summary>Opens the release page.</summary>

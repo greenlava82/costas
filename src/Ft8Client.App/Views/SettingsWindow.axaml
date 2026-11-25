@@ -1080,6 +1080,16 @@
               <CheckBox Grid.Column="1" Content="Check for a new build once a day" IsChecked="{Binding CheckUpdates}" />
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="Update channel" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <RadioButton GroupName="UpdateChannel" Content="Releases (recommended)" IsChecked="{Binding ReleasesOnly}" />
+                <TextBlock Classes="help" Margin="28,0,0,4" Text="The builds everyone gets, published when they have had some time on air." />
+                <RadioButton GroupName="UpdateChannel" Content="Development builds" IsChecked="{Binding DevelopmentBuilds}" />
+                <TextBlock Classes="help" Margin="28,0,0,4" Text="Every new build as soon as it passes the automatic tests, usually several a day. New features arrive first, but a build can have bugs that a release would not, including on air." />
+                <TextBlock Classes="help" Text="{Binding UpdateChannelNote}" />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Check now" />
               <StackPanel Grid.Column="1">
                 <Button Content="Check now" Command="{Binding CheckNowCommand}" />
@@ -1153,13 +1163,6 @@
               <StackPanel Grid.Column="1" Spacing="6">
                 <CheckBox Content="Replay the sample recordings instead of the sound card" IsChecked="{Binding ReplaySamples}" />
                 <CheckBox Content="A simulated station answers my calls" IsChecked="{Binding SimulatedPartner}" IsEnabled="{Binding ReplaySamples}" />
-              </StackPanel>
-            </Grid>
-            <Grid Classes="field" ColumnDefinitions="210,*">
-              <TextBlock Classes="label" Text="Development builds" />
-              <StackPanel Grid.Column="1">
-                <CheckBox Content="Update to each new build of main, not only releases" IsChecked="{Binding DevelopmentBuilds}" />
-                <TextBlock Classes="help" Text="{Binding DevelopmentBuildNote}" />
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">

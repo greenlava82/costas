@@ -43,15 +43,15 @@ You can turn the daily check off, or check by hand, in **Settings › Updates**.
 
 ### Development builds
 
-Testers can follow development builds: every change to Costas that passes its automatic tests, usually several a
-week, before it goes into a release. Turn on [developer mode](settings.md#developer-mode), then tick **Settings ›
-Developer › Development builds**. Costas checks straight away and the update bar offers the newest development build;
-from then on it offers each new one. Development builds are full downloads (about 90 MB) and are tested only by CI, so
-they can break on air.
+Anyone can follow development builds: every change to Costas that passes its automatic tests, usually several a
+week, before it goes into a release. In **Settings › Updates**, set **Update channel** to **Development builds** and
+click **Save**. Costas checks straight away and the update bar offers the newest development build; from then on it
+offers each new one. Development builds are full downloads (about 90 MB) and are tested only by CI, so they can break
+on air. **☰ › About** says under the version whether you are on a release or a development build.
 
-To stop, untick **Development builds** (or turn developer mode off). Costas checks again and the bar offers to **go
-back to the latest release**, even though it is older than the development build you have. Your settings and log are
-kept.
+To go back, set **Update channel** to **Releases** and click **Save**. Costas checks again and the bar offers to **go
+back to the latest release**, even though it is older than the development build you have. Click **Update** as usual.
+Your settings and log are kept. From then on you get releases only.
 
 Upgrading keeps your log and settings.
 
@@ -59,8 +59,10 @@ Upgrading keeps your log and settings.
     Builds up to 0.1.0.407 used a different installer, which downloaded the whole program (about 100 MB) on every
     update. The first update after that downloads the full program once more and moves Costas to the new location
     below; it removes the old copy and keeps your Start menu entry, log and settings. From then on updates are small.
-    If you had installed for all users (in `C:\Program Files\Costas\`), remove that old copy yourself from
-    **Settings › Apps** after the move. An install from before the rename (when the app was called "FT8 Client") is
+    If you had installed for all users (in `C:\Program Files\Costas\`), the old copy stays, and its Start menu or
+    desktop shortcut keeps opening the old version, which reinstalls Costas in full each time (with no **Updating
+    Costas** window, and back on releases). Costas shows a bar offering **Remove old copy**; Windows asks for an
+    administrator's OK. You can also remove it from **Settings › Apps** (the Costas with the old version number). An install from before the rename (when the app was called "FT8 Client") is
 upgraded too, and its data is moved to the Costas data folder on first start.
 
 ## Where your data lives
