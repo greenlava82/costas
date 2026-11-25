@@ -10,6 +10,7 @@
     <!-- The stand-in FlexRadio API, shared with the Rig tests. -->
     <Compile Include="..\Ft8Client.Rig.Tests\Flex\FakeFlexRadio.cs" Link="Flex\FakeFlexRadio.cs" />
     <Compile Include="..\Ft8Client.Integrations.Tests\QDataStreamReader.cs" Link="Wsjtx\QDataStreamReader.cs" />
+    <Compile Include="..\Ft8Client.Integrations.Tests\Mqtt\MqttTestBroker.cs" Link="Mqtt\MqttTestBroker.cs" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
@@ -18,6 +19,7 @@
   <ItemGroup>
     <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.3" />
     <PackageReference Include="FluentAssertions" Version="8.11.0" />
+    <PackageReference Include="MQTTnet.Server" Version="5.2.0.1603" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
