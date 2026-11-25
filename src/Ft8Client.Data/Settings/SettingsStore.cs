@@ -163,7 +163,7 @@ public sealed class SettingsStore(string path)
     /// Brings older files up to <see cref="AppSettings.CurrentSchema"/>. Schema 0 (pre-release) had the profile's
     /// call and grid at the top level and no schema field. Schema 1 could hold band transmit levels walked down to
     /// silence by a misread ALC. Schema 2 had one LoTW account for every station profile, schema 3 one set of contest
-    /// exchanges.
+    /// exchanges, schema 4 the development builds switch under developer options.
     /// </summary>
     public static void Migrate(JsonObject node)
     {
@@ -203,6 +203,24 @@ public sealed class SettingsStore(string path)
             MoveContestExchangesIntoProfiles(node);
             node["schema"] = 4;
         }
+        if (schema < 5)
+        {
+            MoveDevelopmentBuildsToUpdates(node);
+            node["schema"] = 5;
+        }
+    }
+
+    // Schema 5: the development builds switch moved from the hidden developer options to Updates, where anyone can find it.
+    // It used to count only while developer mode was on too, so it is carried over only then: a station that had turned
+    // developer mode off was getting releases and keeps getting them.
+    private static void MoveDevelopmentBuildsToUpdates(JsonObject node)
+    {
+        if (node["developer"] is not JsonObject developer) return;
+        var wanted = developer["developmentBuilds"]?.GetValue<bool>() == true && developer["enabled"]?.GetValue<bool>() == true;
+        developer.Remove("developmentBuilds");
+        if (!wanted) return;
+        if (node["updates"] is not JsonObject updates) node["updates"] = updates = new JsonObject();
+        updates["developmentBuilds"] = true;
     }
 
     // Schema 4: the contest exchanges (state, class, section) moved from the operating settings into each station profile.

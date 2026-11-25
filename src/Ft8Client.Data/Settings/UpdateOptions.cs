@@ -18,6 +18,12 @@ public sealed class UpdateOptions
     public string? SkippedTag { get; set; }
 
     /// <summary>
+    /// Update to development builds (each green build of main) as well as releases. Turning it off goes back to the latest
+    /// release, even though it is older than the development build that is running.
+    /// </summary>
+    public bool DevelopmentBuilds { get; set; }
+
+    /// <summary>
     /// The version Costas closed to install, until the next start has looked at whether it took. Still set
     /// with a different version running means that update did not install.
     /// </summary>

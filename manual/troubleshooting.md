@@ -249,8 +249,16 @@ unsafe"*, or Costas simply does not open.
 
 - Until signed releases are out, Costas runs on such a PC only with Smart App Control switched **off** in Windows
   Security. Windows does not let you switch it back on without resetting the PC, so decide with that in mind.
-- Development builds (**Settings › Developer**) are signed only when a release is; on a PC with Smart App Control
+- Development builds (**Settings › Updates › Update channel**) are signed only when a release is; on a PC with Smart App Control
   stay on releases.
+
+## An update shows no Updating Costas window
+
+Costas closes, a minute or so passes, and it opens again with no **Updating Costas** window in between. That is
+usually an old copy installed for all users in `C:\Program Files\Costas\` starting from an old Start menu or desktop
+shortcut: it is too old to have that window, and it reinstalls the current Costas in full. Click **Remove old copy**
+in the bar Costas shows, or remove the Costas with the old version number in **Settings › Apps**. Unpin any taskbar
+icon that opened the old copy and pin Costas again once it is running.
 
 ## Costas does not open after an update {#costas-does-not-open-after-an-update}
 

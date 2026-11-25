@@ -192,6 +192,20 @@ public class DatabaseAndSettingsTests
         new SettingsStore(path).Load().Profile.Audio.TxGainByBand.Should().ContainKey("20m");
     }
 
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)] // developer mode off: it was getting releases, and still does
+    [InlineData(true, false, false)]
+    public void SettingsStore_SchemaFour_MovesDevelopmentBuildsToUpdates(bool developerMode, bool developmentBuilds, bool follows)
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");
+        File.WriteAllText(path, $$"""{ "schema": 4, "developer": { "enabled": {{(developerMode ? "true" : "false")}}, "developmentBuilds": {{(developmentBuilds ? "true" : "false")}} } }""");
+        var s = new SettingsStore(path).Load();
+        s.Schema.Should().Be(AppSettings.CurrentSchema);
+        s.Updates.DevelopmentBuilds.Should().Be(follows);
+        s.Developer.Enabled.Should().Be(developerMode);
+    }
+
     [Fact]
     public void SettingsStore_Corrupt_ReturnsDefaultsAndKeepsCopy()
     {

@@ -475,6 +475,12 @@ See [Operating from a phone](phone.md).
 
 **Check for a new build once a day** (on) and **Check now**. See [Install › Updates](install.md#updates).
 
+**Update channel** (Releases) chooses which builds the update bar offers: **Releases**, the builds everyone gets, or
+**Development builds**, every new build as soon as it passes the automatic tests. The line under the choice says which
+kind you are running now. After you save, Costas checks straight away. Switching back to Releases offers the latest
+release even though it is older than your development build; your log and settings are kept. See
+[Install › Development builds](install.md#development-builds).
+
 ## Privacy
 
 ![Settings: Privacy](images/settings-privacy.png)
@@ -574,6 +580,5 @@ Hidden by default. In **☰ › About**, click the product name seven times. Set
 calls), and Station setup lists Hamlib's test radio, *Hamlib Dummy*, which never plays transmit audio. This is for
 testing Costas, not for operating.
 
-**Development builds** (off) updates Costas to each new build of the code that passes its tests, not only releases.
-Turning it off, or turning developer mode off, offers the latest release again. See
-[Install › Development builds](install.md#development-builds).
+Development builds used to be switched on here. The choice is now **Update channel** in [Updates](#updates), and
+developer mode is not needed for it.

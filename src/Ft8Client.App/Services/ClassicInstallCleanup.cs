@@ -22,15 +22,15 @@ namespace Ft8Client.App.Services;
 [SupportedOSPlatform("windows")]
 internal static class ClassicInstallCleanup
 {
-    // The classic installer's AppId (installer/Costas.iss); Inno Setup adds "_is1".
-    private const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{ED0829A3-63BC-4E6C-99CB-5DFF4BB4A021}_is1";
+    private const string UninstallKey = OldClassicInstall.UninstallKey;
 
     private static readonly string[] OwnPrograms = ["Costas", "jt9", "rigctld"];
 
     /// <summary>
     /// Runs the classic uninstaller silently when a per-user classic install is still there, then puts back the Start menu
     /// (and desktop) shortcut it removes, which has the same name as Velopack's. An all-users install would need an
-    /// administrator prompt at start-up, so it is left and logged.
+    /// administrator prompt at start-up, so it is left for the operator: the update bar offers to remove it
+    /// (<see cref="OldClassicInstall"/>).
     /// </summary>
     public static void Run(string appDir)
     {
@@ -39,7 +39,7 @@ internal static class ClassicInstallCleanup
             if (Registry.LocalMachine.OpenSubKey(UninstallKey) is { } machine)
             {
                 machine.Dispose();
-                Log.Information("A classic all-users Costas install is still present; remove it from Apps & features");
+                Log.Information("A classic all-users Costas install is still present; the update bar offers to remove it");
             }
             using var key = Registry.CurrentUser.OpenSubKey(UninstallKey);
             if (key?.GetValue("InstallLocation") is not string location || key.GetValue("UninstallString") is not string uninstall) return;
