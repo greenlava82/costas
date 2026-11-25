@@ -54,8 +54,25 @@ $psi.WorkingDirectory = $env:RUNNER_TEMP
 $helper = Start-Process (Join-Path $dir 'third_party\hamlib\bin\rigctld.exe') -ArgumentList '-m', '1', '-t', '4599' -PassThru -WindowStyle Hidden
 $waiter = [System.Diagnostics.Process]::Start($psi)
 Stop-Process -Id $running.Id
-Start-Sleep -Seconds 8
-if ($waiter.HasExited) { throw 'The installer finished while rigctld from the install folder was still running' }
+# Keep rigctld running until the installer says it is waiting for it. A fixed sleep raced a slow runner: when Setup took
+# longer than the sleep to unpack and reach its check, rigctld was already gone and nothing was waited for.
+$deadline = (Get-Date).AddSeconds(120)
+$waiting = $false
+while (-not $waiting -and -not $waiter.HasExited -and (Get-Date) -lt $deadline) {
+    Start-Sleep -Milliseconds 500
+    try {
+        $waiting = Select-String -Path $updateLog -Pattern 'Waiting for .* to exit before installing' -Quiet -ErrorAction Stop
+    } catch {
+        $waiting = $false # Setup has not created its log yet, or holds it for a moment
+    }
+}
+if ($waiter.HasExited) {
+    if (Test-Path $updateLog) { Get-Content $updateLog -Tail 40 | Out-Host }
+    throw 'The installer finished while rigctld from the install folder was still running'
+}
+if (-not $waiting) { throw 'The installer did not say it was waiting for rigctld within 120 s' }
+Start-Sleep -Seconds 3
+if ($waiter.HasExited) { throw 'The installer stopped waiting while rigctld from the install folder was still running' }
 Stop-Process -Id $helper.Id
 if (-not $waiter.WaitForExit(300000)) { throw 'The update did not finish within 5 minutes' }
 if (-not (Select-String -Path $updateLog -Pattern 'Installation process succeeded' -Quiet)) {
