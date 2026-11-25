@@ -590,8 +590,8 @@ public sealed partial class LogViewModel : ObservableObject
                     var only = groups.Count == 1 ? groups[0] : new AdifLogExport.Group(station ?? callsign, []);
                     Ft8Client.Data.Files.AtomicFile.WriteAllText(path, AdifLogExport.Document(only, now, "ADIF export", options, detail));
                     return (station is null
-                        ? $"Exported {only.Contacts.Count} contacts."
-                        : $"Exported {only.Contacts.Count} contacts made as {station}.") + note;
+                        ? $"Exported {Contacts(only.Contacts.Count)}."
+                        : $"Exported {Contacts(only.Contacts.Count)} made as {station}.") + note;
                 }
                 var folder = Path.GetDirectoryName(path) ?? ".";
                 var stem = Path.GetFileNameWithoutExtension(path);
@@ -603,7 +603,7 @@ public sealed partial class LogViewModel : ObservableObject
                     Ft8Client.Data.Files.AtomicFile.WriteAllText(Path.Combine(folder, name), AdifLogExport.Document(g, now, "ADIF export", options, detail));
                     names.Add(name);
                 }
-                return $"Exported {count} contacts to {names.Count} files, one per callsign: {string.Join(", ", names)}." + note;
+                return $"Exported {Contacts(count)} to {names.Count} files, one per callsign: {string.Join(", ", names)}." + note;
             });
         }
         catch (Exception e) when (IsFileError(e))
@@ -615,6 +615,9 @@ public sealed partial class LogViewModel : ObservableObject
             Syncing = false;
         }
     }
+
+    // "1 contact", "1,180 contacts".
+    private static string Contacts(int n) => n == 1 ? "1 contact" : $"{n.ToString("N0", CultureInfo.InvariantCulture)} contacts";
 
     // " The filters left out 1,180 contacts. Plain ASCII text; name, QTH and comment left out." or empty.
     private static string ExportNote(int leftOut, AdifExportOptions options)
