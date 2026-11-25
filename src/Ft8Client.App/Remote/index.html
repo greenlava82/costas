@@ -180,7 +180,7 @@ button.x{flex:none;min-width:36px;padding:6px 8px;background:transparent;border:
 button.sort{background:none;padding:0;font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--accent)}
 .logrow{display:flex;justify-content:space-between;align-items:center;gap:10px}.logrow b{color:var(--tx);font-size:15px;letter-spacing:0}
 .logrow .s{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-body.dashon #slot,body.dashon #onair{display:none!important}
+body.dashon #onair{display:none!important}
 /* The Radio tab: power, Tune, meters and the radio's own settings, as tiles. */
 [data-pane=radio]{order:7}
 .rad .ctl{padding:8px 0;border-top:1px solid var(--line)}.rad .ctl:first-of-type{border-top:0}
@@ -1328,7 +1328,7 @@ function showTab(t) {
   try { localStorage.setItem(TAB, t); } catch { }
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
   document.querySelectorAll("[data-pane]").forEach(p => p.classList.toggle("hidden", !tabs[t].includes(p.dataset.pane)));
-  // The phone's Operate screen carries the slot and what is on the air in its contact tile.
+  // The phone's Operate screen shows what is on the air in its contact tile; the slot progress bar stays on every tab.
   document.body.classList.toggle("dashon", tabs[t].includes("dash"));
   radioView();
 }
