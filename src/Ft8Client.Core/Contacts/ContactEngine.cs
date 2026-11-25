@@ -274,6 +274,7 @@ public sealed class ContactEngine
         if (_c is not null)
         {
             _c.Held = false;
+            _c.HeldUtc = null;
             _c.AwaitingReply = false;
             if (_c.StepTxCount > 0) _c.StepTxCount--; // an operator resend is not counted against the retry limit
         }
@@ -313,6 +314,13 @@ public sealed class ContactEngine
     public bool Holding => _c?.Held == true;
 
     /// <summary>
+    /// How many slots after the one with the first Esc a kept contact waits for the DX station's sign-off before it
+    /// closes by itself (owner decision 2026-11-24: about a minute on FT8). A sign-off after that still shows as a reply
+    /// after stopping, which the operator can answer to log it.
+    /// </summary>
+    public const int HeldSlots = 4;
+
+    /// <summary>
     /// Stops transmitting but keeps the contact (the operator's first Esc): the DX station's replies are still read, so
     /// a sign-off that completes the contact is logged and ends it with nothing more sent. Resend or a step jump carries
     /// on transmitting; <see cref="Abandon"/> ends it.
@@ -322,7 +330,21 @@ public sealed class ContactEngine
         OperatorActivity(nowUtc);
         _cqRunning = false;
         _extraMessage = null;
-        if (_c is not null) _c.Held = true;
+        if (_c is not null)
+        {
+            _c.Held = true;
+            _c.HeldUtc ??= nowUtc;
+        }
+    }
+
+    // A kept contact whose wait is over: closed as if abandoned, so a late sign-off is still offered as a reply after
+    // stopping. Called once the slot's decodes are applied (and, as a backstop when no decodes come, at a slot start).
+    private void ExpireHeld(DateTime slotStartUtc, Mode mode, DateTime nowUtc, int slots)
+    {
+        if (_c is not { Held: true, HeldUtc: { } held }) return;
+        var len = ModeInfo.SlotLength(mode);
+        if (slotStartUtc < SlotMath.SlotStart(held, mode) + slots * len) return;
+        End(ContactOutcome.Abandoned, nowUtc, resume: false);
     }
 
     /// <summary>Manual override: jump the sequence to one of my upcoming steps.</summary>
@@ -332,6 +354,7 @@ public sealed class ContactEngine
         if (_c is null || stepIndex < 0 || stepIndex >= _c.Steps.Count || !_c.Steps[stepIndex].Mine || stepIndex <= _c.Phase) return false;
         if (stepIndex == 0) return false;
         _c.Held = false;
+        _c.HeldUtc = null;
         for (var i = _c.Phase; i < stepIndex; i++) _c.Steps[i] = _c.Steps[i] with { State = StepState.Done };
         SetPhase(_c, stepIndex);
         return true;
@@ -368,6 +391,8 @@ public sealed class ContactEngine
             }
             // Held: nothing more goes out, so a contact the DX's sign-off has just logged is finished.
             if (_c is { Held: true, Logged: true }) End(ContactOutcome.Logged, nowUtc, resume: false);
+            // The last slot it waits for has been decoded with no sign-off: it closes.
+            ExpireHeld(slotStartUtc, mode, nowUtc, HeldSlots);
         }
         else
         {
@@ -460,7 +485,12 @@ public sealed class ContactEngine
 
         if (_c is not null)
         {
-            if (_c.Held) return null;
+            if (_c.Held)
+            {
+                // Backstop when the decodes stop coming (no audio): a slot later than the decode would have closed it.
+                ExpireHeld(slotStartUtc, mode, nowUtc, HeldSlots + 2);
+                return null;
+            }
             if (parity != _c.MyParity) return null;
             if (_c.Phase >= _c.Steps.Count || !_c.Steps[_c.Phase].Mine) return null;
             if (_c.Flow == ContactFlow.Hound) return PlanHound(_c, slotStartUtc, mode, nowUtc);
@@ -1137,6 +1167,9 @@ public sealed class ContactEngine
         public bool Logged { get; set; }
 
         public bool Held { get; set; }
+
+        /// <summary>When the operator's first Esc kept the contact (see <see cref="Hold"/>); null while not held.</summary>
+        public DateTime? HeldUtc { get; set; }
 
         public DateTime? LoggedUtc { get; set; }
 

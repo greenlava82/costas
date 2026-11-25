@@ -695,8 +695,9 @@ public class ContactEngineTests
     }
 
     [Fact]
-    public void Hold_NoReply_SendsNothingAndKeepsContact()
+    public void Hold_NoReplyForFourSlots_ClosesWithoutLoggingOrSending()
     {
+        // Owner decision 2026-11-24: the first Esc keeps the contact for the 4 slots after the Esc's own, then it closes.
         var s = new Sim();
         s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
         s.Step();
@@ -704,12 +705,91 @@ public class ContactEngineTests
         s.Step().Should().Be("ZL2RPA W7LIT R-19");
         s.E.Hold(s.Now);
         var sent = s.Sent.Count;
-        s.Steps(6);
 
+        s.Steps(ContactEngine.HeldSlots);
+        s.E.Holding.Should().BeTrue("the 4th slot after the Esc has not been decoded yet");
+
+        s.Step();
+        s.E.InContact.Should().BeFalse();
+        s.E.View!.Outcome.Should().Be(ContactOutcome.Abandoned);
+        s.Steps(4);
         s.Sent.Should().HaveCount(sent);
-        s.E.InContact.Should().BeTrue();
-        s.E.View!.Outcome.Should().Be(ContactOutcome.InProgress);
         s.Logs.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Hold_Rr73InLastSlotWaited_Logged()
+    {
+        var s = new Sim();
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        s.Step();
+        s.Step("W7LIT ZL2RPA -22");
+        s.Step().Should().Be("ZL2RPA W7LIT R-19");
+        s.E.Hold(s.Now);
+        s.Steps(ContactEngine.HeldSlots);
+
+        s.Step("W7LIT ZL2RPA RR73");
+
+        s.Logs.Should().ContainSingle().Which.Call.Should().Be("ZL2RPA");
+        s.E.View!.Outcome.Should().Be(ContactOutcome.Logged);
+    }
+
+    [Fact]
+    public void Hold_Rr73AfterTheWait_OfferedAsReplyAfterStopping()
+    {
+        var s = new Sim();
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        s.Step();
+        s.Step("W7LIT ZL2RPA -22");
+        s.Step().Should().Be("ZL2RPA W7LIT R-19");
+        s.E.Hold(s.Now);
+        s.Steps(ContactEngine.HeldSlots + 1);
+        s.E.InContact.Should().BeFalse();
+
+        s.Step("W7LIT ZL2RPA RR73");
+
+        s.Logs.Should().BeEmpty("nothing is logged or sent until the operator answers it");
+        s.E.Waiting.Should().ContainSingle(w => w.Call == "ZL2RPA" && w.AfterStop);
+        s.E.AnswerCaller("ZL2RPA", s.Now).Should().BeTrue();
+        s.Logs.Should().ContainSingle().Which.Call.Should().Be("ZL2RPA");
+    }
+
+    [Fact]
+    public void Hold_NoDecodesArrive_ClosedAtALaterSlotStart()
+    {
+        // No audio: no decodes ever apply, so the slot starts close it, two slots after the decode would have.
+        var s = new Sim();
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        s.Step();
+        s.Step("W7LIT ZL2RPA -22");
+        s.Step().Should().Be("ZL2RPA W7LIT R-19");
+        var held = s.Now;
+        s.E.Hold(held);
+        var heldSlot = s.Slot;
+
+        s.E.PlanTransmission(s.Start(heldSlot + ContactEngine.HeldSlots + 1), Mode.Ft8, s.Start(heldSlot + ContactEngine.HeldSlots + 1)).Should().BeNull();
+        s.E.Holding.Should().BeTrue();
+        s.E.PlanTransmission(s.Start(heldSlot + ContactEngine.HeldSlots + 2), Mode.Ft8, s.Start(heldSlot + ContactEngine.HeldSlots + 2)).Should().BeNull();
+        s.E.InContact.Should().BeFalse();
+        s.E.View!.Outcome.Should().Be(ContactOutcome.Abandoned);
+    }
+
+    [Fact]
+    public void Hold_ThenCallAnotherStation_KeptContactClosedAtOnce()
+    {
+        var s = new Sim();
+        s.E.CallStation("ZL2RPA", "RF70", -19, SlotParity.Odd, 1500, Sim.T0);
+        s.Step();
+        s.Step("W7LIT ZL2RPA -22");
+        s.Step().Should().Be("ZL2RPA W7LIT R-19");
+        s.E.Hold(s.Now);
+
+        s.E.CallStation("JA1QRS", "PM95", -8, SlotParity.Odd, 1500, s.Now);
+
+        s.E.Holding.Should().BeFalse();
+        s.E.View!.DxCall.Should().Be("JA1QRS");
+        s.Step().Should().BeNull("this is the other station's slot");
+        s.Step().Should().Be("JA1QRS W7LIT DN40");
     }
 
     [Fact]
