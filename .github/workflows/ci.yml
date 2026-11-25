@@ -12,8 +12,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - name: Install jt9, ft8code, Hamlib, PortAudio and PulseAudio
-        run: sudo apt-get update && sudo apt-get install -y wsjtx libhamlib-utils libportaudio2 pulseaudio pulseaudio-utils libasound2-plugins squashfs-tools zstd
+      - name: Install jt9, ft8code, Hamlib, PortAudio, PulseAudio and Mosquitto
+        run: sudo apt-get update && sudo apt-get install -y wsjtx libhamlib-utils libportaudio2 pulseaudio pulseaudio-utils libasound2-plugins squashfs-tools zstd mosquitto
+      - name: Require the Mosquitto tests
+        # The MQTT tests against a real Mosquitto broker (each starts its own on a free port) fail here rather than skip
+        # if the broker is missing, so the release build always checks Costas against what Home Assistant users run.
+        run: echo "COSTAS_REQUIRE_MOSQUITTO=1" >> "$GITHUB_ENV"
       - name: Start a loopback sound card
         # A PulseAudio null sink whose monitor is the default source: what the Linux backend plays through ALSA's
         # "pulse" device comes back on its input, so the loopback test can check transmit audio end to end.
