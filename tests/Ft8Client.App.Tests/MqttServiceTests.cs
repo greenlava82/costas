@@ -104,7 +104,8 @@ public sealed class MqttServiceTests : IDisposable
         retained.Should().ContainKey(st.Topics.Discovery);
         retained[st.Topics.Tx].Should().Be("OFF");
         retained[st.Topics.Session].Should().Contain("\"state\":\"off\"");
-        st.Session.Snapshot.Services[ServiceNames.Mqtt].Health.Should().Be(ServiceHealth.Ok);
+        // "Publishing" is reported just after "online" goes out, so wait for it rather than read it at once.
+        await Until(() => st.Session.Snapshot.Services.GetValueOrDefault(ServiceNames.Mqtt)?.Health == ServiceHealth.Ok);
     }
 
     [Fact]

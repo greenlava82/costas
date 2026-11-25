@@ -348,7 +348,7 @@ public sealed class MqttServiceBehaviourTests
         refused.Message.Should().Be("The broker refused the user name or password.");
         (await other.RetainedAsync()).Should().BeEmpty("a test publishes nothing retained");
         running.Published.Count(m => m.Topic == st.Topics.Availability).Should().Be(1, "the running connection was not touched");
-        st.Status!.Health.Should().Be(ServiceHealth.Ok);
+        await MqttStation.Until(() => st.Status?.Health == ServiceHealth.Ok, "the running connection still says publishing");
     }
 
     // A PSK31 contact with KP4JRS, logged: what the Logged notice and the qso_logged event come from.
