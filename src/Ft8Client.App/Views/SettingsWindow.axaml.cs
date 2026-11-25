@@ -21,7 +21,7 @@ public partial class SettingsWindow : Window
     [
         ("STATION", ["Station", "Transmitting", "Contacts", "PSK and RTTY"]),
         ("FINDING STATIONS", ["Who to call", "Hunt list", "Blocked calls", "Notifications"]),
-        ("CONNECTIONS", ["Logbooks", "PSK Reporter and RBN", "Mobile connection", "Other programs"]),
+        ("CONNECTIONS", ["Logbooks", "PSK Reporter and RBN", "Mobile connection", "Other programs", "MQTT"]),
         ("COSTAS", ["Appearance", "Updates", "Privacy", "Advanced", "Developer"]),
     ];
 

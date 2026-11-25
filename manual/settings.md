@@ -2,7 +2,7 @@
 
 Open **☰ › Settings**. Pages are listed on the left in groups: **Station** (Station, Transmitting, Contacts, PSK and
 RTTY), **Finding stations** (Who to call, Hunt list, Blocked calls, Notifications), **Connections** (Logbooks, PSK Reporter and RBN, Mobile
-connection, Other programs) and **Costas** (Appearance, Updates, Privacy, Advanced, and Developer when developer mode
+connection, Other programs, MQTT) and **Costas** (Appearance, Updates, Privacy, Advanced, and Developer when developer mode
 is on). Press **Save** to keep changes or **Cancel** to drop them.
 
 **Search settings**, at the top of the list, finds a setting by any word in its name or description: type *upload*
@@ -429,6 +429,12 @@ Costas speaks to the DXLab Suite the way WSJT-X does, so DXLab's own WSJT-X sett
   in DXView and Pathfinder as it does for WSJT-X.
 - **Highlights**: when a program sends WSJT-X's *Highlight Callsign* message for a needed station, the colours show on
   the [Raw decodes](raw-decodes.md) page.
+
+## MQTT
+
+Publishes station events (the on-air session, transmitting, band, frequency, mode and logged contacts) to an MQTT
+broker for Home Assistant, Node-RED or your own scripts. One way only: nothing on the broker can change Costas. See
+[MQTT publishing](mqtt.md) for the topics and a Home Assistant example.
 
 ## Mobile connection
 

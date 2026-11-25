@@ -163,7 +163,7 @@ public class OnAirSessionTests
     {
         var (s, _, _) = New();
         s.Commit();
-        s.End(SessionEndReason.Halted);
+        s.End(SessionEndReason.RigLost);
 
         s.Commit();
 
@@ -173,7 +173,6 @@ public class OnAirSessionTests
     }
 
     [Theory]
-    [InlineData(SessionEndReason.Halted)]
     [InlineData(SessionEndReason.RigLost)]
     [InlineData(SessionEndReason.AppClosed)]
     public void End_Running_EndsAtOnceWithReason(SessionEndReason reason)

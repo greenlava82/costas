@@ -84,11 +84,10 @@ public static class MqttPayloads
         }.ToJsonString();
     }
 
-    /// <summary>The published name of an end reason: idle_timeout, halted, max_length, rig_lost, app_closed.</summary>
+    /// <summary>The published name of an end reason: idle_timeout, max_length, rig_lost, app_closed.</summary>
     public static string ReasonName(SessionEndReason r) => r switch
     {
         SessionEndReason.IdleTimeout => "idle_timeout",
-        SessionEndReason.Halted => "halted",
         SessionEndReason.MaxLength => "max_length",
         SessionEndReason.RigLost => "rig_lost",
         SessionEndReason.AppClosed => "app_closed",

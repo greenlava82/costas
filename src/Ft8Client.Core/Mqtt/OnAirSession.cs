@@ -17,7 +17,7 @@ namespace Ft8Client.Core.Mqtt;
 /// <item>A session starts when Costas commits to a transmission (a message queued for a slot, a keyboard line, Tune)
 /// or PTT keys, and no session is running.</item>
 /// <item>Each commit and each PTT edge counts as activity. While PTT is keyed the session cannot time out.</item>
-/// <item>It ends after <see cref="OnAirSessionOptions.IdleTimeout"/> with no activity, on Halt, when the radio is
+/// <item>It ends after <see cref="OnAirSessionOptions.IdleTimeout"/> with no activity, when the radio is
 /// lost, when Costas closes, or at <see cref="OnAirSessionOptions.MaxLength"/> (once PTT is released).</item>
 /// </list>
 /// Timers run on the monotonic clock, so a system time change cannot end or stretch a session. Thread-safe;

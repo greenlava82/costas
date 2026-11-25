@@ -14,9 +14,6 @@ public enum SessionEndReason
     /// <summary>No transmission for the idle timeout.</summary>
     IdleTimeout,
 
-    /// <summary>The operator halted transmitting in Costas.</summary>
-    Halted,
-
     /// <summary>The session reached its maximum length and was ended as a failsafe.</summary>
     MaxLength,
 

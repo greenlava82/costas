@@ -47,7 +47,7 @@ public static class HaDiscovery
                 ["idle", "listening", "calling_cq", "in_qso"]),
             ["session_end_reason"] = Enum(dev, "session_end_reason", "Session end reason", topics.Session,
                 "{{ value_json.reason if value_json.reason else 'none' }}",
-                ["none", "idle_timeout", "halted", "max_length", "rig_lost", "app_closed"]),
+                ["none", "idle_timeout", "max_length", "rig_lost", "app_closed"]),
             ["band"] = Sensor(dev, "band", "Band", topics.State, "{{ value_json.band }}"),
             ["mode"] = Sensor(dev, "mode", "Mode", topics.State, "{{ value_json.mode }}"),
             ["frequency"] = Frequency(dev, topics.State),
