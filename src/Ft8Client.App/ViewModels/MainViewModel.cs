@@ -616,6 +616,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         var tonight = TonightRows(s);
         Operate.Units = SettingsMapper.Units(_host.Settings.Current);
         Operate.Ranking = SettingsMapper.ToRanking(_host.Settings.Current);
+        Operate.ShowRepeats = _host.Settings.Current.Ranking.ShowRepeats;
         Operate.DoubleClickSwitches = _host.Settings.Current.Operating.DoubleClickSwitches;
         Operate.ShowCqModifier(_host.Settings.Current.Operating.CqModifier, SettingsMapper.ContestOf(_host.Settings.Current.Operating.Contest));
         Operate.Apply(s, tonight.Rows, tonight.Total);

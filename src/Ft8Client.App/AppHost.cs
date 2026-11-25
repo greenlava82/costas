@@ -590,6 +590,7 @@ public sealed class AppHost : IAsyncDisposable
         Remote = new RemoteControlService(Session, Settings, Secrets, Clock, new HostTuning(this), () => new RemoteContext
         {
             Units = SettingsMapper.Units(Settings.Current),
+            ShowRepeats = Settings.Current.Ranking.ShowRepeats,
             QrzName = Session.NameOf,
             QrzLookup = Session.LookupOf,
             Log = () => Session.LogIndex,

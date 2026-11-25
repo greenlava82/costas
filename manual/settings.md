@@ -183,7 +183,10 @@ line*.
   which outranks a new call. Use ▲ ▼ to reorder.
 - **Rank stations that hear me higher (from PSK Reporter)**: on.
 - **Only list stations that are calling CQ**: on. Off also lists stations finishing a contact.
-- **Hide stations I have already worked on this band**: on. They are listed in **Repeats** under Next in line instead.
+- **Show Repeats: stations I have already worked on this band**: on. Stations already in your log on this band and
+  mode are never in Next in line (except one at a park you have not worked); [Repeats](operate.md#repeats) lists them
+  under Next in line so you can work a friend or a regular again. Calling one from Repeats logs another contact. Off
+  hides Repeats on the desk and on the phone.
 - **Leave out long shots (signals too weak to likely complete)**: off.
 - **Count a country or state as worked only when confirmed**: off.
     - **Count only LoTW confirmations (what DXCC and WAS credit)**: on. Off counts QRZ, eQSL and card confirmations too.
@@ -191,6 +194,11 @@ line*.
 - **Keep CQ callers listed**: 2 minutes. How long a station calling CQ stays in Next in line after it was last heard.
   Choices run from *Only while heard every slot* (the list drops a station the first slot it is missed) to 15
   minutes. A station heard working someone else leaves the list straight away whatever this says.
+- **Worked stations count as new again**: *Never (any contact makes it a repeat)*. A station you have worked on this
+  band and mode goes to Repeats. Pick *After 7 days*, *30 days*, *90 days*, *6 months*, *1 year*, *2 years* or
+  *5 years* to have it count as a new call again once your last contact with it on this band and mode is that old:
+  it moves back into Next in line (and so into Auto-call) tagged *New call*, and its **Last worked** column shows
+  when you last worked it. A contact on another band or mode doesn't count either way.
 - **Parks on the Air: Show which park a station is activating (POTA spots)**: on. Costas reads the public spot list
   at pota.app every two minutes while it runs and shows *New park* or *Park* with the reference under **Why**
   ([Operate](operate.md#next-in-line)). When you log a contact with a spotted activator, the park goes into the log

@@ -766,6 +766,8 @@ function renderStations(s) {
       if (u.closing) box.append(el("div", "s", u.closing));
     }
   }
+  // Settings › Who to call › Show Repeats off hides the card, as on the desk.
+  $("repeats").hidden = s.showRepeats === false;
   list($("repeats"), "repeats", "Repeats", "Already in your log on " + s.frequency.split(" · ")[1], s.repeats,
     "Nobody you have worked on this band is on the air right now.", r => stationRow(r), COLUMNS);
   list($("watching"), "watching", "Watching", "Needed, not callable now", s.watching, "Nobody needed is waiting to become callable.", w => {

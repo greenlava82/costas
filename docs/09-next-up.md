@@ -22,7 +22,7 @@ These keep the current layout and fix what makes it awkward. Ordered by how ofte
 | U2 | Ask before a band, mode, dial or Hunt "Go to" change ends a contact | Matches the phone remote; no surprise lost QSOs | S |
 | U3 | Esc in a text box no longer ends the contact (owner's call) | Clearing Log search currently abandons a QSO | S |
 | U4 | Countdowns that tick: contact card "N s left", Repeats, "Went quiet N s ago" | They freeze between updates and read as stale | S |
-| U5 | "Hide stations I've already worked on this band" actually hides them | The setting exists but does nothing | S |
+| U5 | ~~"Hide stations I've already worked on this band" actually hides them~~ Done (issue #205): the dead checkbox is now **Show Repeats**, which hides the Repeats card on the desk and phone | The setting existed but did nothing | S |
 | U6 | Status line gets a tooltip and room at narrow widths | Fault messages are cut to ~110 px and unreadable | S |
 | U7 | Remember window position and maximized state; keep it on a visible screen | Costas can reopen off-screen or at -32000 after closing minimized | S |
 | U8 | One copy at a time, and a visible error if start-up fails | A second copy fights over the COM port; a locked database just means Costas doesn't open | S |

@@ -99,8 +99,12 @@ public sealed class LogIndex
     /// <param name="modeKey">The mode key from <see cref="LogModeKey"/> (<c>FT8</c>, <c>PSK31</c>, ...).</param>
     /// <param name="tierOrder">Order of the four need tags; <see cref="DefaultTierOrder"/> if null.</param>
     /// <param name="confirmedOnly">Count only confirmed contacts for country, band and grid.</param>
+    /// <param name="callWorkedSinceUtc">
+    /// When set, the call counts as worked on this band and mode only with a contact at or after this time, so a station
+    /// last worked before it is a new call again. Null counts any contact ever.
+    /// </param>
     public NeedResult Need(string call, string? entityKey, string? grid, string band, string modeKey,
-                           IReadOnlyList<NeedTag>? tierOrder = null, bool confirmedOnly = false)
+                           IReadOnlyList<NeedTag>? tierOrder = null, bool confirmedOnly = false, DateTime? callWorkedSinceUtc = null)
     {
         var order = tierOrder ?? DefaultTierOrder;
         band = band.ToLowerInvariant();
@@ -108,7 +112,7 @@ public sealed class LogIndex
 
         for (var i = 0; i < order.Count; i++)
         {
-            if (Matches(order[i], call, entityKey, grid, band, modeKey, confirmedOnly)) return new NeedResult(order[i], i + 1);
+            if (Matches(order[i], call, entityKey, grid, band, modeKey, confirmedOnly, callWorkedSinceUtc)) return new NeedResult(order[i], i + 1);
         }
         return new NeedResult(NeedTag.Worked, 5);
     }
@@ -148,6 +152,17 @@ public sealed class LogIndex
     /// <summary>True when this call has a contact on this band and mode.</summary>
     public bool CallWorked(string call, string band, string modeKey) =>
         _calls.Contains((band.ToLowerInvariant(), modeKey.ToUpperInvariant(), Callsign.Normalize(call)));
+
+    /// <summary>True when this call has a contact on this band and mode at or after <paramref name="sinceUtc"/>.</summary>
+    /// <param name="call">The call.</param>
+    /// <param name="band">The band.</param>
+    /// <param name="modeKey">The mode key.</param>
+    /// <param name="sinceUtc">The earliest contact time that counts, UTC.</param>
+    public bool CallWorkedSince(string call, string band, string modeKey, DateTime sinceUtc) =>
+        CallWorked(call, band, modeKey)
+        && _byCall.TryGetValue(Callsign.Normalize(call), out var list)
+        && list.Any(c => c.DateUtc >= sinceUtc && string.Equals(c.Band, band, StringComparison.OrdinalIgnoreCase)
+                         && string.Equals(c.ModeKey, modeKey, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Entities worked on a band.</summary>
     public int EntitiesWorkedOnBand(string band) => _entitiesByBand.TryGetValue(band.ToLowerInvariant(), out var s) ? s.Count : 0;
@@ -192,12 +207,13 @@ public sealed class LogIndex
     public LogContact? LastContactWith(string call) =>
         _byCall.TryGetValue(Callsign.Normalize(call), out var list) ? list.MaxBy(c => c.DateUtc) : null;
 
-    private bool Matches(NeedTag tag, string call, string? entityKey, string? grid, string band, string modeKey, bool confirmedOnly) => tag switch
+    private bool Matches(NeedTag tag, string call, string? entityKey, string? grid, string band, string modeKey, bool confirmedOnly,
+                         DateTime? callWorkedSinceUtc) => tag switch
     {
         NeedTag.NewCountry => entityKey is not null && !EntityWorked(entityKey, confirmedOnly),
         NeedTag.NewBand => entityKey is not null && EntityWorked(entityKey, confirmedOnly) && !EntityWorkedOnBand(entityKey, band, confirmedOnly),
         NeedTag.NewGrid => Grid.Grid4(grid) is not null && !GridWorked(grid!, confirmedOnly),
-        NeedTag.NewCall => !CallWorked(call, band, modeKey),
+        NeedTag.NewCall => callWorkedSinceUtc is { } since ? !CallWorkedSince(call, band, modeKey, since) : !CallWorked(call, band, modeKey),
         _ => false,
     };
 

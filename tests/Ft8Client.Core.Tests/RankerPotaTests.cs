@@ -34,7 +34,7 @@ public class RankerPotaTests
             new PotaSpot("K3GHI", 14_075_500, "FT8", "US-0002", null, null, T0),
             new PotaSpot("K4JKL/P", 14_075_800, "FT8", "US-0003", null, null, T0),
         ], T0);
-        return Ranker.Rank(new RankInput(t.Stations, log, null, new RankingSettings { PreferNewParks = preferNewParks, HideWorked = false },
+        return Ranker.Rank(new RankInput(t.Stations, log, null, new RankingSettings { PreferNewParks = preferNewParks },
             TestData.Countries.Lookup("W7LIT"), "20m", "FT8", T0 + TimeSpan.FromSeconds(16), TestData.Countries, Parks: withParks ? parks : null));
     }
 

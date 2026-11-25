@@ -16,6 +16,9 @@ namespace Ft8Client.App.Remote;
 /// <summary>What the phone's state is built from besides the session snapshot: the same sources the Operate view reads.</summary>
 public sealed record RemoteContext
 {
+    /// <summary>Whether Repeats is shown (Settings › Who to call › Show Repeats). Off sends an empty list and hides the card.</summary>
+    public bool ShowRepeats { get; init; } = true;
+
     /// <summary>Distance units.</summary>
     public DistanceUnit Units { get; init; } = DistanceUnit.Miles;
 

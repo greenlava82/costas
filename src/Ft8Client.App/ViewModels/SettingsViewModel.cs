@@ -99,7 +99,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         foreach (var t in SettingsMapper.ToRanking(s.Ranking).TierOrder) TierOrder.Add(new TierItem(t, StationText.Need(t)));
         PreferHearsMe = s.Ranking.PreferHearsMe;
         OnlyCallingCq = s.Ranking.OnlyCallingCq;
-        HideWorked = s.Ranking.HideWorked;
+        ShowRepeats = s.Ranking.ShowRepeats;
         SkipLongShots = s.Ranking.SkipLongShots;
         ConfirmedOnly = s.Ranking.ConfirmedOnly;
         ConfirmedByLotw = !string.Equals(s.Ranking.ConfirmedBy, "any", StringComparison.OrdinalIgnoreCase);
@@ -125,6 +125,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         HuntBand = HuntBands[0];
         HuntKind = HuntKinds[0];
         KeepCqCallers = KeepChoiceFor(s.Ranking.KeepCqCallersMinutes);
+        NewAgainAfter = NewAgainChoiceFor(s.Ranking.NewAgainAfterDays);
         LogbookEnabled = s.Qrz.LogbookEnabled;
         UploadOnComplete = s.Qrz.UploadOnComplete;
         SyncMinutes = s.Qrz.SyncMinutes.ToString(CultureInfo.InvariantCulture);
@@ -762,9 +763,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool OnlyCallingCq { get; set; }
 
-    /// <summary>Hide worked.</summary>
+    /// <summary>Show the Repeats list of stations already worked on this band.</summary>
     [ObservableProperty]
-    public partial bool HideWorked { get; set; }
+    public partial bool ShowRepeats { get; set; }
 
     /// <summary>Skip long shots.</summary>
     [ObservableProperty]
@@ -984,6 +985,35 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     private static double GreatCircleMiles(int km) => Core.Geo.GreatCircle.ToMiles(km);
+
+    /// <summary>Choices for when a station worked on this band and mode counts as new again, with their days (0 never).</summary>
+    public static readonly IReadOnlyList<(string Text, int Days)> NewAgainChoices =
+    [
+        ("Never (any contact makes it a repeat)", 0), ("After 7 days", 7), ("After 30 days", 30), ("After 90 days", 90),
+        ("After 6 months", 182), ("After 1 year", 365), ("After 2 years", 730), ("After 5 years", 1826),
+    ];
+
+    /// <summary>The new-again choices as shown.</summary>
+    public IReadOnlyList<string> NewAgainAfterChoices { get; } = NewAgainChoices.Select(c => c.Text).ToList();
+
+    /// <summary>When a station already worked on this band counts as new again.</summary>
+    [ObservableProperty]
+    public partial string NewAgainAfter { get; set; }
+
+    /// <summary>The choice for stored days: never for 0, else the nearest choice not shorter, or the longest.</summary>
+    public static string NewAgainChoiceFor(int days)
+    {
+        if (days <= 0) return NewAgainChoices[0].Text;
+        foreach (var (text, d) in NewAgainChoices) if (d >= days) return text;
+        return NewAgainChoices[^1].Text;
+    }
+
+    /// <summary>Days for a shown choice; 0 (never) when it is not one of the choices.</summary>
+    public static int NewAgainDaysFor(string? choice)
+    {
+        foreach (var (text, d) in NewAgainChoices) if (text == choice) return d;
+        return 0;
+    }
 
     /// <summary>Choices for how long a CQ caller stays in Next in line after it was last heard, with their minutes.</summary>
     public static readonly IReadOnlyList<(string Text, int Minutes)> KeepCqChoices =
@@ -1846,7 +1876,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             s.Ranking.TierOrder = SettingsMapper.TierNames(TierOrder.Select(t => t.Tag));
             s.Ranking.PreferHearsMe = PreferHearsMe;
             s.Ranking.OnlyCallingCq = OnlyCallingCq;
-            s.Ranking.HideWorked = HideWorked;
+            s.Ranking.ShowRepeats = ShowRepeats;
             s.Ranking.SkipLongShots = SkipLongShots;
             s.Ranking.ConfirmedOnly = ConfirmedOnly;
             s.Ranking.ConfirmedBy = ConfirmedByLotw ? "lotw" : "any";
@@ -1863,6 +1893,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             var near = Int(HuntNearby, 50, 5000, 0);
             if (near > 0) s.Hunt.NearbyKm = HuntNearbyUnit == "km" ? near : (int)Math.Round(near * Core.Geo.GreatCircle.KmPerMile);
             s.Ranking.KeepCqCallersMinutes = KeepMinutesFor(KeepCqCallers);
+            s.Ranking.NewAgainAfterDays = NewAgainDaysFor(NewAgainAfter);
             // Only a level typed here replaces the band's level, so one automatic level set meanwhile is kept.
             if (TxGain.Trim() != _loadedTxGain)
             {

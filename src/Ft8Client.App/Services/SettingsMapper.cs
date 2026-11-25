@@ -163,11 +163,11 @@ public static class SettingsMapper
             TierOrder = order,
             PreferHearsMe = r.PreferHearsMe,
             OnlyCallingCq = r.OnlyCallingCq,
-            HideWorked = r.HideWorked,
             SkipLongShots = r.SkipLongShots,
             ConfirmedOnly = r.ConfirmedOnly,
             PreferNewParks = r.PreferNewParks,
             KeepCqCallers = TimeSpan.FromMinutes(Math.Clamp(r.KeepCqCallersMinutes, 0, 60)),
+            NewAgainAfter = r.NewAgainAfterDays > 0 ? TimeSpan.FromDays(Math.Min(r.NewAgainAfterDays, 36_500)) : null,
         };
     }
 
