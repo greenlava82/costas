@@ -108,6 +108,9 @@ public sealed class MqttTestBroker : IAsyncDisposable
         return all.ToDictionary(m => m.Topic, m => m.ConvertPayloadToString(), StringComparer.Ordinal);
     }
 
+    /// <summary>Clients connected now.</summary>
+    public async Task<int> ConnectedClientsAsync() => (await _server.GetClientsAsync()).Count;
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {

@@ -51,11 +51,42 @@ public sealed record OldClassicInstall(string Version, string Folder, string Uni
     private static OldClassicInstall? Read()
     {
         using var key = Registry.LocalMachine.OpenSubKey(UninstallKey);
-        if (key?.GetValue("UninstallString") is not string uninstall) return null;
-        var exe = uninstall.Trim().Trim('"');
-        if (!File.Exists(exe)) return null;
-        var folder = key.GetValue("InstallLocation") as string ?? Path.GetDirectoryName(exe) ?? string.Empty;
-        return new OldClassicInstall(key.GetValue("DisplayVersion") as string ?? string.Empty, folder.TrimEnd('\\'), exe);
+        if (key is null) return null;
+        return FromUninstallEntry(key.GetValue("UninstallString") as string, key.GetValue("InstallLocation") as string,
+            key.GetValue("DisplayVersion") as string, File.Exists);
+    }
+
+    /// <summary>
+    /// The old copy described by its Apps &amp; features entry, or null when the entry names no uninstaller that is still
+    /// on disk. A blank install location falls back to the uninstaller's folder.
+    /// </summary>
+    internal static OldClassicInstall? FromUninstallEntry(string? uninstallString, string? installLocation, string? displayVersion,
+                                                           Func<string, bool> fileExists)
+    {
+        if (string.IsNullOrWhiteSpace(uninstallString)) return null;
+        var exe = uninstallString.Trim().Trim('"');
+        if (exe.Length == 0 || !fileExists(exe)) return null;
+        var folder = string.IsNullOrWhiteSpace(installLocation) ? Path.GetDirectoryName(exe) ?? string.Empty : installLocation.Trim();
+        folder = folder.TrimEnd('\\', '/');
+        if (folder.Length == 0) return null;
+        return new OldClassicInstall(displayVersion?.Trim() ?? string.Empty, folder, exe);
+    }
+
+    /// <summary>
+    /// True when <paramref name="appDir"/> (the running Costas) is not inside this old copy's folder, so the old copy is
+    /// a separate install worth offering to remove. C:\Program Files\Costas does not contain C:\Program Files\Costas2.
+    /// </summary>
+    internal bool IsSeparateFrom(string appDir)
+    {
+        static string Normal(string path) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)).Replace('/', '\\') + "\\";
+        try
+        {
+            return !Normal(appDir).StartsWith(Normal(Folder), StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false; // a folder that cannot be read is not offered
+        }
     }
 
     /// <summary>

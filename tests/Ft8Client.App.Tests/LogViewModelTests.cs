@@ -239,7 +239,7 @@ public class LogViewModelTests
 
         var text = File.ReadAllText(path);
         text.Should().Contain("VK3ABC").And.NotContain("K1ABC");
-        vm.Message.Should().Be("Exported 1 contacts made as K0GST.");
+        vm.Message.Should().Be("Exported 1 contact made as K0GST.");
         vm.StationFilter = LogViewModel.AllStations;
         await vm.ExportAsync(path);
         var folder = Path.GetDirectoryName(path)!;
@@ -358,5 +358,51 @@ public class LogViewModelTests
         await vm.ExportAsync(path);
         File.ReadAllText(path).Should().NotContain("<name:").And.NotContain("<qth:");
         vm.Message.Should().EndWith(" Plain ASCII text; name, QTH and comment left out.");
+    }
+
+    [Fact]
+    public async Task ExportAsync_DefaultFilters_LeavesOutPhoneAndCwAndSaysHowMany()
+    {
+        var db = SqliteDatabase.InMemory(out var keep);
+        using var _ = keep;
+        var repo = new QsoRepository(db);
+        var on = new DateTime(2026, 11, 20, 12, 0, 0, DateTimeKind.Utc);
+        foreach (var (call, mode) in new[] { ("DL1FT", "FT8"), ("DL2SSB", "SSB"), ("DL3CW", "CW") })
+            repo.Insert(new QsoRecord { ProfileId = "p", Call = call, QsoDateOn = on, Band = "20m", Mode = mode, StationCallsign = "W7LIT", CreatedUtc = on, ModifiedUtc = on });
+        var vm = NewVm(repo);
+        var path = Path.Combine(Directory.CreateTempSubdirectory("costas-export").FullName, "log.adi");
+
+        await vm.ExportAsync(path);
+
+        // The list shows digital modes by default, and Export ADIF writes what the list shows: the message must say
+        // that phone and CW contacts were left out, so nobody takes the file for a full backup.
+        File.ReadAllText(path).Should().Contain("DL1FT").And.NotContain("DL2SSB").And.NotContain("DL3CW");
+        vm.Message.Should().Be("Exported 1 contact made as W7LIT. The filters left out 2 contacts.");
+
+        vm.ModeFilter = LogViewModel.AllModes;
+        await vm.ExportAsync(path);
+
+        File.ReadAllText(path).Should().Contain("DL1FT").And.Contain("DL2SSB").And.Contain("DL3CW");
+    }
+
+    [Fact]
+    public void ClearFilters_CustomRange_ClearsTheTypedDatesToo()
+    {
+        var db = SqliteDatabase.InMemory(out var keep);
+        using var _ = keep;
+        var vm = NewVm(new QsoRepository(db));
+        vm.DateFilter = LogViewModel.CustomRange;
+        vm.RangeFrom = "2026-11-20";
+        vm.RangeTo = "garbage";
+        vm.RangeError.Should().NotBeEmpty();
+
+        vm.ClearFiltersCommand.Execute(null);
+
+        vm.DateFilter.Should().Be(LogViewModel.AllTime);
+        vm.IsCustomRange.Should().BeFalse();
+        vm.RangeFrom.Should().BeEmpty();
+        vm.RangeTo.Should().BeEmpty();
+        vm.RangeError.Should().BeEmpty();
+        vm.Filtered.Should().BeFalse();
     }
 }

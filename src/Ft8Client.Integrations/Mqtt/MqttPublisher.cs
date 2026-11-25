@@ -48,6 +48,7 @@ public sealed class MqttPublisher : IAsyncDisposable
     private Task? _loop;
     private IMqttClient? _client;
     private volatile bool _connected;
+    private volatile bool _disposed;
 
     /// <summary>Creates a publisher; nothing connects until <see cref="Start"/>.</summary>
     /// <param name="options">Broker and credentials.</param>
@@ -77,10 +78,14 @@ public sealed class MqttPublisher : IAsyncDisposable
         _loop = Task.Run(() => RunAsync(_cts.Token));
     }
 
-    /// <summary>Queues a message. Never blocks and never throws for broker trouble.</summary>
+    /// <summary>
+    /// Queues a message. Never blocks and never throws for broker trouble, nor once the publisher is disposed: callers
+    /// include the transmitter's PTT events, which must never fail because of MQTT.
+    /// </summary>
     public void Publish(MqttOutgoing message)
     {
         ArgumentNullException.ThrowIfNull(message);
+        if (_disposed) return;
         lock (_gate)
         {
             if (message.Retain)
@@ -95,7 +100,14 @@ public sealed class MqttPublisher : IAsyncDisposable
                 _events.Enqueue(message);
             }
         }
-        _wake.Release();
+        try
+        {
+            _wake.Release();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Disposed while this was queuing: nothing more is sent.
+        }
     }
 
     /// <summary>
@@ -140,6 +152,7 @@ public sealed class MqttPublisher : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await StopAsync([], TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+        _disposed = true;
         _wake.Dispose();
     }
 
