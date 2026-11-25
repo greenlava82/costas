@@ -173,11 +173,14 @@ public sealed class UpdateService : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>Runs the old copy's uninstaller; replaced in tests, which cannot answer Windows' administrator prompt.</summary>
+    internal Func<OldClassicInstall, Task<string?>> RemoveOldCopy { get; set; } = old => old.RemoveAsync();
+
     /// <summary>Removes <see cref="OldCopy"/> (Windows' administrator prompt). Returns null when done, or what went wrong.</summary>
     public async Task<string?> RemoveOldCopyAsync()
     {
         if (OldCopy is not { } old) return null;
-        var error = await old.RemoveAsync().ConfigureAwait(false);
+        var error = await RemoveOldCopy(old).ConfigureAwait(false);
         if (error is null) OldCopy = null;
         Changed?.Invoke();
         return error;
@@ -267,7 +270,7 @@ public sealed class UpdateService : IDisposable
             {
                 if (!OperatingSystem.IsWindows()) return;
                 ClassicInstallCleanup.Run(AppContext.BaseDirectory);
-                if (OldClassicInstall.Find() is { } old && !Path.GetFullPath(AppContext.BaseDirectory).StartsWith(Path.GetFullPath(old.Folder), StringComparison.OrdinalIgnoreCase))
+                if (OldClassicInstall.Find() is { } old && old.IsSeparateFrom(AppContext.BaseDirectory))
                 {
                     OldCopy = old;
                     Changed?.Invoke();
