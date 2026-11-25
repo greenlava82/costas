@@ -13,6 +13,7 @@ using Ft8Client.Audio.Timing;
 using Ft8Client.Core;
 using Ft8Client.Core.Contacts;
 using Ft8Client.Core.Decoding;
+using Ft8Client.Core.Logbook;
 using Ft8Client.Core.Time;
 using Ft8Client.Data.Reference;
 using Ft8Client.Rig;
@@ -43,7 +44,7 @@ public class LateDecodeTests
         public readonly NullAudioOutput Output;
         public readonly List<(string Message, DateTime StartedUtc)> Sent = [];
 
-        public Rig(TimeSpan? commandStartLimit = null)
+        public Rig(TimeSpan? commandStartLimit = null, Func<SessionConfig, SessionConfig>? configure = null)
         {
             Radio = new SimulatedRig(Clock);
             Output = new NullAudioOutput { Now = () => Clock.UtcNow };
@@ -51,6 +52,7 @@ public class LateDecodeTests
             Tx = new Transmitter(Radio, Output, Clock, freqs);
             var config = new SessionConfig { MyCall = "W7LIT", MyGrid = "DN40", FixedTxOffsetHz = 1080 };
             if (commandStartLimit is { } limit) config = config with { CommandStartLimit = limit };
+            if (configure is not null) config = configure(config);
             Session = new Session(config, Decoder, new SilentSource(), Tx, Clock, ReferenceData.LoadCountries(), freqs);
             Session.Transmitting += (tx, at) => Sent.Add((tx.Plan.Message, at));
             Slots = new SlotClock(Clock, Mode.Ft8);
@@ -522,6 +524,31 @@ public class LateDecodeTests
         r.Session.Snapshot.LastLogged!.Call.Should().Be("N8WCR");
         r.Session.Snapshot.LastLogged.Should().BeSameAs(before.LastLogged, "N8WCR is logged once");
         r.Session.Snapshot.Contact!.DxCall.Should().Be("K1ABC");
+    }
+
+    [Theory]
+    [InlineData(365, NeedTag.NewCall)]
+    [InlineData(0, NeedTag.Worked)]
+    public async Task Record_StationWorkedLongAgo_LoggedNeedFollowsNewAgainSetting(int newAgainDays, NeedTag expected)
+    {
+        // Issue #205: a station last worked on this band and mode longer ago than "count as new again" is listed as a new
+        // call; the contact is logged with that tag too, not as a repeat.
+        var r = new Rig(configure: c => c with
+        {
+            Ranking = c.Ranking with { NewAgainAfter = newAgainDays > 0 ? TimeSpan.FromDays(newAgainDays) : null },
+        });
+        r.Session.SetLogIndex(LogIndex.Build(
+            [new LogContact("N8WCR", "20m", "FT8", "EN81", ReferenceData.LoadCountries().Lookup("N8WCR")?.Entity.Key, null, false, CqSlot.AddYears(-2))]));
+        await r.CallN8wcrAsync();
+        r.Decoder.Script(ReportSlot, TimeSpan.FromSeconds(0.5), "W7LIT N8WCR -16");
+        r.Decoder.Script(MySecondSlot.AddSeconds(15), TimeSpan.FromSeconds(0.5), "W7LIT N8WCR RR73");
+
+        await r.RunUntilAsync(MySecondSlot.AddSeconds(31));
+
+        var logged = r.Session.Snapshot.LastLogged;
+        logged.Should().NotBeNull();
+        logged!.Call.Should().Be("N8WCR");
+        logged.Need.Should().Be(expected);
     }
 
     [Fact]
