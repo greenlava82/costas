@@ -164,13 +164,26 @@ public class RankerMockupScenarioTests
     }
 
     [Fact]
-    public void Rank_StationCallingMe_RanksFirstWithinTierAndIsListed()
+    public void Rank_StationCallingMeInNewestSlot_RanksFirstAndIsListed()
     {
+        // Heard in the latest slot, after everyone else (issue #200), so it leads even the new countries.
         var extra = Make("VE7XYZ", "CN89", -20, LastOdd) with { State = StationState.CallingMe, Parity = SlotParity.Odd };
         var r = Ranker.Rank(new RankInput([.. Stations(), extra], Log(), Reports(), new RankingSettings(), TestData.Countries.Lookup("W7LIT"), "20m", "FT8", Now));
-        r.Line.Select(x => x.Station.Call).Skip(4).First().Should().Be("VE7XYZ");
+        r.Line.Select(x => x.Station.Call).First().Should().Be("VE7XYZ");
         r.CallingMe.Select(x => x.Station.Call).Should().Equal("VE7XYZ");
         StationText.DoingNow(extra).Should().Be("Calling you");
+    }
+
+    [Fact]
+    public void Rank_StationsFromTwoSlots_NewestSlotFirstThenUsualOrderWithinEach()
+    {
+        // Issue #200: the latest slot's stations lead, so the top row can be called at once; each slot keeps the usual order.
+        var older = Make("ZL2RPA", "RF70", -19, LastEven) with { State = StationState.CallingCq, CqStreak = 3 };
+        var newerStrong = Make("K1ABC", "FN42", -3, LastOdd) with { State = StationState.CallingCq, CqStreak = 3, Parity = SlotParity.Odd };
+        var newerNew = Make("JA1QRS", "PM95", -18, LastOdd) with { State = StationState.CallingCq, CqStreak = 3, Parity = SlotParity.Odd };
+        var r = Ranker.Rank(new RankInput([older, newerStrong, newerNew], Log(), Reports(), new RankingSettings(), TestData.Countries.Lookup("W7LIT"),
+            "20m", "FT8", Now));
+        r.Line.Select(x => x.Station.Call).Should().Equal("JA1QRS", "K1ABC", "ZL2RPA");
     }
 
     [Theory]

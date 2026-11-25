@@ -217,7 +217,8 @@ narrows **Chance** and **Where** (long text ends in "…"; hover for the full re
 **Last worked**, **Signal** and the **#** rank, in that order. **Last heard** is the last to go. Widen the window and
 they come back at the widths you set.
 
-How the order works: stations are grouped by need (new DXCC first), then by chance, then by how well they hear
+How the order works: stations heard in the most recent slot come first, so the top row is one you can call right
+away. Within a slot, stations are grouped by need (new DXCC first), then by chance, then by how well they hear
 you, then by their signal. The **ⓘ** beside the title shows the current rules in one sentence; click it to change
 them (the same options as [Settings › Who to call](settings.md#who-to-call)).
 

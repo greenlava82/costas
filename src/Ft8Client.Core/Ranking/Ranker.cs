@@ -128,7 +128,11 @@ public static class Ranker
 
     private static int CompareLine(RankedStation a, RankedStation b, RankingSettings settings)
     {
-        var c = LineBucket(a).CompareTo(LineBucket(b));
+        // Stations heard in the most recent slot first, so the top row can be called at once; within a slot the usual
+        // order (owner decision 2026-11-24, issue #200).
+        var c = b.Station.LastHeardUtc.CompareTo(a.Station.LastHeardUtc);
+        if (c != 0) return c;
+        c = LineBucket(a).CompareTo(LineBucket(b));
         if (c != 0) return c;
         c = (b.ContestTag is not null).CompareTo(a.ContestTag is not null); // in a contest, a new multiplier first
         if (c != 0) return c;
