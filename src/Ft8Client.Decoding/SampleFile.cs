@@ -84,6 +84,7 @@ public sealed record SampleFile(string Path, SlotAudio Audio, DecodeContext? Gol
     private static Mode GuessMode(string path, int sampleCount)
     {
         var dir = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)) ?? string.Empty);
+        if (string.Equals(dir, "wspr", StringComparison.OrdinalIgnoreCase) || sampleCount >= 100 * ModeInfo.DecoderSampleRate) return Mode.Wspr;
         if (string.Equals(dir, "ft4", StringComparison.OrdinalIgnoreCase)) return Mode.Ft4;
         if (string.Equals(dir, "ft8", StringComparison.OrdinalIgnoreCase)) return Mode.Ft8;
         return sampleCount < 8 * ModeInfo.DecoderSampleRate ? Mode.Ft4 : Mode.Ft8;

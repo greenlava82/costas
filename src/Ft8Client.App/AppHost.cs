@@ -15,6 +15,7 @@ using Ft8Client.Audio.Backends;
 using Ft8Client.Audio.Dsp;
 using Ft8Client.Audio.Timing;
 using Ft8Client.Core;
+using Ft8Client.Core.Wspr;
 using Ft8Client.Core.Bands;
 using Ft8Client.Core.Decoding;
 using Ft8Client.Core.Geo;
@@ -122,6 +123,7 @@ public sealed class AppHost : IAsyncDisposable
         SyncState = new SyncStateRepository(Database);
         Cache = new CallsignCacheRepository(Database);
         Spots = new SpotRepository(Database);
+        WsprSpots = new WsprSpotRepository(Database);
         BandStats = new BandStatRepository(Database);
         Countries = ReferenceData.LoadCountries(paths);
         Frequencies = ReferenceData.LoadFrequencies(paths);
@@ -173,6 +175,9 @@ public sealed class AppHost : IAsyncDisposable
 
     /// <summary>Reports of my signal.</summary>
     public SpotRepository Spots { get; }
+
+    /// <summary>WSPR signals heard (docs/10-wspr.md).</summary>
+    public WsprSpotRepository WsprSpots { get; }
 
     /// <summary>Per-slot decode counts.</summary>
     public BandStatRepository BandStats { get; }
@@ -389,6 +394,7 @@ public sealed class AppHost : IAsyncDisposable
             Log.Warning(ex, "Could not move saved credentials to their new names");
         }
         Jt9Decoder.CleanTempRoot(Paths.Temp);
+        WsprdDecoder.CleanTempRoot(Paths.Temp);
 
         // Each jt9 found is tried until one starts, so a bundled copy that cannot run here gives way to an installed one.
         Jt9Path = Jt9Locator.Find(s.Paths.Jt9, path =>
@@ -461,6 +467,16 @@ public sealed class AppHost : IAsyncDisposable
             LogHold, () => !Simulating && Settings.Current.Profile.Cloudlog.UploadOnComplete,
             () => !Simulating && Settings.Current.Profile.ClubLog.UploadOnComplete);
         Session = new Session(config, decoder, source, Transmitter, Clock, Countries, Frequencies, log);
+        // WSPR is decoded by wsprd, which WSJT-X ships beside jt9. Without it WSPR still opens, and says why it hears nothing.
+        if (WsprdLocator.Find(Jt9Path) is { } wsprd)
+        {
+            Session.AttachWspr(new WsprdDecoder(new WsprdOptions(wsprd, Paths.Temp), Guard), WsprSpots);
+            Log.Information("WSPR decoder: {Wsprd}", wsprd);
+        }
+        else
+        {
+            Session.AttachWspr(new NullWsprDecoder("wsprd not found. Reinstall Costas, or install WSJT-X."), WsprSpots);
+        }
         // What follows the start of a transmission (the log write, the journal, the screen) runs on its own thread, in
         // order, so a slow disk or a locked database never holds up the slot thread, which also releases PTT.
         _work = new WorkQueue("SessionWork", ex => Log.Error(ex, "Deferred session work failed"));

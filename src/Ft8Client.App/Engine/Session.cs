@@ -222,6 +222,14 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// <summary>Slot clock events, on the slot thread. Never waits on I/O.</summary>
     public void OnSlotEvent(SlotEvent e)
     {
+        // WSPR has its own path: its slots are 2 minutes, decoded by wsprd, with no contact engine.
+        if (ModeInfo.IsWspr(Config.Mode))
+        {
+            OnWsprSlotEvent(e);
+            return;
+        }
+        // The clock changes mode at a slot boundary: the last WSPR slot after a switch to another mode is not for it.
+        if (e.Mode == Mode.Wspr && !ModeInfo.IsKeyboard(Config.Mode)) return;
         // In a keyboard mode nothing is cut into slots: text arrives through ApplyText as it is read.
         if (ModeInfo.IsKeyboard(Config.Mode))
         {
@@ -946,6 +954,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// </summary>
     public async Task<bool> CallStationAsync(string call)
     {
+        if (RefuseWspr()) return false;
         if (ModeInfo.IsKeyboard(Config.Mode)) return CallStation(call);
         bool switching;
         lock (_gate)
@@ -971,6 +980,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     // afterHalt: my transmission in this slot was just cut off for this call, so the slot may be used again.
     private bool CallStation(string call, bool afterHalt)
     {
+        if (RefuseWspr()) return false;
         if (ModeInfo.IsKeyboard(Config.Mode)) return CallKeyboardStation(call);
         lock (_gate)
         {
@@ -1060,6 +1070,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// <summary>Starts or stops calling CQ.</summary>
     public void ToggleCq()
     {
+        if (RefuseWspr()) return;
         if (ModeInfo.IsKeyboard(Config.Mode))
         {
             ToggleKeyboardCq();
@@ -1086,6 +1097,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// <summary>Stops calling CQ; does nothing when CQ is not on, so a tap that arrives late never starts it.</summary>
     public void StopCq()
     {
+        if (ModeInfo.IsWspr(Config.Mode)) return;
         if (ModeInfo.IsKeyboard(Config.Mode))
         {
             StopKeyboardCq();
@@ -1114,6 +1126,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// <summary>Answers a waiting caller when the current contact ends.</summary>
     public void AnswerAfterThisContact(string call)
     {
+        if (RefuseWspr()) return;
         lock (_gate) _engine.AnswerAfterThisContact(call, _clock.UtcNow);
         Publish();
     }
@@ -1692,8 +1705,10 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     {
         lock (_gate)
         {
-            if (ModeInfo.IsSlotted(_config.Mode)) return false;
-            _fault = $"In {ModeInfo.Name(_config.Mode)}, send with the macro keys (F1 to F5) or type and press Enter.";
+            if (ModeInfo.IsWspr(_config.Mode)) _fault = WsprRefusal;
+            else if (ModeInfo.IsSlotted(_config.Mode)) return false;
+            else
+                _fault = $"In {ModeInfo.Name(_config.Mode)}, send with the macro keys (F1 to F5) or type and press Enter.";
         }
         Publish();
         return true;
@@ -1812,6 +1827,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 UnnamedSignals = keyboard ? _unnamedSignals : [],
                 Reading = keyboard ? ShownReading() : null,
                 LiveLine = keyboard ? LiveLine(now) : null,
+                Wspr = WsprViewAt(now),
             };
             _snapshot = snap;
         }

@@ -28,6 +28,7 @@ public sealed partial class Session
     /// <summary>Turns Auto-call on or off (an operator action). Turning it on stops a CQ in progress.</summary>
     public void SetAutoCall(bool on)
     {
+        if (on && RefuseWspr()) return;
         lock (_gate)
         {
             var now = _clock.UtcNow;

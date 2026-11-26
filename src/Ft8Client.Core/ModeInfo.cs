@@ -23,9 +23,9 @@ public static class ModeInfo
 
     /// <summary>
     /// The modes an operator can pick today. <see cref="TryParse"/> accepts only these, so settings, the remote and the
-    /// frequency table cannot switch to a mode whose receive is not built yet. PSK31, PSK63 and RTTY receive only so far.
+    /// frequency table cannot switch to a mode whose receive is not built yet. PSK31, PSK63 and RTTY receive only so far; WSPR receives (docs/10-wspr.md W1) and does not transmit yet.
     /// </summary>
-    public static IReadOnlyList<Mode> Operable { get; } = [Mode.Ft8, Mode.Ft4, Mode.Psk31, Mode.Psk63, Mode.Rtty];
+    public static IReadOnlyList<Mode> Operable { get; } = [Mode.Ft8, Mode.Ft4, Mode.Psk31, Mode.Psk63, Mode.Rtty, Mode.Wspr];
 
     /// <summary>
     /// True for the modes that run the FT8/FT4 pipeline (<c>jt9</c>, the contact engine, the early pass): FT8 and FT4.

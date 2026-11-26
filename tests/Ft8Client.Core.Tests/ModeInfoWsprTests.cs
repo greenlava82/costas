@@ -53,10 +53,14 @@ public class ModeInfoWsprTests
     public void Name_Wspr_IsWspr() => ModeInfo.Name(Mode.Wspr).Should().Be("WSPR");
 
     [Fact]
-    public void TryParse_Wspr_ReturnsFalse() => ModeInfo.TryParse("WSPR", out _).Should().BeFalse();
+    public void TryParse_Wspr_Parses()
+    {
+        ModeInfo.TryParse("wspr", out var mode).Should().BeTrue();
+        mode.Should().Be(Mode.Wspr);
+    }
 
     [Fact]
-    public void Operable_NotYetBuilt_LeavesOutWspr() => ModeInfo.Operable.Should().NotContain(Mode.Wspr);
+    public void Operable_AfterW1_IncludesWspr() => ModeInfo.Operable.Should().Contain(Mode.Wspr);
 
     [Fact]
     public void JtNineHelpers_Wspr_Throw()

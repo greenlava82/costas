@@ -86,8 +86,12 @@ public sealed class SlotClock
     /// </summary>
     public void SetMode(Mode mode)
     {
-        if (!ModeInfo.HasSlots(mode)) return;
-        lock (_gate) _pendingMode = mode;
+        lock (_gate)
+        {
+            // A keyboard mode keeps the last slotted mode's timing, except that WSPR's 2-minute marks make no sense for it: FT8.
+            if (!ModeInfo.HasSlots(mode)) mode = _mode == Mode.Wspr ? Mode.Ft8 : _mode;
+            _pendingMode = mode == _mode ? null : mode;
+        }
     }
 
     /// <summary>Offset of a mark from the slot start.</summary>

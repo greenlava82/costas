@@ -58,6 +58,7 @@ public sealed partial class Session
     /// </summary>
     public string? SendMacro(int key)
     {
+        if (ModeInfo.IsWspr(Config.Mode)) return WsprRefusal;
         string? why;
         lock (_gate)
         {
@@ -79,6 +80,7 @@ public sealed partial class Session
     public string? SendText(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
+        if (ModeInfo.IsWspr(Config.Mode)) return WsprRefusal;
         string? why;
         lock (_gate)
         {
@@ -99,6 +101,7 @@ public sealed partial class Session
     public string? KeyEnter(string typed, bool onAir = false)
     {
         ArgumentNullException.ThrowIfNull(typed);
+        if (ModeInfo.IsWspr(Config.Mode)) return WsprRefusal;
         if (_keys.Active)
         {
             // Text typed into the line just before the over started joins the over rather than being lost.

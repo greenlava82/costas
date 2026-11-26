@@ -25,7 +25,7 @@ namespace Ft8Client.Decoding;
 /// folder. Both are kept in the temp root and copied into each new scratch folder, so a type 3 message whose call was
 /// heard earlier is resolved, and a run does not plan from scratch.
 /// </remarks>
-public sealed class WsprdDecoder
+public sealed class WsprdDecoder : IWsprDecoder
 {
     private static readonly string[] Kept = ["hashtable.txt", "wspr_wisdom.dat"];
     private readonly WsprdOptions _options;

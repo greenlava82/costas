@@ -7,9 +7,8 @@
 // see the GNU General Public License in LICENSE for details.
 
 using Ft8Client.Core.Decoding;
-using Ft8Client.Core.Wspr;
 
-namespace Ft8Client.Decoding;
+namespace Ft8Client.Core.Wspr;
 
 /// <summary>Outcome of decoding one WSPR slot.</summary>
 /// <param name="Spots">The signals heard, in decoder order.</param>

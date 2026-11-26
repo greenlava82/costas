@@ -113,3 +113,14 @@ Step-by-step directions, files, traps and stop-and-ask points: `10-wspr-build.md
 | W6 | Band hopping | Automated: hop schedule tests with a manual clock; first slot after a hop never transmits. Manual: an evening of hopping across three bands |
 
 Status (2026-11-26, `drt/wspr-plan`): W0 built. V-WSPR1 to V-WSPR8 are in `08-open-questions.md` Findings; `Mode.Wspr`, `ModeInfo.IsKeyboard`/`IsWspr`/`HasSlots` and `WsprTiming` are in Core; WSPR is not yet operable. Owner decisions taken on the way: WSJT-X's slot table (6.2), HTTPS upload (5), the 200 Hz guard window (3).
+
+Status (W1, 2026-11-26): receive is built. WSPR is in the Mode menu (`ModeInfo.Operable`), with dial frequencies for 160 m to 6 m (not 60 m: WSJT-X has none) in `frequencies.json`; `Session.OnWsprSlotEvent` records the 2-minute slot, hands it to `WsprdDecoder` at the 114.048 s cut-off, parses it with `WsprSpotParser`, files the signals in `wspr_spot` (migration 008) and shows them in `SessionSnapshot.Wspr`; FT8, FT4, macro and Auto-call commands refuse with "Not in WSPR mode."; `--simulate` replays `samples/wspr/`. The WSPR screen itself is W5: until then WSPR shows the ordinary Operate view.
+
+## Build decisions for review
+
+Decisions taken while building without the owner, to be confirmed or changed:
+
+- **W1 · A WSPR clock mark after a switch.** The clock changes mode at a slot boundary, so `Session` ignores a WSPR mark when the session is no longer in WSPR (and the reverse). Switching from WSPR to a keyboard mode moves the clock to FT8 timing, since WSPR's 2-minute marks make no sense for PSK or RTTY transmit.
+- **W1 · Unresolved hashed calls** (`<...>`) are kept as spots with the call `<...>`, so the count and the signal show; they are not uploaded in W2.
+- **W1 · Stored spots** are kept 30 days unless waiting for upload; nothing calls the prune yet.
+- **W1 · No 60 m WSPR row** in `frequencies.json`; 6 m uses 50.293 MHz (WSJT-X lists it for regions 2 and 3).

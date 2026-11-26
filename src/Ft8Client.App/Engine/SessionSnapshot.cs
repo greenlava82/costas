@@ -191,6 +191,9 @@ public sealed record SessionSnapshot
     /// <summary>Who is calling whom, by the station being called (stations with current callers or recent picks).</summary>
     public IReadOnlyDictionary<string, Pileup> Pileups { get; init; } = new Dictionary<string, Pileup>();
 
+    /// <summary>WSPR: the signals heard, the next slot and the decoder state; null in any other mode.</summary>
+    public WsprView? Wspr { get; init; }
+
     /// <summary>PSK and RTTY: what is being sent and what is typed ahead.</summary>
     public KeyboardTxView KeyboardTx { get; init; } = KeyboardTxView.Idle;
 

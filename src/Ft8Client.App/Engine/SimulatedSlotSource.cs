@@ -36,7 +36,7 @@ public sealed class SimulatedSlotSource : ISlotSource
         }
         var all = Directory.EnumerateFiles(folder, "*.wav", SearchOption.AllDirectories).Order(StringComparer.Ordinal).ToList();
         if (all.Count == 0) throw new FileNotFoundException("No WAV files to simulate with.", folder);
-        _files = [.. all.Where(SampleFile.IsJt9Slot)];
+        _files = [.. all.Where(f => !SampleFile.IsKeyboardMode(f))];
     }
 
     /// <summary>Extra signals to mix into a slot (12 kHz samples), e.g. the simulated partner.</summary>
@@ -59,11 +59,14 @@ public sealed class SimulatedSlotSource : ISlotSource
         short[]? samples = null;
         for (var tries = 0; tries < _files.Count && samples is null; tries++)
         {
-            var f = SampleFile.Load(_files[_next]);
+            // A WSPR recording is a 2-minute slot for wsprd and an FT8 or FT4 one is for jt9: each mode plays its own.
+            var path = _files[_next];
             _next = (_next + 1) % _files.Count;
+            if (SampleFile.IsWsprMode(path) != (mode == Mode.Wspr)) continue;
+            var f = SampleFile.Load(path);
             if (f.Audio.Mode == mode) samples = f.Audio.Samples12k;
         }
-        samples ??= new short[ModeInfo.DecoderSamples(mode)];
+        samples ??= new short[ModeInfo.RecordSamples(mode)];
         var mix = Mixer?.Invoke(slotStartUtc, mode);
         if (mix is not null)
         {

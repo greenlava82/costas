@@ -99,6 +99,17 @@ public class SlotClockWsprTests
     }
 
     [Fact]
+    public void SetMode_KeyboardFromWspr_FallsBackToFt8AtBoundary()
+    {
+        var time = new ManualClock(T(2, 0, 7));
+        var clock = new SlotClock(time, Mode.Wspr);
+        clock.Poll();
+        clock.SetMode(Mode.Rtty);
+        Run(clock, time, TimeSpan.FromMinutes(2));
+        clock.Mode.Should().Be(Mode.Ft8, "WSPR's 2-minute marks make no sense for a keyboard mode");
+    }
+
+    [Fact]
     public void SetMode_Keyboard_IsIgnored()
     {
         var clock = new SlotClock(new ManualClock(T(2, 0, 0)), Mode.Wspr);
