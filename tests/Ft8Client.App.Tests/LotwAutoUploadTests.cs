@@ -20,4 +20,18 @@ public class LotwAutoUploadTests
     [InlineData(20, 60)]
     public void RetryDelay_FailuresInARow_DoublesUpToAnHour(int failures, int minutes) =>
         LotwService.RetryDelay(failures).Should().Be(TimeSpan.FromMinutes(minutes));
+
+    [Theory]
+    [InlineData(1, 30)]
+    [InlineData(2, 60)]
+    [InlineData(3, 120)]
+    [InlineData(5, 480)]
+    [InlineData(6, 720)]
+    [InlineData(50, 720)]
+    public void DownloadRetryDelay_FailuresInARow_DoublesFromHalfAnHourUpToTheInterval(int failures, int minutes) =>
+        LotwService.DownloadRetryDelay(failures, TimeSpan.FromHours(12)).Should().Be(TimeSpan.FromMinutes(minutes));
+
+    [Fact]
+    public void DownloadRetryDelay_ShortInterval_NeverWaitsLongerThanIt() =>
+        LotwService.DownloadRetryDelay(4, TimeSpan.FromHours(1)).Should().Be(TimeSpan.FromHours(1));
 }

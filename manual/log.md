@@ -113,7 +113,10 @@ ARRL's Logbook of the World is where DXCC and WAS credit comes from. Set it up i
 - **Confirmations.** With your LoTW website login, Costas downloads new LoTW confirmations every 12 hours, and
   when you choose **LoTW ▾ › Download new confirmations** in the Log view. Each one marks the matching contact
   (same call, band and mode within 30 minutes) as confirmed on LoTW. A confirmation for a contact that is not in your
-  log adds it.
+  log adds it. LoTW is often slow to answer, above all the first download, which holds every confirmation you have:
+  Costas waits up to 15 minutes for LoTW to start sending. If a download fails, Costas tries again after 30 minutes,
+  then 1 hour, 2 hours and so on up to the usual 12 hours, and a download that was cut off part way is fetched again
+  in full next time, so no confirmation is skipped.
 - **Uploads.** Costas signs and uploads contacts through TQSL, ARRL's signing program, which holds your callsign
   certificate. Choose **LoTW ▾ › Upload new contacts with TQSL**, or turn on uploading each contact as it is logged.
   TQSL skips contacts LoTW already has. Install TQSL first and set up your Station Location in it. With uploading as

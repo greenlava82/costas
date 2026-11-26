@@ -20,13 +20,32 @@ public sealed partial class LotwReportClient
     /// <summary>The report address.</summary>
     public const string Url = "https://lotw.arrl.org/lotwuser/lotwreport.adi";
 
-    /// <summary>Timeout for one download (the first one can hold years of confirmations).</summary>
-    public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(2);
+    /// <summary>
+    /// How long LoTW may take to start sending. LoTW can be silent for minutes before the first byte: a first download
+    /// of years of confirmations, or a busy evening at ARRL, takes many minutes (issue #219: 2 minutes was not enough).
+    /// </summary>
+    public static readonly TimeSpan FirstByteTimeout = TimeSpan.FromMinutes(15);
+
+    /// <summary>How long the download may go quiet once LoTW has started sending.</summary>
+    public static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(3);
+
+    /// <summary>The longest one download may take from start to end.</summary>
+    public static readonly TimeSpan TotalTimeout = TimeSpan.FromMinutes(30);
 
     private readonly HttpClient _http;
+    private readonly TimeProvider _time;
 
-    /// <summary>Creates a client on an <see cref="HttpClient"/> that identifies the app.</summary>
-    public LotwReportClient(HttpClient http) => _http = http;
+    /// <summary>
+    /// Creates a client on an <see cref="HttpClient"/> that identifies the app. The client's own timeout must be at least
+    /// <see cref="TotalTimeout"/> (or infinite): this class keeps its own deadlines.
+    /// </summary>
+    /// <param name="http">The HTTP client.</param>
+    /// <param name="time">The clock for the deadlines; the system clock when null.</param>
+    public LotwReportClient(HttpClient http, TimeProvider? time = null)
+    {
+        _http = http;
+        _time = time ?? TimeProvider.System;
+    }
 
     /// <summary>The request address (holds the password: never log it).</summary>
     /// <param name="login">LoTW login name.</param>
@@ -49,25 +68,70 @@ public sealed partial class LotwReportClient
         return Url + "?" + string.Join('&', q);
     }
 
-    /// <summary>Downloads confirmations received since <paramref name="since"/>.</summary>
+    /// <summary>
+    /// Downloads confirmations received since <paramref name="since"/>. LoTW gets <see cref="FirstByteTimeout"/> to start
+    /// sending, then <see cref="IdleTimeout"/> between pieces, and <see cref="TotalTimeout"/> in all.
+    /// </summary>
     public async Task<LotwReport> FetchAsync(string login, string password, string? since, string? ownCall, CancellationToken ct)
     {
+        var started = false;
+        using var total = new CancellationTokenSource(TotalTimeout, _time);
+        using var quiet = new CancellationTokenSource(FirstByteTimeout, _time);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, total.Token, quiet.Token);
         string text;
         try
         {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(Timeout);
-            text = await _http.GetStringAsync(BuildUrl(login, password, since, ownCall), cts.Token).ConfigureAwait(false);
+            using var request = new HttpRequestMessage(HttpMethod.Get, BuildUrl(login, password, since, ownCall));
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, linked.Token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) return new LotwReport([], null, $"LoTW answered {(int)response.StatusCode}");
+            var body = await response.Content.ReadAsStreamAsync(linked.Token).ConfigureAwait(false);
+            await using (body.ConfigureAwait(false))
+            {
+                using var bytes = new MemoryStream();
+                var buffer = new byte[16384];
+                int n;
+                while ((n = await body.ReadAsync(buffer, linked.Token).ConfigureAwait(false)) > 0)
+                {
+                    started = true;
+                    quiet.CancelAfter(IdleTimeout);
+                    bytes.Write(buffer, 0, n);
+                }
+                text = Decode(bytes.ToArray(), response.Content.Headers.ContentType?.CharSet);
+            }
         }
-        catch (HttpRequestException ex)
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            return new LotwReport([], null, ex.StatusCode is { } code ? $"LoTW answered {(int)code}" : "LoTW unreachable");
+            return new LotwReport([], null, total.IsCancellationRequested
+                ? $"LoTW did not finish sending in {TotalTimeout.TotalMinutes:0} minutes"
+                : started
+                    ? $"LoTW stopped sending for {IdleTimeout.TotalMinutes:0} minutes"
+                    : $"LoTW did not answer in {FirstByteTimeout.TotalMinutes:0} minutes");
         }
-        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        catch (HttpRequestException)
         {
-            return new LotwReport([], null, "LoTW did not answer in time");
+            return new LotwReport([], null, started ? "The LoTW download was cut off" : "LoTW unreachable");
+        }
+        catch (IOException)
+        {
+            return new LotwReport([], null, started ? "The LoTW download was cut off" : "LoTW unreachable");
         }
         return Parse(text);
+    }
+
+    private static string Decode(byte[] bytes, string? charset)
+    {
+        var encoding = System.Text.Encoding.UTF8;
+        if (!string.IsNullOrWhiteSpace(charset))
+        {
+            try
+            {
+                encoding = System.Text.Encoding.GetEncoding(charset.Trim('"', ' '));
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+        return encoding.GetString(bytes);
     }
 
     /// <summary>
@@ -85,10 +149,22 @@ public sealed partial class LotwReportClient
         }
         var m = LastQslField().Match(text[..eoh]);
         var last = m.Success ? m.Groups[2].Value[..Math.Min(int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), m.Groups[2].Value.Length)] : null;
-        var records = AdifReader.Read(text).Where(r => string.Equals(r["qsl_rcvd"], "Y", StringComparison.OrdinalIgnoreCase)).ToList();
+        var all = AdifReader.Read(text);
+        var count = NumRecField().Match(text[..eoh]);
+        if (count.Success && int.TryParse(count.Groups[2].Value[..Math.Min(int.Parse(count.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), count.Groups[2].Value.Length)].Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var expected)
+            && all.Count < expected && text.IndexOf("<APP_LoTW_EOF>", eoh, StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            // Cut off part way (fewer records than the header promised and no end marker): keep the old qso_qslsince so
+            // the missing confirmations come next time rather than being skipped for good.
+            return new LotwReport([], null, $"LoTW sent {all.Count} of {expected} confirmations; the rest come with the next download");
+        }
+        var records = all.Where(r => string.Equals(r["qsl_rcvd"], "Y", StringComparison.OrdinalIgnoreCase)).ToList();
         return new LotwReport(records, last?.Trim(), null);
     }
 
     [GeneratedRegex(@"<APP_LoTW_LASTQSL:(\d+)>([^<]*)", RegexOptions.IgnoreCase)]
     private static partial Regex LastQslField();
+
+    [GeneratedRegex(@"<APP_LoTW_NUMREC:(\d+)>([^<]*)", RegexOptions.IgnoreCase)]
+    private static partial Regex NumRecField();
 }

@@ -142,31 +142,43 @@ public sealed class LotwService : IDisposable
     /// <summary>How long automatic upload waits after <paramref name="failures"/> failed runs in a row.</summary>
     internal static TimeSpan RetryDelay(int failures) => TimeSpan.FromMinutes(Math.Min(60, Math.Pow(2, Math.Clamp(failures, 1, 6))));
 
+    /// <summary>
+    /// How long the background download waits after <paramref name="failures"/> failed downloads in a row: 30 minutes,
+    /// doubling, never longer than the normal <paramref name="interval"/>.
+    /// </summary>
+    internal static TimeSpan DownloadRetryDelay(int failures, TimeSpan interval) =>
+        TimeSpan.FromMinutes(Math.Min(interval.TotalMinutes, 30 * Math.Pow(2, Math.Clamp(failures, 1, 10) - 1)));
+
     /// <summary>Downloads new confirmations now. Returns a message for the status line.</summary>
-    public async Task<string> DownloadNowAsync(CancellationToken ct)
+    public async Task<string> DownloadNowAsync(CancellationToken ct) => (await DownloadAsync(ct).ConfigureAwait(false)).Text;
+
+    // The status-line message, and whether LoTW answered with a report (false when it failed and should be tried sooner).
+    private async Task<(string Text, bool Ok)> DownloadAsync(CancellationToken ct)
     {
         var o = _settings.Current.Profile.Lotw;
         var password = _secrets.Get(SecretNames.LotwPassword(ProfileId));
-        if (!_allowed) return "LoTW is not used in simulation.";
+        if (!_allowed) return ("LoTW is not used in simulation.", true);
         if (!o.Enabled || string.IsNullOrWhiteSpace(o.Username) || string.IsNullOrEmpty(password))
         {
             ShowStatus(null);
-            return "LoTW is not set up. Add your LoTW login in Settings.";
+            return ("LoTW is not set up. Add your LoTW login in Settings.", true);
         }
-        if (!await _downloadLock.WaitAsync(0, ct).ConfigureAwait(false)) return "A LoTW download is already running.";
+        if (!await _downloadLock.WaitAsync(0, ct).ConfigureAwait(false)) return ("A LoTW download is already running.", true);
         try
         {
             var call = _settings.Current.Profile.Callsign;
             var (last, _) = _sync.Get(ProfileId, SyncTarget);
             var since = last?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-            using var http = HttpFactory.Create(call, timeout: LotwReportClient.Timeout);
+            // The report client keeps its own, longer deadlines (LoTW can take many minutes to start sending).
+            using var http = HttpFactory.Create(call, timeout: LotwReportClient.TotalTimeout + TimeSpan.FromMinutes(1));
+            _session.SetService(ServiceNames.Lotw, new ServiceStatus(ServiceHealth.Ok, "Downloading LoTW confirmations", _clock.UtcNow));
             var report = await new LotwReportClient(http).FetchAsync(o.Username!, password, since, call, ct).ConfigureAwait(false);
             if (!report.Ok)
             {
                 _session.SetService(ServiceNames.Lotw, new ServiceStatus(report.Error!.Contains("login", StringComparison.Ordinal) ? ServiceHealth.Down : ServiceHealth.Degraded,
                     report.Error, _clock.UtcNow));
                 Log.Warning("LoTW download failed: {Message}", report.Error);
-                return report.Error!;
+                return (report.Error!, false);
             }
             var records = report.Records
                 .Select(r => AdifMapper.ToQso(r, ProfileId, call, QsoSource.Lotw, _countries))
@@ -180,7 +192,7 @@ public sealed class LotwService : IDisposable
             _session.SetService(ServiceNames.Lotw, new ServiceStatus(ServiceHealth.Ok, text, _clock.UtcNow));
             Log.Information("LoTW download: {Count} confirmations ({Matched} matched, {Added} added)", records.Count, matched, added);
             if (records.Count > 0) LogChanged?.Invoke();
-            return added > 0 ? $"{text}; {added} were not in the log and were added." : text + ".";
+            return (added > 0 ? $"{text}; {added} were not in the log and were added." : text + ".", true);
         }
         finally
         {
@@ -245,15 +257,20 @@ public sealed class LotwService : IDisposable
         else if (text is not null) _session.SetService(ServiceNames.Lotw, new ServiceStatus(ServiceHealth.Ok, text, _clock.UtcNow));
     }
 
+    // Downloads every DownloadHours; after a failed download (LoTW slow or down) tries again sooner, from 30 minutes up.
     private async Task DownloadLoopAsync(CancellationToken ct)
     {
+        var failures = 0;
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                if (_allowed && _settings.Current.Profile.Lotw.Enabled) await DownloadNowAsync(ct).ConfigureAwait(false);
+                var ok = true;
+                if (_allowed && _settings.Current.Profile.Lotw.Enabled) (_, ok) = await DownloadAsync(ct).ConfigureAwait(false);
                 else ShowStatus(null);
-                await Task.Delay(TimeSpan.FromHours(Math.Max(1, _settings.Current.Lotw.DownloadHours)), ct).ConfigureAwait(false);
+                failures = ok ? 0 : failures + 1;
+                var interval = TimeSpan.FromHours(Math.Max(1, _settings.Current.Lotw.DownloadHours));
+                await Task.Delay(ok ? interval : DownloadRetryDelay(failures, interval), ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

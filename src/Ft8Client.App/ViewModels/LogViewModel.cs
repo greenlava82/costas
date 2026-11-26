@@ -674,7 +674,7 @@ public sealed partial class LogViewModel : ObservableObject
 
     /// <summary>Downloads new LoTW confirmations now.</summary>
     [RelayCommand]
-    private Task LotwDownloadNowAsync() => RunAsync(LotwDownload, "Downloading LoTW confirmations…");
+    private Task LotwDownloadNowAsync() => RunAsync(LotwDownload, "Downloading LoTW confirmations… LoTW can take several minutes to answer.");
 
     /// <summary>Signs and uploads contacts LoTW does not have yet, through TQSL.</summary>
     [RelayCommand]
