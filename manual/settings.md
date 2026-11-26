@@ -467,11 +467,14 @@ See [Operating from a phone](phone.md).
 ![Settings: Appearance](images/settings-appearance.png)
 
 - **Skin**: Classic (the original appearance and system accent), Ocean (cool blues), Forest (soft greens), or
-  Amber (warm sand and copper). Four instrument skins also change the faceplate, typography, panel shapes and controls:
+  Amber (warm sand and copper). Six instrument skins also change the faceplate, typography, panel shapes and controls:
   **Modern Radio** has a recessed digital display and a dial button; **Classic Transceiver** has a gray and black
   faceplate, lime green seven-segment LCD digits and a black tuning dial; **Vintage Receiver** has warm dial lighting,
   brass trim, rounded controls and a sweeping slot needle; **SDR Console** has square modules, monospace readouts
-  and a segmented slot strip. Their meters show progress through the current FT8 or FT4 slot; with one of these skins the faceplate is the
+  and a segmented slot strip; **Workbench** looks like bench test gear, with putty grey (graphite in dark) panels, one
+  safety-orange accent, pill-shaped keys, a dial knob and IBM Plex type; **Darkroom** is red on near-black for night
+  operating, so your eyes stay used to the dark (its light theme is rose paper with dark red ink). For the whole screen
+  to stay red with Darkroom, also pick **Night red** in the waterfall's **Levels** panel. Their meters show progress through the current FT8 or FT4 slot; with one of these skins the faceplate is the
   only slot countdown, so the contact card and bottom bar leave theirs out. The display also carries the radio's
   power out, ALC and SWR meters (in place of the bottom bar's) once the radio has reported them. Click the large
   frequency display or **DIAL** button to open the same frequency editor used by Classic.

@@ -10,6 +10,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Media;
+using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Platform;
+using SkiaSharp;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Avalonia.Styling;
@@ -69,7 +72,7 @@ public class AppearanceTests
                     ColorOf(labelBrush).Should().Be(Color.Parse(palette.AccentText));
                     ColorOf(chipBrush).Should().Be(Color.Parse(palette.Accent));
                     chipBrush!.Opacity.Should().Be(0.65);
-                    card.CornerRadius.Should().Be(new CornerRadius(skin.Id switch { "radio" => 3, "retro" => 2, "vintage" => 14, "sdr" => 0, _ => 8 }));
+                    card.CornerRadius.Should().Be(new CornerRadius(skin.Id switch { "radio" => 3, "retro" => 2, "vintage" => 14, "sdr" => 0, "workbench" => 6, "darkroom" => 0, _ => 8 }));
                     Resource(app, "CriticalBrush", variant).Should().BeSameAs(critical);
                     Resource(app, "OnAirBrush", variant).Should().BeSameAs(onAir);
                 }
@@ -231,6 +234,46 @@ public class AppearanceTests
                 Thread.Sleep(200);
             }
         }
+    }
+
+    [Fact]
+    public async Task SkinFonts_BundledFamilies_RegularAndSemiBoldShareOneFamilyName()
+    {
+        // A face whose family name carries its weight ("IBM Plex Mono SemiBold") is not found as SemiBold of "IBM Plex Mono",
+        // so semibold titles quietly fell back to the system monospace font. Each family must have both weights under one name,
+        // and every family a skin asks for must be one of them.
+        var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(AppearanceTests).Assembly);
+        await session.Dispatch(() =>
+        {
+            var families = new Dictionary<string, List<int>>();
+            var fonts = AssetLoader.GetAssets(new Uri("avares://Costas/Assets/Fonts"), null).Where(u => u.AbsolutePath.EndsWith(".ttf")).ToList();
+            fonts.Should().HaveCount(8);
+            foreach (var uri in fonts)
+            {
+                using var stream = AssetLoader.Open(uri);
+                using var data = SKData.Create(stream);
+                using var face = SKTypeface.FromData(data);
+                face.Should().NotBeNull(uri.ToString());
+                (families.TryGetValue(face!.FamilyName, out var weights) ? weights : families[face.FamilyName] = []).Add(face.FontWeight);
+            }
+            families.Keys.Should().BeEquivalentTo("IBM Plex Sans", "IBM Plex Mono", "Red Hat Text", "Red Hat Mono");
+            families.Values.Should().OnlyContain(w => w.Order().SequenceEqual(new[] { 400, 600 }));
+
+            foreach (var (skin, keys) in new[] { ("workbench", new[] { "WorkbenchSans", "WorkbenchMono" }), ("darkroom", new[] { "DarkroomSans", "DarkroomMono" }) })
+            {
+                var found = AppSkin.Find(skin);
+                found.Id.Should().Be(skin);
+                families.Keys.Should().Contain(found.PreviewFont.Name, $"{skin}'s settings preview uses a bundled face");
+                var style = new StyleInclude(new Uri("avares://Costas/Styles/")) { Source = new Uri($"avares://Costas/Styles/{found.StyleResource}") };
+                foreach (var key in keys)
+                {
+                    style.TryGetResource(key, null, out var value).Should().BeTrue(key);
+                    var family = (FontFamily)value!;
+                    family.Key.Should().NotBeNull(key);
+                    families.Keys.Should().Contain(family.FamilyNames[0], $"{skin} {key} names a bundled family");
+                }
+            }
+        }, CancellationToken.None);
     }
 
     [Fact]

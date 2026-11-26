@@ -1,0 +1,66 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Ft8Client.App.ViewModels" xmlns:v="using:Ft8Client.App.Views">
+  <!-- Workbench: a piece of bench test gear. Putty or graphite panels, one safety-orange accent, pill keys and a dial knob.
+       Colours come from the skin palette, so the faceplate follows light and dark. -->
+  <Styles.Resources>
+    <FontFamily x:Key="WorkbenchSans">avares://Costas/Assets/Fonts#IBM Plex Sans</FontFamily>
+    <FontFamily x:Key="WorkbenchMono">avares://Costas/Assets/Fonts#IBM Plex Mono</FontFamily>
+    <DataTemplate x:Key="InstrumentFaceTemplate" x:DataType="vm:MainViewModel">
+      <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6"
+              BoxShadow="0 2 6 0 #26000000" Padding="0">
+        <Grid ColumnDefinitions="160,*,230" ColumnSpacing="0">
+          <StackPanel Margin="18,14" Spacing="3" VerticalAlignment="Center">
+            <TextBlock Text="Costas" FontFamily="{StaticResource WorkbenchSans}" FontSize="22" FontWeight="SemiBold" />
+            <TextBlock Text="BENCH INSTRUMENT" FontFamily="{StaticResource WorkbenchMono}" FontSize="9" LetterSpacing="1.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,6,0,0">
+              <TextBlock Text="{Binding SelectedMode}" FontFamily="{StaticResource WorkbenchMono}" FontSize="11" Foreground="{DynamicResource AccentTextBrush}" />
+              <TextBlock Text="{Binding SelectedBandChoice.Name}" FontFamily="{StaticResource WorkbenchMono}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+            </StackPanel>
+          </StackPanel>
+          <!-- The recessed well: the window colour sunk into the panel, as on a bench meter. -->
+          <Border Grid.Column="1" Background="{DynamicResource WindowBackgroundBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1"
+                  CornerRadius="4" Margin="0,10" Padding="16,6">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+              <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="DIAL · MHz" FontFamily="{StaticResource WorkbenchMono}" FontSize="9" LetterSpacing="1.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                <Button Classes="instrument-dial" IsEnabled="{Binding CanChangeBand}" ToolTip.Tip="Edit dial frequency" AutomationProperties.Name="Dial frequency">
+                  <TextBlock Text="{Binding Frequency}" FontFamily="{StaticResource WorkbenchMono}" FontSize="36" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                </Button>
+              </StackPanel>
+              <v:TxFaceMeters Grid.Column="1" LabelBrush="{DynamicResource TextSecondaryBrush}" ValueBrush="{DynamicResource TextPrimaryBrush}"
+                              MeterBrush="{DynamicResource TextPrimaryBrush}" CautionBrush="{DynamicResource CautionBrush}"
+                              TrackBrush="{DynamicResource RowDividerBrush}" FontFamily="{StaticResource WorkbenchMono}" />
+              <Button Grid.Column="2" Classes="instrument-dial tuning-knob" Width="50" Height="50" CornerRadius="25" VerticalAlignment="Center"
+                      HorizontalContentAlignment="Center" VerticalContentAlignment="Top" IsEnabled="{Binding CanChangeBand}"
+                      ToolTip.Tip="Open the dial frequency editor" AutomationProperties.Name="Edit dial frequency"
+                      Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1,1,1,2">
+                <Border Width="3" Height="13" Margin="0,5,0,0" CornerRadius="1.5" Background="{DynamicResource AccentBrush}" />
+              </Button>
+            </Grid>
+          </Border>
+          <StackPanel Grid.Column="2" Margin="18,12" Spacing="8" VerticalAlignment="Center">
+            <DockPanel>
+              <TextBlock Text="SLOT" FontFamily="{StaticResource WorkbenchMono}" FontSize="9" LetterSpacing="1.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding SlotRemaining}" HorizontalAlignment="Right" FontFamily="{StaticResource WorkbenchMono}" FontSize="11" />
+            </DockPanel>
+            <v:SlotMeter Value="{Binding SlotProgress}" Height="8" MeterBrush="{DynamicResource AccentBrush}" TrackBrush="{DynamicResource RowDividerBrush}" AutomationProperties.Name="Slot progress" />
+            <TextBlock Classes="instrument-phase" Classes.transmitting="{Binding Transmitting}" Text="{Binding SlotLabel}" FontFamily="{StaticResource WorkbenchMono}" FontSize="11" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </Styles.Resources>
+  <Style Selector="Window"><Setter Property="FontFamily" Value="{StaticResource WorkbenchSans}" /></Style>
+  <Style Selector="TextBlock.message, TextBlock.num"><Setter Property="FontFamily" Value="{StaticResource WorkbenchMono}" /></Style>
+  <Style Selector="Border.card"><Setter Property="CornerRadius" Value="6" /><Setter Property="BoxShadow" Value="0 2 6 0 #1F000000" /></Style>
+  <Style Selector="TextBlock.title"><Setter Property="FontFamily" Value="{StaticResource WorkbenchMono}" /><Setter Property="FontSize" Value="12" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="LetterSpacing" Value="1" /></Style>
+  <Style Selector="Button:not(.link):not(.wfoverlay):not(.instrument-dial):not(.tab)"><Setter Property="CornerRadius" Value="14" /><Setter Property="BorderThickness" Value="1" /><Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" /></Style>
+  <Style Selector="ComboBox, TextBox"><Setter Property="CornerRadius" Value="4" /></Style>
+  <Style Selector="Button.tab"><Setter Property="CornerRadius" Value="4" /><Setter Property="FontFamily" Value="{StaticResource WorkbenchMono}" /><Setter Property="FontSize" Value="12" /></Style>
+  <Style Selector="TextBlock.instrument-phase"><Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+  <Style Selector="TextBlock.instrument-phase.transmitting"><Setter Property="Foreground" Value="{DynamicResource CriticalBrush}" /></Style>
+  <Style Selector="Button.instrument-dial"><Setter Property="Padding" Value="0" /></Style>
+  <Style Selector="Button.instrument-dial:not(.tuning-knob)"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+  <Style Selector="Button.instrument-dial:not(.tuning-knob) /template/ ContentPresenter"><Setter Property="Background" Value="Transparent" /></Style>
+  <Style Selector="Button.instrument-dial:pointerover /template/ ContentPresenter"><Setter Property="Opacity" Value="0.85" /></Style>
+</Styles>

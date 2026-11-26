@@ -58,11 +58,37 @@ public class WaterfallPaletteTests
                 .BeGreaterThanOrEqualTo(Luma(WaterfallPalette.At(WaterfallPalette.Costas, i - 1)) - 1, $"step {i} (allowing for rounding to whole colour levels)");
     }
 
+    [Fact]
+    public void At_NightRedEveryStep_RedDominatesAndNeverDarkens()
+    {
+        // Night vision: every step is red-led, green and blue stay well under red, and it brightens all the way up.
+        Rgb(WaterfallPalette.At(WaterfallPalette.NightRed, 0)).Should().Be((0, 0, 0));
+        Rgb(WaterfallPalette.At(WaterfallPalette.NightRed, WaterfallPalette.Steps - 1)).R.Should().Be(255);
+        for (var i = 1; i < WaterfallPalette.Steps; i++)
+        {
+            var (r, g, b) = Rgb(WaterfallPalette.At(WaterfallPalette.NightRed, i));
+            g.Should().BeLessThanOrEqualTo(r / 2, $"step {i}");
+            b.Should().BeLessThanOrEqualTo(g + 1, $"step {i} has no more blue than green");
+            Luma(WaterfallPalette.At(WaterfallPalette.NightRed, i)).Should()
+                .BeGreaterThanOrEqualTo(Luma(WaterfallPalette.At(WaterfallPalette.NightRed, i - 1)) - 1, $"step {i}");
+        }
+    }
+
+    [Fact]
+    public void Choices_IncludeNightRed_AndEveryChoiceIsKnown()
+    {
+        WaterfallPalette.Choices.Select(c => c.Id).Should().Contain(WaterfallPalette.NightRed);
+        foreach (var (id, _) in WaterfallPalette.Choices)
+            WaterfallPalette.Known(id).Should().Be(id);
+    }
+
     [Theory]
     [InlineData(null, WaterfallPalette.Wsjtx)]
     [InlineData("", WaterfallPalette.Wsjtx)]
     [InlineData("linrad", WaterfallPalette.Wsjtx)]
     [InlineData(WaterfallPalette.Costas, WaterfallPalette.Costas)]
+    [InlineData(WaterfallPalette.NightRed, WaterfallPalette.NightRed)]
+    [InlineData("NIGHT-RED", WaterfallPalette.Wsjtx)]
     public void Known_UnknownId_FallsBackToWsjtx(string? id, string known)
     {
         WaterfallPalette.Known(id).Should().Be(known);

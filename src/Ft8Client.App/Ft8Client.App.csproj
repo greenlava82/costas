@@ -20,6 +20,9 @@
   </ItemGroup>
   <ItemGroup>
     <AvaloniaResource Include="Assets\costas.ico" />
+    <!-- Typefaces for the Workbench and Darkroom skins (SIL Open Font License 1.1; the licences ship beside the app). -->
+    <AvaloniaResource Include="Assets\Fonts\*.ttf" />
+    <None Include="Assets\Fonts\OFL-*.txt" Link="licenses\fonts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- The icon desktop notifications show (a file: Windows' AppUserModelId registration and D-Bus both take a path). -->
     <None Include="Assets\costas-256.png" Link="costas.png" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="Remote\index.html" LogicalName="Ft8Client.App.Remote.index.html" />
