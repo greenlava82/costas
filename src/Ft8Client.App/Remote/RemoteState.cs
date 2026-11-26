@@ -154,4 +154,7 @@ public sealed record RemoteState
 
     /// <summary>The station this phone has open, or null.</summary>
     public RemoteDetails? Details { get; init; }
+
+    /// <summary>The WSPR card (beacon, next slot, what was heard) in WSPR mode, else null.</summary>
+    public RemoteWspr? Wspr { get; init; }
 }

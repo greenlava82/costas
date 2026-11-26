@@ -150,3 +150,11 @@ Status (W4, 2026-11-26): the beacon is built and tested on a simulated radio wit
 - **W4 · Decision:** a compound call with a 4-character locator cannot send WSJT-X's alternate type 3 message (`wsprsim` and `wsprd` need 6 characters), so Start beacon refuses it and says to set a 6-character locator. A 6-character locator on a plain call alternates type 1 and type 3 as WSJT-X does, unless "prefer type 1" is set.
 - **W4 · Decision:** the defaults are 20 % Tx, 5 % power and a reported 37 dBm (5 W on a 100 W radio). The screen warns when the radio's power and the attenuation, or its meter, differ from the reported dBm by more than 3 dB; the reported value is never changed.
 - **W4 · Decision:** the radio's old power is put back once nothing is transmitting; if a transmission is still on the air when the beacon stops, it waits up to 3 minutes for it.
+
+Status (W5, 2026-11-26): the screen and the phone card are built (`WsprViewModel`, `WsprView.axaml`, `RemoteWspr`, the three phone commands, `mockups/wspr/index.html`, `02-ui-spec.md`).
+
+- **W5 · Decision (needs the owner):** the screen was built **without waiting for the mockup to be approved**, from a mockup drawn in the app's own styles. Look at it and say what to change.
+- **W5 · Decision:** the beacon's settings (share, reported dBm, radio power, attenuation, offset, type 1, WSPRnet) are on the WSPR screen, not in a Settings window section. Everything they hold is a per-profile `WsprOptions`; moving them is a view change only.
+- **W5 · Decision:** the question before leaving WSPR or changing band is an inline bar on the WSPR screen (the menu snaps back to what is running meanwhile), not a dialog. A band or mode change from the phone does not ask (U2, which asks for the other modes, is not built yet); it stops the beacon because `Session.SetBand` does.
+- **W5 · Decision:** the phone's `wsprStart` and `wsprHere` follow D25 as the other transmit commands do (they refuse until the user has pressed Operate as on their own profile); `wsprStop` and Halt work for anyone.
+- **W5 · Not built:** "Heard by" (V-WSPR5), listed as optional in the plan and display only. The query is in `08-open-questions.md` when wanted.

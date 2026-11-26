@@ -293,6 +293,7 @@ body.dashon #onair{display:none!important}
       </div>
     </div>
     <div data-pane="operate">
+      <div id="wspr" class="card hidden"></div>
       <div class="card"><div id="contactBody"></div><div id="contactBtns" class="btns"></div></div>
       <div id="callers" class="card list hidden" style="margin-top:12px"></div>
       <div id="line" class="card list" style="margin-top:12px"></div>
@@ -529,6 +530,7 @@ function render() {
 
   renderSlot();
   renderContact(s);
+  renderWspr(s);
   renderCallers(s);
   renderLine(s);
   renderStations(s);
@@ -575,6 +577,34 @@ function contactButtons(s) {
     // Stop CQ is its own command, so a tap that lands just after CQ ended cannot start it again.
     ? [s.callingCq ? ["Stop CQ", "red", "cqStop", false] : ["Call CQ", "", "cq", cqOff]]
     : [["Resend", "", "resend", false]].concat(c.canLogNow ? [["Log now", "", "logNow", false]] : [], [["Abandon", "red", "abandon", false]]);
+}
+
+// WSPR mode: this card takes the place of the contact card and Next in line. Start beacon and I'm here are operator actions;
+// the station refuses Start unless the settings can be sent exactly as they are, and stops the beacon when nobody gives input.
+function renderWspr(s) {
+  const w = s.wspr;
+  $("wspr").classList.toggle("hidden", !w);
+  $("contactBody").parentElement.classList.toggle("hidden", !!w);
+  $("line").classList.toggle("hidden", !!w);
+  if (!w || !changed("wspr", w)) return;
+  const box = $("wspr"); box.replaceChildren();
+  const m = (sec) => Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+  const head = el("div", "head"); head.append(el("b", null, "WSPR beacon"), el("span", "s", "Next slot in " + m(w.nextSlotIn)));
+  box.append(head, el("div", "lbl", w.status));
+  if (w.on && w.presenceLeft !== null) box.append(el("div", "sub", "Stops in " + m(w.presenceLeft) + " unless you tap I'm here."));
+  box.append(el("div", "sub", w.power));
+  if (w.powerWarning) box.append(el("div", "sub", w.powerWarning));
+  const btns = el("div", "btns");
+  btns.append(button(w.on ? "Stop beacon" : "Start beacon", w.on ? "" : "go", () => cmd(w.on ? "wsprStop" : "wsprStart")));
+  if (w.on) btns.append(button("I'm here", "", () => cmd("wsprHere")));
+  box.append(btns);
+  box.append(el("div", "sub", w.decoder + " · " + w.upload));
+  if (w.heard.length === 0) box.append(el("div", "s", "Nothing heard yet."));
+  w.heard.forEach(h => {
+    const row = el("div", "dec");
+    row.append(el("span", null, h.utc), el("span", null, h.snr), el("span", "msgt", h.call + (h.grid ? " " + h.grid : "")), el("span", "cty", h.distance));
+    box.append(row);
+  });
 }
 
 function renderContact(s) {

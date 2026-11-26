@@ -253,6 +253,14 @@ public sealed class RemoteControl
             case "jump" when cmd.Step is { } step:
                 _target.JumpTo(step);
                 return null;
+            case "wsprStart":
+                return await _target.StartBeaconAsync().ConfigureAwait(false);
+            case "wsprStop":
+                _target.StopBeacon(null);
+                return null;
+            case "wsprHere":
+                _target.NoteWsprPresence();
+                return null;
             case "band":
                 return await BandAsync(cmd).ConfigureAwait(false);
             case "goTo":
@@ -290,7 +298,7 @@ public sealed class RemoteControl
     // Commands that put the station's callsign on the air or in the log: a linked user sends them only from their own
     // profile. Tune is not one: its carrier carries no callsign.
     private static bool OperatesAs(string type) =>
-        type is "cq" or "call" or "answer" or "answerAfter" or "resend" or "macro" or "jump" or "logNow";
+        type is "cq" or "call" or "answer" or "answerAfter" or "resend" or "macro" or "jump" or "logNow" or "wsprStart" or "wsprHere";
 
     private static string NotYetYours(RemoteProfileOffer offer) => offer.Busy is { } busy
         ? $"Not done: the station is on {offer.InUse}, busy {busy}. You can switch to {offer.Mine} when it is idle."
@@ -339,6 +347,7 @@ public sealed class RemoteControl
     private static bool Understood(RemoteCommand cmd, string call) => cmd.Type switch
     {
         "halt" or "abandon" or "cq" or "cqStop" or "switchProfile" or "resend" or "logNow" or "band" or "offsetAuto" or "goTo" => true,
+        "wsprStart" or "wsprStop" or "wsprHere" => true,
         "call" or "answer" or "answerAfter" or "dismiss" => call.Length > 0,
         "jump" => cmd.Step is not null,
         "offset" => cmd.Hz is not null,

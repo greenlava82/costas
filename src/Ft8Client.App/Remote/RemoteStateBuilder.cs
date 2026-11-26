@@ -60,7 +60,7 @@ public static class RemoteStateBuilder
 
         // Same countdown as the contact card: to the slot boundary, the whole slot a transmission went out in counting as transmit.
         // A keyboard mode has no slots: a zero length hides the countdown.
-        var slotted = ModeInfo.IsSlotted(s.Mode);
+        var slotted = ModeInfo.HasSlots(s.Mode);
         var slotLen = slotted ? ModeInfo.SlotLength(s.Mode) : TimeSpan.Zero;
         var into = slotted ? nowUtc - SlotMath.SlotStart(nowUtc, s.Mode) : TimeSpan.Zero;
         var (meter, meterTip, meterKind) = TxMeterText.Warning(s.TxMeters);
@@ -117,7 +117,21 @@ public static class RemoteStateBuilder
             Logged = Logged(s.LastLogged, nowUtc),
             Decodes = [.. s.RawDecodes.Reverse().Take(MaxDecodes).Select(Decode)],
             Details = viewing is null ? null : Details(viewing, s, nowUtc, ctx, log, inContact),
+            Wspr = s.Wspr is { } w ? Wspr(w, s, nowUtc, units) : null,
         };
+    }
+
+    // The WSPR card: the same lines as the desk screen, and the newest signals heard.
+    private static RemoteWspr Wspr(WsprView w, SessionSnapshot s, DateTime nowUtc, DistanceUnit units)
+    {
+        var b = w.Beacon;
+        var left = w.NextSlotUtc - nowUtc;
+        return new RemoteWspr(b.On, WsprViewModel.StatusText(b, s.Transmitting), (int)Math.Max(0, Math.Ceiling(left.TotalSeconds)),
+            b is { On: true, PresenceEndsUtc: { } end } ? (int)Math.Max(0, Math.Ceiling((end - nowUtc).TotalSeconds)) : null,
+            WsprViewModel.PowerText(b), b.PowerWarning, w.DecoderState,
+            s.Services.TryGetValue(ServiceNames.Wsprnet, out var up) ? up.Message : "WSPRnet off",
+            [.. w.Recent.Take(MaxRows).Select(h => new RemoteWsprSpot(h.Spot.SlotStartUtc.ToString("HH:mm", CultureInfo.InvariantCulture), h.Spot.Callsign,
+                h.Spot.Grid ?? string.Empty, h.Spot.Snr.ToString(CultureInfo.InvariantCulture), h.DistanceKm is { } km ? StationText.Distance(km, units) : string.Empty))]);
     }
 
     // Rows carry the pileup on each station ("3 calling"), as the desk's call-list rows do.

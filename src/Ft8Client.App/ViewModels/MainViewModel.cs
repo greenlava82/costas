@@ -31,7 +31,7 @@ using Ft8Client.Modems.Rtty;
 namespace Ft8Client.App.ViewModels;
 
 /// <summary>The main window: top bar, views, bottom bar, keyboard.</summary>
-public sealed partial class MainViewModel : ObservableObject, IOperateCommands
+public sealed partial class MainViewModel : ObservableObject, IOperateCommands, IWsprCommands
 {
     private readonly AppHost _host;
     private readonly CallerAlert _callers = new();
@@ -109,6 +109,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         Awards.SetDxpeditions(host.Dxpeditions.Current);
         host.Dxpeditions.Changed += cal => Dispatch(() => Awards.SetDxpeditions(cal));
         Contest = new ContestViewModel(this, () => host.Clock.UtcNow);
+        Wspr = new WsprViewModel(this, () => host.Clock.UtcNow);
         StationDetailsViewModel.HeardHistory = (call, key) =>
         {
             _ = heard.RefreshIfOlderThan(HeardHistoryService.MaxAge);
@@ -275,6 +276,13 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
 
     /// <summary>Operate view.</summary>
     public OperateViewModel Operate { get; }
+
+    /// <summary>The WSPR screen, shown in place of Operate in WSPR mode.</summary>
+    public WsprViewModel Wspr { get; }
+
+    /// <summary>Operate is showing: the Operate tab, and not WSPR mode (which has its own screen).</summary>
+    [ObservableProperty]
+    public partial bool ShowOperate { get; set; } = true;
 
     /// <summary>Raw decodes view.</summary>
     public RawDecodesViewModel Raw { get; }
@@ -631,6 +639,9 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         Operate.DoubleClickSwitches = _host.Settings.Current.Operating.DoubleClickSwitches;
         Operate.ShowCqModifier(_host.Settings.Current.Operating.CqModifier, SettingsMapper.ContestOf(_host.Settings.Current.Operating.Contest));
         Operate.Apply(s, tonight.Rows, tonight.Total);
+        Wspr.Units = Operate.Units;
+        Wspr.Apply(s);
+        RefreshWsprVisibility(s.Mode);
         Contest.Apply(s.Contest, s.Band);
         // Ending the contest hides its tab: go back to Operate rather than show an empty view.
         if (!Contest.Visible && Tab == 5) Tab = 0;
@@ -738,7 +749,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         var now = _host.Clock.UtcNow;
         ClockText = now.ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " UTC";
         var mode = _host.Session.Config.Mode;
-        if (ModeInfo.IsSlotted(mode))
+        if (ModeInfo.HasSlots(mode))
         {
             var len = ModeInfo.SlotLength(mode);
             var start = SlotMath.SlotStart(now, mode);
@@ -756,6 +767,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         }
         UpdateTune(_host.Session.Snapshot);
         Operate.Tick();
+        Wspr.Tick(now);
         Logged.Tick();
         _host.LogHold.Tick();
         Mini.Refresh(SelectedBand, SelectedMode);
@@ -773,6 +785,13 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         if (_updatingBand || value is null) return;
         var band = value.Replace(" ", string.Empty, StringComparison.Ordinal);
         ModeInfo.TryParse(SelectedMode, out var mode);
+        if (_host.Session.BeaconOn)
+        {
+            // A running beacon is not stopped by a click: ask, and keep the old band shown meanwhile.
+            Wspr.AskLeave(band, mode);
+            FollowBand(_host.Session.Config.Band);
+            return;
+        }
         _ = _host.SetBandAsync(band, mode);
     }
 
@@ -795,6 +814,15 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     {
         if (_updatingBand) return;
         ModeInfo.TryParse(value, out var mode);
+        if (_host.Session.BeaconOn)
+        {
+            // Leaving WSPR ends the beacon: ask first, and keep WSPR shown meanwhile.
+            Wspr.AskLeave(SelectedBand?.Replace(" ", string.Empty, StringComparison.Ordinal) ?? _host.Session.Config.Band, mode);
+            _updatingBand = true;
+            SelectedMode = ModeInfo.Name(_host.Session.Config.Mode);
+            _updatingBand = false;
+            return;
+        }
         RefreshBands(mode);
         var band = SelectedBand?.Replace(" ", string.Empty, StringComparison.Ordinal) ?? "20m";
         if (_host.Frequencies.Find(band, mode) is null) band = _host.Frequencies.Bands(mode).FirstOrDefault() ?? band;
@@ -815,6 +843,33 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         RefreshQuiet();
         if (value >= 0 && value < TabNames.Length) _host.Usage.Track("view_opened", "view", TabNames[value]);
         RefreshView(value);
+        RefreshWsprVisibility(_host.Session.Config.Mode);
+    }
+
+    // In WSPR mode the Operate tab shows the WSPR screen: there are no contacts, no Next in line and no calling.
+    private void RefreshWsprVisibility(Mode mode)
+    {
+        var wspr = ModeInfo.IsWspr(mode);
+        Wspr.Visible = Tab == 0 && wspr;
+        ShowOperate = Tab == 0 && !wspr;
+    }
+
+    // ---------------------------------------------------------------- WSPR (IWsprCommands)
+
+    Task<string?> IWsprCommands.StartBeaconAsync() => _host.Session.StartBeaconAsync();
+
+    void IWsprCommands.StopBeacon() => _host.Session.StopBeacon(null);
+
+    void IWsprCommands.ImHere() => _host.Session.NoteWsprPresence();
+
+    Data.Settings.WsprOptions IWsprCommands.Options => _host.Settings.Current.Profile.Wspr;
+
+    void IWsprCommands.UpdateOptions(Action<Data.Settings.WsprOptions> change) => _host.Settings.Update(s => change(s.Profile.Wspr));
+
+    void IWsprCommands.LeaveWspr(string band, Mode mode)
+    {
+        _host.Session.StopBeacon("Beacon stopped: you changed band or mode.");
+        _ = _host.SetBandAsync(band, mode);
     }
 
     private LoggedContact? _lastLogged;

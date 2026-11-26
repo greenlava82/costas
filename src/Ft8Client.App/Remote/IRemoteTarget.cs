@@ -49,6 +49,15 @@ public interface IRemoteTarget
     /// <summary>Logs the contact now.</summary>
     void LogNow();
 
+    /// <summary>WSPR: starts the beacon (an operator action). Returns why it did not start, or null.</summary>
+    Task<string?> StartBeaconAsync();
+
+    /// <summary>WSPR: stops the beacon; a transmission on the air finishes. <paramref name="reason"/> is null for the operator's own stop.</summary>
+    void StopBeacon(string? reason);
+
+    /// <summary>WSPR: the phone's "I'm here", operator input for the beacon.</summary>
+    void NoteWsprPresence();
+
     /// <summary>Jumps to one of my upcoming steps.</summary>
     void JumpTo(int step);
 

@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Costas · WSPR screen (mockup)</title>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --line:#d7dae0; --text:#1b1f27; --sec:#667085; --acc:#2563eb; --warn:#fff4d6; --warnline:#e0b84a; --ok:#1f8a4c }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171c; --card:#1e232b; --line:#323946; --text:#e8ebf0; --sec:#98a2b3; --acc:#6ea0ff; --warn:#3a3118; --warnline:#8a7020; --ok:#4cc38a } }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 "Segoe UI",system-ui,sans-serif; padding:16px }
+  .grid { display:grid; grid-template-columns:1fr 340px; gap:12px; max-width:1200px }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 18px }
+  .top { grid-column:1 / 3 } h2,h3 { margin:0 0 6px } .sec { color:var(--sec) } .num { font-variant-numeric:tabular-nums }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:12px } button { font:inherit; padding:6px 14px; border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:6px }
+  button.go { background:var(--acc); color:#fff; border-color:var(--acc); font-weight:600 } .bar { height:6px; background:var(--line); border-radius:3px; margin:8px 0 } .bar i { display:block; height:6px; width:31%; background:var(--acc); border-radius:3px }
+  .attn { background:var(--warn); border:1px solid var(--warnline); border-radius:6px; padding:6px 10px; margin-top:8px }
+  table { border-collapse:collapse; width:100% } th { text-align:left; color:var(--sec); font-weight:500; font-size:12px } td,th { padding:3px 6px 3px 0 }
+  label { display:flex; justify-content:space-between; align-items:center; margin:5px 0 } input,select { width:110px }
+</style>
+<div class="grid">
+  <div class="card top">
+    <div class="row">
+      <div><h2>Next slot receives (receive slot).</h2><div class="sec num">Next slot 14:06 UTC in 1:23</div></div>
+      <div><button>I'm here</button> <button class="go">Stop beacon</button></div>
+    </div>
+    <div class="bar"><i></i></div>
+    <div class="sec">Stops in 4:12 unless you press a key or tap I'm here.</div>
+    <div class="sec">Reports 37 dBm (5 W). Radio and attenuation give about 37.0 dBm.</div>
+    <div class="attn">The radio is set for about 33.0 dBm, but the message says 37 dBm.</div>
+  </div>
+  <div class="card">
+    <div class="row"><h3>Heard</h3><span class="sec">WSPRnet: 3 spots sent</span></div>
+    <div class="sec" style="margin-bottom:6px">9 heard in the last slot.</div>
+    <table class="num"><tr><th>UTC</th><th>Call</th><th>Grid</th><th>SNR</th><th>Drift</th><th>Distance</th><th>Power</th><th>Audio Hz</th></tr>
+      <tr><td>14:04</td><td><b>ND6P</b></td><td>DM04</td><td>-9</td><td>0</td><td>612 mi</td><td>30 dBm</td><td>1446</td></tr>
+      <tr><td>14:04</td><td><b>W5BIT</b></td><td>EL09</td><td>-15</td><td>0</td><td>1,420 mi</td><td>17 dBm</td><td>1460</td></tr>
+      <tr><td>14:02</td><td><b>G8VDQ</b></td><td>IO91</td><td>-23</td><td>0</td><td>4,810 mi</td><td>37 dBm</td><td>1465</td></tr></table>
+  </div>
+  <div class="card" style="align-self:start">
+    <h3>Beacon</h3>
+    <div class="sec">Settings can be changed while the beacon is stopped.</div>
+    <label>Transmit share (%) <input value="20"></label>
+    <label>Reported power (dBm) <select><option>37</option></select></label>
+    <label>Radio power (%) <input value="5"></label>
+    <label>Attenuation (dB) <input value="0"></label>
+    <label>Audio offset (Hz) <input value="1500"></label>
+    <label><span>Prefer type 1 messages</span> <input type="checkbox" style="width:auto"></label>
+    <hr style="border:0;border-top:1px solid var(--line)">
+    <label><span>Report what I hear to WSPRnet</span> <input type="checkbox" checked style="width:auto"></label>
+  </div>
+</div>
+<p class="sec" style="max-width:1200px">Mockup of the WSPR screen (docs/10-wspr.md section 8) that replaces Operate in WSPR mode. Built on the app's own card, colour and type styles. Not owner-approved: the screen was built from it without waiting for sign-off (docs/10-wspr.md, build decisions).</p>

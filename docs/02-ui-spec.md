@@ -367,3 +367,13 @@ Every control has an accessible name. The line and grids are keyboard navigable.
 - **Next in line**: Why shows "New mult · X" in green or "Dupe" in grey for contest stations.
 - **Contest view**: tiles for contacts, multipliers, claimed score and rate; a per-band table; the multiplier grid (states and provinces for the Roundup, fields for WW Digi) with worked ones in green; the contest log, newest first, with New mult and Dupe tags; a dupe check box that filters the log and says whether the call is a dupe on the current band; Export Cabrillo….
 
+
+## WSPR mode (owner decision D29, 2026-11-26; `10-wspr.md`)
+
+In WSPR the Operate tab shows the WSPR screen in place of Operate (`mockups/wspr/index.html`); the other tabs are unchanged. There are no contacts, so no contact card, Next in line, Call or CQ.
+
+- **Beacon card** (across the top): a status line ("Beacon off. Receiving.", "Next slot transmits.", "Next slot receives (receive slot).", "Transmitting W7LIT DN40 37"), the countdown to the next 2-minute slot, a progress bar, **Start beacon / Stop beacon** and **I'm here**, "Stops in 4:12 unless you press a key or tap I'm here" while it runs, the power line ("Reports 37 dBm (5 W). Radio and attenuation give about 37.0 dBm.") and, in the caution colour, the warning when the estimate or the radio's meter differs from the reported power by more than 3 dB, a refusal from Start, and the question "Stop the beacon and switch to FT8?" with **Stop and change** and **Keep the beacon** when the band or mode menu is used while it runs.
+- **Heard** (left): the signals heard, newest first: UTC, call, grid, SNR, drift, distance in the operator's unit, reported power, audio Hz; the decoder's one-line state and the WSPRnet upload state above it.
+- **Beacon** (right): Tx share, reported dBm (the legal list), radio power %, attenuation, audio offset, "prefer type 1", and "Report what I hear to WSPRnet". They are fixed while the beacon runs.
+- **Phone**: the Operate pane shows a WSPR card in place of the contact card: the same status, countdown, presence time, power line and warning, **Start beacon / Stop beacon** and **I'm here**, and the newest signals heard. Settings stay on the desk. Halt Tx stays in the bar.
+- **Not built**: the "Heard by" list of stations that reported my beacon (V-WSPR5's query is documented, but it is optional and display only).

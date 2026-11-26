@@ -354,7 +354,9 @@
 
     <Panel Grid.Row="4">
       <Panel IsVisible="{Binding !CurrentTabOut}">
-        <v:OperateView x:Name="OperatePage" DataContext="{Binding Operate}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Tab, Converter={x:Static v:Converters.IntEquals}, ConverterParameter=0}" />
+        <v:OperateView x:Name="OperatePage" DataContext="{Binding Operate}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowOperate}" />
+        <!-- WSPR mode has its own screen in place of Operate: no contacts, no Next in line. -->
+        <v:WsprView DataContext="{Binding Wspr}" IsVisible="{Binding Visible}" />
         <v:RawDecodesView DataContext="{Binding Raw}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Tab, Converter={x:Static v:Converters.IntEquals}, ConverterParameter=1}" />
         <v:ReachView DataContext="{Binding Reach}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Tab, Converter={x:Static v:Converters.IntEquals}, ConverterParameter=2}" />
         <v:LogView DataContext="{Binding LogView}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Tab, Converter={x:Static v:Converters.IntEquals}, ConverterParameter=3}" />

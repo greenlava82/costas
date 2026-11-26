@@ -1,0 +1,109 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Ft8Client.App.ViewModels"
+             xmlns:v="using:Ft8Client.App.Views"
+             x:Class="Ft8Client.App.Views.WsprView"
+             x:DataType="vm:WsprViewModel">
+  <!-- WSPR (docs/10-wspr.md section 8): the beacon on top, what was heard below it, the beacon's settings beside it. There are no
+       contacts here, so none of Operate's panels. Mockup: mockups/wspr/index.html. -->
+  <Grid RowDefinitions="Auto,*" ColumnDefinitions="*,340" Margin="16,0,16,12" RowSpacing="12" ColumnSpacing="12">
+    <Border Grid.ColumnSpan="2" Classes="card" Padding="18,14">
+      <StackPanel Spacing="10">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Button Content="I'm here" Command="{Binding ImHereCommand}" IsVisible="{Binding BeaconOn}"
+                    ToolTip.Tip="Tell the beacon you are at the radio. Any key or click does the same; the beacon stops if you give no input for the Tx watchdog time." />
+            <Button Content="{Binding StartStopText}" Command="{Binding StartStopCommand}" MinWidth="130" FontWeight="SemiBold"
+                    ToolTip.Tip="Start or stop the WSPR beacon. It never starts by itself, and it stops if you leave." />
+          </StackPanel>
+          <StackPanel Spacing="2">
+            <TextBlock Text="{Binding Status}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Countdown}" Classes="secondary num" />
+          </StackPanel>
+        </DockPanel>
+        <ProgressBar Minimum="0" Maximum="1" Value="{Binding SlotProgress}" Height="6" />
+        <TextBlock Text="{Binding Presence}" Classes="secondary" IsVisible="{Binding BeaconOn}" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding PowerLine}" Classes="secondary" TextWrapping="Wrap" />
+        <Border Classes="attention" Padding="10,6" IsVisible="{Binding PowerWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Text="{Binding PowerWarning}" TextWrapping="Wrap" />
+        </Border>
+        <Border Classes="attention" Padding="10,6" IsVisible="{Binding Notice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" />
+        </Border>
+        <Border Classes="attention" Padding="10,8" IsVisible="{Binding LeaveQuestion, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+              <Button Content="Stop and change" Command="{Binding ConfirmLeaveCommand}" />
+              <Button Content="Keep the beacon" Command="{Binding KeepBeaconCommand}" />
+            </StackPanel>
+            <TextBlock Text="{Binding LeaveQuestion}" VerticalAlignment="Center" TextWrapping="Wrap" />
+          </DockPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Row="1" Classes="card" Padding="14,10">
+      <DockPanel>
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+          <TextBlock DockPanel.Dock="Right" Text="{Binding UploadStatus}" Classes="secondary" VerticalAlignment="Center" />
+          <TextBlock Text="Heard" FontSize="16" FontWeight="SemiBold" />
+        </DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="{Binding DecoderState}" Classes="secondary" Margin="0,0,0,6" TextWrapping="Wrap" />
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="60,*,70,50,50,110,70,70">
+          <TextBlock Text="UTC" Classes="colhead" />
+          <TextBlock Grid.Column="1" Text="Call" Classes="colhead" />
+          <TextBlock Grid.Column="2" Text="Grid" Classes="colhead" />
+          <TextBlock Grid.Column="3" Text="SNR" Classes="colhead" />
+          <TextBlock Grid.Column="4" Text="Drift" Classes="colhead" />
+          <TextBlock Grid.Column="5" Text="Distance" Classes="colhead" />
+          <TextBlock Grid.Column="6" Text="Power" Classes="colhead" />
+          <TextBlock Grid.Column="7" Text="Audio Hz" Classes="colhead" />
+        </Grid>
+        <ScrollViewer>
+          <ItemsControl ItemsSource="{Binding Spots}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:WsprSpotRowViewModel">
+                <Grid ColumnDefinitions="60,*,70,50,50,110,70,70" Margin="0,2">
+                  <TextBlock Text="{Binding Time}" Classes="num" />
+                  <TextBlock Grid.Column="1" Text="{Binding Call}" FontWeight="SemiBold" />
+                  <TextBlock Grid.Column="2" Text="{Binding Grid}" />
+                  <TextBlock Grid.Column="3" Text="{Binding Snr}" Classes="num" />
+                  <TextBlock Grid.Column="4" Text="{Binding Drift}" Classes="num" />
+                  <TextBlock Grid.Column="5" Text="{Binding Distance}" Classes="num" />
+                  <TextBlock Grid.Column="6" Text="{Binding Power}" Classes="num" />
+                  <TextBlock Grid.Column="7" Text="{Binding Frequency}" Classes="num" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <Border Grid.Row="1" Grid.Column="1" Classes="card" Padding="14,10" VerticalAlignment="Top">
+      <StackPanel Spacing="8">
+        <TextBlock Text="Beacon" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Text="Settings can be changed while the beacon is stopped." Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding BeaconOn}" />
+        <StackPanel Spacing="8" IsEnabled="{Binding CanEditSettings}">
+          <Grid ColumnDefinitions="*,120" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
+            <TextBlock Text="Transmit share (%)" VerticalAlignment="Center" ToolTip.Tip="Share of the 2-minute slots it transmits in; 20 is WSJT-X's default." />
+            <NumericUpDown Grid.Column="1" Minimum="1" Maximum="100" Increment="1" FormatString="0" Value="{Binding TxPercent}" />
+            <TextBlock Grid.Row="1" Text="Reported power (dBm)" VerticalAlignment="Center" ToolTip.Tip="What the message says. Costas never changes it; it only warns when the radio looks different." />
+            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding DbmChoices}" SelectedItem="{Binding ReportedDbm}" HorizontalAlignment="Stretch" />
+            <TextBlock Grid.Row="2" Text="Radio power (%)" VerticalAlignment="Center" ToolTip.Tip="Set on the radio over CAT while the beacon runs, as a share of its maximum (at least 1 W), and put back after." />
+            <NumericUpDown Grid.Row="2" Grid.Column="1" Minimum="1" Maximum="100" Increment="1" FormatString="0" Value="{Binding PowerPercent}" />
+            <TextBlock Grid.Row="3" Text="Attenuation (dB)" VerticalAlignment="Center" ToolTip.Tip="Audio drive reduction on top of the radio's power, 0 to -20. WSPR has a constant envelope, so it stays clean." />
+            <NumericUpDown Grid.Row="3" Grid.Column="1" Minimum="-20" Maximum="0" Increment="1" FormatString="0" Value="{Binding AttenuationDb}" />
+            <TextBlock Grid.Row="4" Text="Audio offset (Hz)" VerticalAlignment="Center" ToolTip.Tip="The centre of the four tones, inside the 1400 to 1600 Hz WSPR window." />
+            <NumericUpDown Grid.Row="4" Grid.Column="1" Minimum="1400" Maximum="1600" Increment="10" FormatString="0" Value="{Binding OffsetHz}" />
+          </Grid>
+          <CheckBox Content="Prefer type 1 messages" IsChecked="{Binding PreferType1}"
+                    ToolTip.Tip="Send the 4-character locator only, even if yours has 6 characters." />
+        </StackPanel>
+        <Separator />
+        <CheckBox Content="Report what I hear to WSPRnet" IsChecked="{Binding UploadEnabled}"
+                  ToolTip.Tip="Uploads the signals heard to wsprnet.org under your callsign and locator. Off until you turn it on." />
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

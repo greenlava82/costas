@@ -48,6 +48,18 @@ internal sealed class FakeRemoteTarget : IRemoteTarget
 
     public void LogNow() => Calls.Add("logNow");
 
+    public string? BeaconStartResult { get; set; }
+
+    public Task<string?> StartBeaconAsync()
+    {
+        Calls.Add("wsprStart");
+        return Task.FromResult(BeaconStartResult);
+    }
+
+    public void StopBeacon(string? reason) => Calls.Add("wsprStop");
+
+    public void NoteWsprPresence() => Calls.Add("wsprHere");
+
     public string? SendMacro(int key)
     {
         Calls.Add("macro " + key);
