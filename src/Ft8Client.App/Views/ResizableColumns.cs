@@ -10,6 +10,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Media.TextFormatting;
 using Avalonia.VisualTree;
 
 namespace Ft8Client.App.Views;
@@ -85,14 +88,31 @@ public static class ResizableColumns
         {
             if (e.WidthChanged) Apply();
         }
+        // Auto-size: after each layout pass the grid says how wide its text is in the measured columns (Where, Why,
+        // Doing now), so the layout can give cut-off columns the room Doing now does not use. A hidden grid (Repeats
+        // turned off, a folded table) says nothing.
+        void OnLayoutUpdated(object? sender, EventArgs e)
+        {
+            var columns = layout.MeasuredColumns;
+            if (columns.Count == 0) return;
+            if (!grid.IsEffectivelyVisible)
+            {
+                layout.ReportNeeds(grid, null);
+                return;
+            }
+            layout.ReportNeeds(grid, MeasureColumns(grid, columns, layout.Count));
+        }
         var grips = GetIsHeader(grid) ? AddGrips(grid, layout, () => view.SaveColumns(name)) : [];
         Apply();
         layout.Changed += Apply;
         grid.SizeChanged += OnSize;
+        grid.LayoutUpdated += OnLayoutUpdated;
         grid.SetValue(UnhookProperty, () =>
         {
             layout.Changed -= Apply;
             grid.SizeChanged -= OnSize;
+            grid.LayoutUpdated -= OnLayoutUpdated;
+            layout.ReportNeeds(grid, null);
             foreach (var grip in grips) grid.Children.Remove(grip);
         });
     }
@@ -129,6 +149,13 @@ public static class ResizableColumns
             ToolTip.SetTip(grip, "Drag to move this edge: the column on one side grows, the other shrinks. Double-click to put both back.");
             Grid.SetColumn(grip, i);
             Grid.SetRowSpan(grip, Math.Max(1, grid.RowDefinitions.Count));
+            // A column auto-size widened is dragged from the width on screen, not the narrower one stored.
+            grip.DragStarted += (_, _) =>
+            {
+                var shown = layout.Fit(grid.Bounds.Width);
+                layout.Adopt(shown, left);
+                layout.Adopt(shown, left + 1);
+            };
             grip.DragDelta += (_, e) => layout.MoveEdge(left, e.Vector.X, grid.Bounds.Width);
             grip.DragCompleted += (_, _) => save();
             grip.DoubleTapped += (_, e) =>
@@ -142,5 +169,57 @@ public static class ResizableColumns
             grips.Add(grip);
         }
         return grips;
+    }
+
+    /// <summary>The width each of <paramref name="columns"/> needs to show its cells' text in full, by column index.</summary>
+    internal static double[] MeasureColumns(Grid grid, IReadOnlyList<int> columns, int count)
+    {
+        var needs = new double[count];
+        foreach (var child in grid.Children)
+        {
+            if (child is Thumb || Grid.GetColumnSpan(child) != 1) continue;
+            var column = Grid.GetColumn(child);
+            if (column < count && columns.Contains(column)) needs[column] = Math.Max(needs[column], NaturalWidth(child));
+        }
+        return needs;
+    }
+
+    /// <summary>
+    /// How wide a cell would be with no limit: text is measured on its own (a trimmed TextBlock's desired size is only
+    /// as wide as its column), panels add up or take the widest of what they hold, and anything else keeps its desired
+    /// width. Hidden content takes no room.
+    /// </summary>
+    internal static double NaturalWidth(Control c)
+    {
+        if (!c.IsVisible) return 0;
+        var margin = c.Margin.Left + c.Margin.Right;
+        switch (c)
+        {
+            case TextBlock t:
+                var padding = margin + t.Padding.Left + t.Padding.Right;
+                return string.IsNullOrEmpty(t.Text) ? padding
+                    : padding + TextWidth(t.Text, new Typeface(t.FontFamily, t.FontStyle, t.FontWeight, t.FontStretch), t.FontSize);
+            case StackPanel panel:
+                var shown = panel.Children.Where(x => x.IsVisible).Select(NaturalWidth).ToList();
+                if (shown.Count == 0) return margin;
+                return margin + (panel.Orientation == Orientation.Horizontal ? shown.Sum() + panel.Spacing * (shown.Count - 1) : shown.Max());
+            case Border { Child: Control child } border:
+                return margin + border.Padding.Left + border.Padding.Right + border.BorderThickness.Left + border.BorderThickness.Right + NaturalWidth(child);
+            default:
+                return double.IsNaN(c.Width) ? c.DesiredSize.Width : c.Width + margin;
+        }
+    }
+
+    private static readonly Dictionary<(string Text, Typeface Face, double Size), double> TextWidths = [];
+
+    // Rows re-measure after every layout pass, so widths are kept: the same place names and states come round again.
+    private static double TextWidth(string text, Typeface face, double size)
+    {
+        if (TextWidths.TryGetValue((text, face, size), out var width)) return width;
+        if (TextWidths.Count > 4096) TextWidths.Clear();
+        using var layout = new TextLayout(text, face, size, null);
+        width = Math.Ceiling(layout.WidthIncludingTrailingWhitespace);
+        TextWidths[(text, face, size)] = width;
+        return width;
     }
 }
