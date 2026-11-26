@@ -214,11 +214,13 @@ public sealed class MqttService : IAsyncDisposable
         var minutes = StatsPayloads.SessionMinutes(s, _clock.UtcNow);
         lock (_gate)
         {
-            if (_sessionMinutes == minutes) return;
+            if (!StatsOn || _sessionMinutes == minutes) return;
             _sessionMinutes = minutes;
-            _statsPayloads[t.SessionDuration] = StatsPayloads.SessionDuration(s, _clock.UtcNow);
+            var payload = StatsPayloads.SessionDuration(s, _clock.UtcNow);
+            _statsPayloads[t.SessionDuration] = payload;
+            // Queued under the lock, so it can never land after the empty message that clears it (see StatsSwitched).
+            p.Publish(new MqttOutgoing(t.SessionDuration, payload, true));
         }
-        p.Publish(new MqttOutgoing(t.SessionDuration, StatsPayloads.SessionDuration(s, _clock.UtcNow), true));
     }
 
     private void OnSessionChanged(SessionSnapshot s) => Safely(() => QueueSession(s));
@@ -383,15 +385,16 @@ public sealed class MqttService : IAsyncDisposable
         PublishSessionDuration(_onAir.Snapshot);
     }
 
-    // Retained statistics go out only when they change; the latest of each is sent again on every connect.
+    // Retained statistics go out only when they change; the latest of each is sent again on every connect. Checked and
+    // queued under the lock: statistics turned off while the worker counts must not be published after they were cleared.
     private void PublishStat(MqttPublisher p, string topic, string payload)
     {
         lock (_gate)
         {
-            if (_statsPayloads.TryGetValue(topic, out var old) && old == payload) return;
+            if (!StatsOn || (_statsPayloads.TryGetValue(topic, out var old) && old == payload)) return;
             _statsPayloads[topic] = payload;
+            p.Publish(new MqttOutgoing(topic, payload, true));
         }
-        p.Publish(new MqttOutgoing(topic, payload, true));
     }
 
     // A timer callback: an exception here would end the process.
@@ -550,20 +553,20 @@ public sealed class MqttService : IAsyncDisposable
     // Statistics turned on or off with Publish contacts: on counts everything afresh, off deletes what was published.
     private void StatsSwitched()
     {
+        _lastStats = null;
         lock (_gate)
         {
             _statsPayloads.Clear();
             _sessionMinutes = null;
+            // Under the same lock as every statistics publish, so none queued before this can follow the clearing.
+            if (!StatsOn && _publisher is { } p && _topics is { } t)
+                foreach (var topic in t.StatsTopics) p.Publish(new MqttOutgoing(topic, string.Empty, true));
         }
-        _lastStats = null;
         if (StatsOn)
         {
             _statsDirty = _qrzDirty = _pskDirty = true;
             SignalStats();
-            return;
         }
-        if (_publisher is { } p && _topics is { } t)
-            foreach (var topic in t.StatsTopics) p.Publish(new MqttOutgoing(topic, string.Empty, true));
     }
 
     private async Task StopPublisherAsync()
