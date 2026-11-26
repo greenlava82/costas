@@ -1,0 +1,133 @@
+<!-- The radio's own settings, together (owner pick 2026-11-26, option B): power, a FlexRadio's amplifier and tuner,
+     Tune, the transmit offset and Auto-select. On Operate this row sits at the foot of the contact card's on-air panel,
+     under the buttons for the contact; on the other views it sits in the bottom bar, where the contact card is out of
+     sight. One copy is on screen at a time. None of these keys the radio except Tune, which is the operator's click. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Ft8Client.App.ViewModels"
+             xmlns:v="using:Ft8Client.App.Views"
+             x:Class="Ft8Client.App.Views.RadioControls"
+             x:DataType="vm:MainViewModel">
+  <WrapPanel x:Name="Row" ItemSpacing="8" LineSpacing="8" VerticalAlignment="Center">
+    <!-- The radio's power setting, when the radio reports it over CAT. Changes the setting only, never keys. -->
+    <Button x:Name="PowerButton" AutomationProperties.Name="{Binding PowerText, StringFormat='Radio power {0}'}" VerticalAlignment="Center" IsVisible="{Binding HasPower}"
+            ToolTip.Tip="The radio's power setting. Click to change it.">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <TextBlock Text="{Binding PowerText}" Classes="num" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <TextBlock Text="▾" VerticalAlignment="Center" />
+      </StackPanel>
+      <Button.Flyout>
+        <Flyout>
+          <StackPanel Classes="flyout" Spacing="8" Width="240">
+            <TextBlock Text="Radio power" Classes="title" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Button Content="−5" Command="{Binding PowerStepCommand}" CommandParameter="-5" AutomationProperties.Name="5 watts less" />
+              <TextBox Text="{Binding PowerEntry}" Width="60" AutomationProperties.Name="Power in watts">
+                <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding PowerSetCommand}" /></TextBox.KeyBindings>
+              </TextBox>
+              <TextBlock Text="W" VerticalAlignment="Center" />
+              <Button Content="+5" Command="{Binding PowerStepCommand}" CommandParameter="5" AutomationProperties.Name="5 watts more" />
+              <Button Content="Use" Command="{Binding PowerSetCommand}" />
+            </StackPanel>
+            <TextBlock Text="{Binding PowerRange}" Classes="secondary" />
+            <TextBlock Text="{Binding PowerMessage}" TextWrapping="Wrap" Foreground="{DynamicResource CautionBrush}"
+                       IsVisible="{Binding PowerMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Text="Changes the radio's power setting only; it does not transmit. Not while a transmission is on the air."
+                       Classes="secondary" TextWrapping="Wrap" />
+            <TextBlock Text="Range wrong for your radio (100 W gives 50 W)? Type its top power in Settings › Station › Radio's top power."
+                       Classes="secondary" TextWrapping="Wrap" />
+          </StackPanel>
+        </Flyout>
+      </Button.Flyout>
+    </Button>
+    <!-- A FlexRadio's paired amplifier and tuner (PowerGenius XL, TunerGenius XL), through the radio's own API.
+         Shown only when the radio reports one; nothing switches without a click, and never while on the air. -->
+    <!-- A real button with a menu arrow, like the profile chip, so it reads as the way into the controls rather
+         than a status label. -->
+    <Button x:Name="AccessoryButton" AutomationProperties.Name="{Binding Accessory.BarText, StringFormat='Amplifier and tuner: {0}'}" VerticalAlignment="Center" IsVisible="{Binding Accessory.Any}"
+            ToolTip.Tip="The amplifier and tuner paired with your FlexRadio. Click for Operate, Standby and Bypass.">
+      <!-- "Amp: Standby  Tuner: Operate": the device as a quiet label, its state in bold (owner, 2026-11-18). -->
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding Accessory.HasAmp}">
+          <TextBlock Text="Amp:" Classes="secondary" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding Accessory.AmpState}" FontWeight="SemiBold" VerticalAlignment="Center"
+                     Foreground="{Binding Accessory.BarKind, Converter={x:Static v:Converters.KindBrush}}" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding Accessory.HasTuner}">
+          <TextBlock Text="Tuner:" Classes="secondary" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding Accessory.TunerState}" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </StackPanel>
+        <TextBlock Text="▾" VerticalAlignment="Center" Margin="-4,0,0,0" />
+      </StackPanel>
+      <Button.Flyout>
+        <Flyout>
+          <StackPanel Classes="flyout" Spacing="8" Width="280">
+            <StackPanel Spacing="6" IsVisible="{Binding Accessory.HasAmp}">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Text="{Binding Accessory.AmpState}" VerticalAlignment="Center"
+                           Foreground="{Binding Accessory.AmpKind, Converter={x:Static v:Converters.KindBrush}}" />
+                <TextBlock Text="{Binding Accessory.AmpName}" Classes="title" />
+              </DockPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button Content="Operate" Command="{Binding AmpOperateCommand}" IsEnabled="{Binding Accessory.CanAmpOperate}" MinWidth="90"
+                        AutomationProperties.Name="Amplifier to operate" />
+                <Button Content="Standby" Command="{Binding AmpStandbyCommand}" IsEnabled="{Binding Accessory.CanAmpStandby}" MinWidth="90"
+                        AutomationProperties.Name="Amplifier to standby" />
+              </StackPanel>
+            </StackPanel>
+            <StackPanel Spacing="6" IsVisible="{Binding Accessory.HasTuner}">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Text="{Binding Accessory.TunerState}" VerticalAlignment="Center" Classes="secondary" />
+                <TextBlock Text="{Binding Accessory.TunerName}" Classes="title" />
+              </DockPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button Content="Operate" Command="{Binding TunerOperateCommand}" IsEnabled="{Binding Accessory.CanTunerOperate}" MinWidth="90"
+                        AutomationProperties.Name="Tuner to operate" />
+                <Button Content="Standby" Command="{Binding TunerStandbyCommand}" IsEnabled="{Binding Accessory.CanTunerStandby}" MinWidth="90"
+                        AutomationProperties.Name="Tuner to standby" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button Content="Bypass" Command="{Binding TunerBypassCommand}" IsEnabled="{Binding Accessory.CanTunerBypass}" MinWidth="90"
+                        AutomationProperties.Name="Bypass the tuner" />
+                <Button Content="In line" Command="{Binding TunerInLineCommand}" IsEnabled="{Binding Accessory.CanTunerInLine}" MinWidth="90"
+                        AutomationProperties.Name="Tuner in line" />
+              </StackPanel>
+            </StackPanel>
+            <TextBlock Text="{Binding AccessoryMessage}" TextWrapping="Wrap" Foreground="{DynamicResource CautionBrush}"
+                       IsVisible="{Binding AccessoryMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Text="Switches them through your FlexRadio. It does not transmit, and it is not possible while a transmission is on the air."
+                       Classes="secondary" TextWrapping="Wrap" />
+          </StackPanel>
+        </Flyout>
+      </Button.Flyout>
+    </Button>
+    <Button x:Name="TuneButton" Content="{Binding TuneText}" Command="{Binding TuneCommand}" IsEnabled="{Binding CanTune}" MinWidth="70"
+            ToolTip.Tip="Starts the radio's own antenna tuner. A radio without one gets a steady tone at your transmit offset for up to 10 seconds instead. Click again to stop." />
+    <!-- The transmit offset and Auto-select stay together when the row wraps. -->
+    <StackPanel Orientation="Horizontal" Spacing="8">
+    <TextBlock Text="Tx" Classes="secondary" VerticalAlignment="Center" Margin="8,0,0,0" />
+    <Button x:Name="OffsetButton" AutomationProperties.Name="Transmit offset" VerticalAlignment="Center"
+            ToolTip.Tip="{Binding TxOffsetText, StringFormat='{}{0}. Where in the passband you transmit: click to set it, or click the waterfall.'}">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <TextBlock Text="{Binding TxOffsetShort}" Classes="num" VerticalAlignment="Center" />
+        <TextBlock Text="▾" VerticalAlignment="Center" />
+      </StackPanel>
+      <Button.Flyout>
+        <Flyout>
+          <StackPanel Classes="flyout" Spacing="8" Width="220">
+            <TextBlock Text="Transmit offset" Classes="title" />
+            <Button Content="Automatic (picks a clear spot)" Command="{Binding OffsetAutoCommand}" HorizontalAlignment="Stretch" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBox Text="{Binding ManualOffset}" Width="90" AutomationProperties.Name="Manual offset in hertz" />
+              <TextBlock Text="Hz" VerticalAlignment="Center" />
+              <Button Content="Use" Command="{Binding OffsetManualCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Flyout>
+      </Button.Flyout>
+    </Button>
+    <Button x:Name="AutoSelectButton" Content="Auto-select" Command="{Binding OffsetAutoCommand}"
+            ToolTip.Tip="Automatically pick a clear transmit channel" AutomationProperties.Name="Auto-select transmit channel" />
+    </StackPanel>
+  </WrapPanel>
+</UserControl>

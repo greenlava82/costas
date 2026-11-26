@@ -388,8 +388,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     public bool Showing(int tab) => Tab == tab || IsOut(tab);
 
     /// <summary>
-    /// The bottom bar shows Call CQ and the slot countdown only on views other than Operate, whose contact card has its own.
-    /// Halt Tx stays in the bar regardless.
+    /// The bottom bar shows Call CQ, the slot countdown and the radio's controls (power, amp and tuner, Tune, transmit
+    /// offset, Auto-select) only on views other than Operate, whose contact card has its own. Halt Tx stays in the bar regardless.
     /// </summary>
     [ObservableProperty]
     public partial bool BarShowsCqAndSlot { get; set; } = true;
@@ -426,6 +426,17 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     /// <summary>"Tx offset 1650 Hz · clear".</summary>
     [ObservableProperty]
     public partial string TxOffsetText { get; set; } = string.Empty;
+
+    /// <summary>The transmit offset on the Radio row's button: "1650 Hz", with "manual" and "busy" when they apply.</summary>
+    [ObservableProperty]
+    public partial string TxOffsetShort { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The transmit offset for the Radio row, short enough to sit beside power and Tune: "1650 Hz", plus "manual" when the
+    /// operator set it and "busy" when someone else is there. The full line (<see cref="TxOffsetText"/>) is its tooltip.
+    /// </summary>
+    public static string ShortOffset(int hz, bool clear, bool auto) =>
+        FormattableString.Invariant($"{hz} Hz") + (auto ? string.Empty : " · manual") + (clear ? string.Empty : " · busy");
 
     /// <summary>True once the radio has reported a transmit meter, so the meter strip shows.</summary>
     [ObservableProperty]
@@ -659,6 +670,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         UpdateTune(s);
         UpdateAccessories();
         TxOffsetText = (s.TxOffsetAuto ? string.Empty : "Manual · ") + TxOffsetPicker.Describe(new TxOffsetChoice(s.TxOffsetHz, s.TxOffsetClear));
+        TxOffsetShort = ShortOffset(s.TxOffsetHz, s.TxOffsetClear, s.TxOffsetAuto);
         // A line set by an operator action ("Added to your Hunt list", "not in the station list") stays for a few seconds;
         // the snapshot that the action itself publishes used to replace it before it could be read. A fault still shows.
         var (statusText, statusKind) = Status(s, SettingsMapper.Rtty(_host.Settings.Current));
