@@ -14,11 +14,16 @@ namespace Ft8Client.App.Services;
 /// <summary>A named desktop skin. Classic leaves Fluent's system accent in place.</summary>
 public sealed record AppSkin(string Id, string Name, string Description, SkinPalette Light, SkinPalette Dark, string? StyleResource = null)
 {
-    public CornerRadius PreviewCornerRadius => Id switch { "radio" => new(3), "retro" => new(2), "vintage" => new(14), "sdr" => new(0), _ => new(4) };
+    public CornerRadius PreviewCornerRadius => Id switch { "radio" => new(3), "retro" => new(2), "vintage" => new(14), "sdr" => new(0), "workbench" => new(6), "darkroom" => new(0), _ => new(4) };
     public bool HasSegmentedDisplay => Id == "retro";
     public bool HasPlainPreview => !HasSegmentedDisplay;
-    public FontFamily PreviewFont => Id == "vintage" ? new("Georgia, Liberation Serif, DejaVu Serif") :
-        StyleResource is not null ? new("Cascadia Mono, Consolas, DejaVu Sans Mono, monospace") : new("Segoe UI, DejaVu Sans");
+    public FontFamily PreviewFont => Id switch
+    {
+        "vintage" => new("Georgia, Liberation Serif, DejaVu Serif"),
+        "workbench" => new("avares://Costas/Assets/Fonts#IBM Plex Mono"),
+        "darkroom" => new("avares://Costas/Assets/Fonts#Red Hat Mono"),
+        _ => StyleResource is not null ? new("Cascadia Mono, Consolas, DejaVu Sans Mono, monospace") : new("Segoe UI, DejaVu Sans"),
+    };
     public string PreviewTitle => StyleResource is null ? "Next in line" : Id == "vintage" ? "Receiver dial" : "DIAL FREQUENCY";
 
     public static IReadOnlyList<AppSkin> All { get; } =
@@ -51,6 +56,14 @@ public sealed record AppSkin(string Id, string Name, string Description, SkinPal
             new("#E4EDF1", "#F7FBFC", "#A3BBC8", "#7895A7", "#142D3C", "#486777", "#006D82", "#005E72", "#C6E8EF", "#D1E0E7"),
             new("#0B141D", "#122331", "#36546A", "#58788F", "#E3F3FF", "#A1BED3", "#12657D", "#67DEEE", "#153D51", "#233C4F"),
             "SdrConsole.axaml"),
+        new("workbench", "Workbench", "A piece of bench test gear: putty or graphite panels, one safety-orange accent, pill-shaped keys, a dial knob and IBM Plex type.",
+            new("#D9D6CF", "#EFECE6", "#C4BFB5", "#A9A398", "#232323", "#66625A", "#C24A12", "#A63C0B", "#F3DCCB", "#DDD9D1"),
+            new("#1B1B1A", "#2A2A28", "#3E3D39", "#5A5852", "#ECE9E2", "#ABA79E", "#D9531A", "#FF8A4C", "#4A3020", "#35342F"),
+            "Workbench.axaml"),
+        new("darkroom", "Darkroom", "Red on near-black for night operating, like a darkroom safelight, so your eyes stay used to the dark. Light theme is rose paper with dark red ink.",
+            new("#F6E9E5", "#FDF6F4", "#DDBDB5", "#B98B81", "#3F0703", "#76271F", "#A51C12", "#8E1810", "#F0CFC6", "#EBD3CC"),
+            new("#080404", "#140807", "#6E2219", "#A0372B", "#FF6B57", "#E0503F", "#D93A2B", "#FF8C75", "#4D1510", "#3A120D"),
+            "Darkroom.axaml"),
     ];
 
     /// <summary>Old settings and unrecognized IDs retain the original appearance.</summary>

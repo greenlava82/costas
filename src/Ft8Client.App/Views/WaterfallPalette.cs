@@ -25,8 +25,11 @@ public static class WaterfallPalette
     /// <summary>Dark navy through blue and purple to bright red (owner request 2026-11-16).</summary>
     public const string Costas = "costas";
 
+    /// <summary>Black through dark red to bright red-orange only, for night operating with the Darkroom skin.</summary>
+    public const string NightRed = "night-red";
+
     /// <summary>The palettes offered, by id and the name shown.</summary>
-    public static IReadOnlyList<(string Id, string Name)> Choices { get; } = [(Wsjtx, "WSJT-X"), (Costas, "Blue to red")];
+    public static IReadOnlyList<(string Id, string Name)> Choices { get; } = [(Wsjtx, "WSJT-X"), (Costas, "Blue to red"), (NightRed, "Night red")];
 
     // WSJT-X Palettes/Default.pal (sourceforge.net/p/wsjt/wsjtx, b4f9a43, read 2026-11-16). GPLv3, as Costas.
     private static readonly (int R, int G, int B)[] WsjtxStops =
@@ -44,14 +47,24 @@ public static class WaterfallPalette
         (1.00, 255, 70, 50),
     ];
 
+    // No green or blue light beyond a little warmth at the top, so a dark-adapted eye stays dark-adapted.
+    private static readonly (double At, int R, int G, int B)[] NightRedStops =
+    [
+        (0.00, 0, 0, 0),
+        (0.35, 70, 6, 4),
+        (0.70, 190, 28, 18),
+        (1.00, 255, 110, 70),
+    ];
+
     private static readonly int[] WsjtxColours = WsjtxTable();
-    private static readonly int[] CostasColours = Enumerable.Range(0, Steps).Select(i => CostasColour(i / (Steps - 1.0))).ToArray();
+    private static readonly int[] CostasColours = Enumerable.Range(0, Steps).Select(i => Interpolate(CostasStops, i / (Steps - 1.0))).ToArray();
+    private static readonly int[] NightRedColours = Enumerable.Range(0, Steps).Select(i => Interpolate(NightRedStops, i / (Steps - 1.0))).ToArray();
 
     /// <summary>The colour table for a palette id; an unknown id gets the WSJT-X palette.</summary>
-    public static int[] Colours(string? id) => id == Costas ? CostasColours : WsjtxColours;
+    public static int[] Colours(string? id) => id switch { Costas => CostasColours, NightRed => NightRedColours, _ => WsjtxColours };
 
     /// <summary>A known palette id, or the WSJT-X palette for anything else.</summary>
-    public static string Known(string? id) => id == Costas ? Costas : Wsjtx;
+    public static string Known(string? id) => id is Costas or NightRed ? id : Wsjtx;
 
     /// <summary>The colour at a step of a palette.</summary>
     public static int At(string? id, int step) => Colours(id)[Math.Clamp(step, 0, Steps - 1)];
@@ -75,11 +88,11 @@ public static class WaterfallPalette
         return table;
     }
 
-    private static int CostasColour(double t)
+    private static int Interpolate((double At, int R, int G, int B)[] stops, double t)
     {
         var k = 1;
-        while (k < CostasStops.Length - 1 && t > CostasStops[k].At) k++;
-        var (a, b) = (CostasStops[k - 1], CostasStops[k]);
+        while (k < stops.Length - 1 && t > stops[k].At) k++;
+        var (a, b) = (stops[k - 1], stops[k]);
         var f = Math.Clamp((t - a.At) / (b.At - a.At), 0, 1);
         return Argb(a.R + f * (b.R - a.R), a.G + f * (b.G - a.G), a.B + f * (b.B - a.B));
     }
