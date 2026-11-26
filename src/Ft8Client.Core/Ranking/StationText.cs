@@ -244,7 +244,13 @@ public static class StationText
         return town is null ? e.Name : $"{town}, {e.Name}";
     }
 
-    /// <summary>The "Where" column: place, then distance when known.</summary>
+    /// <summary>Place, then distance when known: "London, ON, Canada · 1,550 mi".</summary>
     public static string Where(Station s, DistanceUnit unit) =>
-        s.DistanceKm is { } km ? $"{Place(s.Entity, s.Region, s.City)} · {Distance(km, unit)}" : Place(s.Entity, s.Region, s.City);
+        s.DistanceKm is { } km ? $"{Place(s)} · {Distance(km, unit)}" : Place(s);
+
+    /// <summary>The "Where" column of the Operate tables: the place only, as <see cref="Place(EntityMatch?, string?, string?)"/>.</summary>
+    public static string Place(Station s) => Place(s.Entity, s.Region, s.City);
+
+    /// <summary>The "Distance" column: "1,550 mi" or "2,494 km", or empty when the station's grid is not known.</summary>
+    public static string Distance(Station s, DistanceUnit unit) => s.DistanceKm is { } km ? Distance(km, unit) : string.Empty;
 }
