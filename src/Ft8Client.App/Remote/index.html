@@ -954,7 +954,7 @@ function renderTune(s) {
   box.append(top);
   if (!s.canChangeBand) box.append(el("div", "s", "Wait until this transmission ends to change band."));
   const seg = el("div", "seg");
-  ["FT8", "FT4"].forEach(m => seg.append(button(m, s.mode === m ? "on" : "", () => { if (s.mode !== m) changeBand(s.band, m); }, !s.canChangeBand)));
+  ["FT8", "FT4", "WSPR"].forEach(m => seg.append(button(m, s.mode === m ? "on" : "", () => { if (s.mode !== m) changeBand(s.band, m); }, !s.canChangeBand)));
   box.append(el("div", "lbl", "Mode"), seg, el("div", "lbl", "Band"));
   const grid = el("div", "grid");
   s.bands.forEach(b => grid.append(button(b.name, b.key === s.band ? "on" : "", () => { if (b.key !== s.band) changeBand(b.key); }, !s.canChangeBand)));

@@ -91,6 +91,18 @@ public class RemoteWsprTests
     }
 
     [Fact]
+    public async Task HandleAsync_BandOrModeChangeWhileTheBeaconRuns_IsRefusedUntilItIsStopped()
+    {
+        var beacon = new WsprBeaconView(true, true, "", Now.AddMinutes(4), null, null, 20, 37, 0, null, null, null);
+        _target.Snapshot = new SessionSnapshot { Mode = Mode.Wspr, Band = "20m", Wspr = new WsprView([], Now.AddMinutes(1), null, 0, "") { Beacon = beacon } };
+        var rc = new RemoteControl(_target, _clock, new DeviceTokens(), _ => { }, new FakeRemoteTuning());
+
+        var why = await rc.HandleAsync("phone", new RemoteCommand("band", Band: "40m", Mode: "FT8"));
+
+        why.Should().Be("Stop the beacon first: changing band or mode ends it.");
+    }
+
+    [Fact]
     public void Build_NotInWspr_HasNoWsprCard()
     {
         var s = RemoteStateBuilder.Build(new SessionSnapshot { MyCall = "W7LIT", Mode = Mode.Ft8, Band = "20m", DialHz = 14_074_000 }, Now, new RemoteContext(), "you", null);

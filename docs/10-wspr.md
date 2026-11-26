@@ -179,3 +179,5 @@ Nothing on this list has been done. Everything built so far ran on a simulated r
 - [ ] **W4, presence:** leave the desk: the beacon stops after the Tx watchdog minutes (at least 2); tap I'm here on the phone and see it carry on.
 - [ ] **W6, an evening of hopping across three bands:** a list such as `20m, 40m, 30m`; check the radio and tuner follow, the first slot on each band only receives, and a band your licence does not allow only receives.
 - [ ] **Decisions above that change what goes on the air:** WSJT-X's slot table (D29, done as you chose), the 20 ms ramp, the centred audio offset, the dwell for hopping.
+
+- **W5 (added later) · Phone mode picker:** the phone's FT8 / FT4 buttons gain **WSPR**, so the phone can move the station into WSPR mode. While the beacon runs the phone refuses a band or mode change ("Stop the beacon first: changing band or mode ends it."), which replaces the earlier decision that a phone change stops it without asking.

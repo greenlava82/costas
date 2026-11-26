@@ -374,6 +374,7 @@ public sealed class RemoteControl
     {
         if (_tuning is null) return "The station cannot change that from the phone.";
         if (_target.Snapshot.Transmitting) return "Wait until this transmission ends to change band.";
+        if (_target.Snapshot.Wspr?.Beacon.On == true) return "Stop the beacon first: changing band or mode ends it.";
         var mode = _target.Snapshot.Mode;
         if (cmd.Mode is { Length: > 0 } m && !ModeInfo.TryParse(m, out mode)) return $"{m} is not a mode the station knows.";
         var bands = _tuning.Bands(mode);
