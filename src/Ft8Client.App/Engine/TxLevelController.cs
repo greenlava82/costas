@@ -28,6 +28,13 @@ public sealed class TxLevelController
     /// </summary>
     public const double AutoHeadroomDb = 6;
 
+    /// <summary>
+    /// How far above the band's FT8 level PSK starts, and how far a quiet PSK transmission may rise in one go. PSK peaks
+    /// at half scale (6 dB below FT8's steady tone), so at the FT8 level its peaks reach only a quarter of the power
+    /// FT8 does; 5 dB up brings them to about 1 dB under the point where FT8 found the ALC starting to act.
+    /// </summary>
+    public const double PskAboveBandDb = 5;
+
     private readonly Transmitter _tx;
     private readonly AppSettingsAccessor _settings;
     private readonly object _gate = new();
@@ -56,13 +63,28 @@ public sealed class TxLevelController
 
     /// <summary>
     /// The transmit level for <paramref name="band"/> in <paramref name="mode"/>: its own if it has one, else the band's,
-    /// else the level in Settings. PSK keeps a level of its own on each band, since it aims for no ALC at all.
+    /// else the level in Settings. PSK keeps a level of its own on each band, since it aims for no ALC at all; until it
+    /// has one it starts at <see cref="PskStartDb"/>.
     /// </summary>
     public static double LevelFor(AudioSettings audio, string band, string? mode = null)
     {
         ArgumentNullException.ThrowIfNull(audio);
-        return audio.TxGainByBand.TryGetValue(LevelKey(band, mode), out var g) || audio.TxGainByBand.TryGetValue(band, out g) ? g : audio.TxGainDb;
+        if (audio.TxGainByBand.TryGetValue(LevelKey(band, mode), out var own)) return own;
+        return IsPsk(mode) ? PskStartDb(audio, band) : BandLevel(audio, band);
     }
+
+    /// <summary>
+    /// Where PSK starts on <paramref name="band"/>: <see cref="PskAboveBandDb"/> above the band's FT8 level (or the level
+    /// in Settings), at most 0 dBFS. A quiet PSK transmission below it rises straight to it.
+    /// </summary>
+    public static double PskStartDb(AudioSettings audio, string band)
+    {
+        ArgumentNullException.ThrowIfNull(audio);
+        return Math.Min(0, Math.Round(BandLevel(audio, band) + PskAboveBandDb, 1));
+    }
+
+    private static double BandLevel(AudioSettings audio, string band) =>
+        audio.TxGainByBand.TryGetValue(band, out var g) ? g : audio.TxGainDb;
 
     /// <summary>Where a band's level is kept: the band (FT8, FT4, RTTY), or "20m PSK" for PSK31 and PSK63.</summary>
     public static string LevelKey(string band, string? mode) => IsPsk(mode) ? band + " PSK" : band;
@@ -106,7 +128,8 @@ public sealed class TxLevelController
             var known = _states.TryGetValue(band, out var st) && st.GainDb == gain;
             previous = known ? _lastChange.GetValueOrDefault(band) : null;
             step = TxLevelTuner.Next(known ? st! : new TxLevelState(gain), alc, audio.TxGainDb + AutoHeadroomDb,
-                audio.TxGainDb - AudioSettings.AutoLowestBelowDb, zeroAlc: psk);
+                audio.TxGainDb - AudioSettings.AutoLowestBelowDb, zeroAlc: psk,
+                riseToDb: psk ? PskStartDb(audio, sent.Band) : null);
             _states[band] = step.State;
             _lastChange[band] = step.Change;
         }

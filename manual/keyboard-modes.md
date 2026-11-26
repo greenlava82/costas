@@ -167,7 +167,12 @@ last added key goes altogether). If every key is empty, the default macros come 
   radio does not take it back, a note under the macro keys says what to set, and Costas tries again on the next mode
   change or reconnect.
 - For PSK, automatic transmit level aims for no ALC at all, since any ALC action makes a PSK signal wider. It keeps a
-  separate level for PSK on each band, so your FT8 level is not affected.
+  separate level for PSK on each band, so your FT8 level is not affected. A band's PSK level starts 5 dB above its FT8
+  level, because a PSK signal's peaks are half the height of FT8's steady tone; if a PSK over shows no ALC while the
+  level is still below that, the next over goes straight to it rather than creeping up half a decibel at a time.
+- The power meter can read lower on PSK than on FT8, and that is normal: the signal swells and dips between its peaks,
+  so at a clean level its average power is about half of what you set (around 20 to 25 W with the radio at 45 W).
+  On the FT-710, anything under 5 W shows as **≤5 W**, because the radio does not report lower powers.
 - RTTY goes out at the same audio level as FT8 on that band (the power cap above keeps it cool).
 - Costas puts the radio in its data mode (DATA-U on Yaesu) for PSK and RTTY, as for FT8, and makes the tones itself.
   Leave the radio's own PSK and RTTY modes alone: its RTTY mode needs FSK keying and its PSK mode uses the radio's
