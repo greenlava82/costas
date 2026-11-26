@@ -162,3 +162,7 @@ Status (2026-10-14, `feature/keyboard-modes`): built. V23 and V24 confirmed from
 In order of value: band advice, alerts, Hound mode, inbound UDP, LoTW, streaming decode, awards page, then macOS and Linux builds.
 
 Done so far: alerts (Hunt list, docs/04 §16) and LoTW (docs/05 §7b).
+
+## M13 · WSPR mode
+
+Spec: `10-wspr.md`, build guide `10-wspr-build.md`, owner decision D29. Build in the order of its section 9 (W0 to W6), each step's acceptance tests passing before the next. Starts after M12.

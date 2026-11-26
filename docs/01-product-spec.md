@@ -66,7 +66,7 @@ Hound contacts (built 2026-10-12; automatic for a recognised Fox since 2026-10-1
 
 ### Later or not planned
 
-Waterfall (optional panel in the Raw decodes tab). Other modes (WSPR, JT65, Q65, MSK144, FST4, JTTY). Contest exchanges. Fox and SuperFox transmit (dropped by the owner 2026-11-14). Map view. Translations. macOS builds (design for them; do not build them yet). Linux: a preview is built, transmit included (D17).
+Waterfall (optional panel in the Raw decodes tab). WSPR mode (owner decision D29, spec in `10-wspr.md`; not built yet). Other modes (JT65, Q65, MSK144, FST4, JTTY). Contest exchanges. Fox and SuperFox transmit (dropped by the owner 2026-11-14). Map view. Translations. macOS builds (design for them; do not build them yet). Linux: a preview is built, transmit included (D17).
 
 ## Protocol facts the design relies on
 
