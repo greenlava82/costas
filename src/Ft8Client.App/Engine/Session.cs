@@ -223,7 +223,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     public void OnSlotEvent(SlotEvent e)
     {
         // In a keyboard mode nothing is cut into slots: text arrives through ApplyText as it is read.
-        if (!ModeInfo.IsSlotted(Config.Mode))
+        if (ModeInfo.IsKeyboard(Config.Mode))
         {
             _tx.OnSlotEvent(e);
             return;
@@ -946,7 +946,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// </summary>
     public async Task<bool> CallStationAsync(string call)
     {
-        if (!ModeInfo.IsSlotted(Config.Mode)) return CallStation(call);
+        if (ModeInfo.IsKeyboard(Config.Mode)) return CallStation(call);
         bool switching;
         lock (_gate)
         {
@@ -971,7 +971,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     // afterHalt: my transmission in this slot was just cut off for this call, so the slot may be used again.
     private bool CallStation(string call, bool afterHalt)
     {
-        if (!ModeInfo.IsSlotted(Config.Mode)) return CallKeyboardStation(call);
+        if (ModeInfo.IsKeyboard(Config.Mode)) return CallKeyboardStation(call);
         lock (_gate)
         {
             var now = _clock.UtcNow;
@@ -1060,7 +1060,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// <summary>Starts or stops calling CQ.</summary>
     public void ToggleCq()
     {
-        if (!ModeInfo.IsSlotted(Config.Mode))
+        if (ModeInfo.IsKeyboard(Config.Mode))
         {
             ToggleKeyboardCq();
             return;
@@ -1086,7 +1086,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// <summary>Stops calling CQ; does nothing when CQ is not on, so a tap that arrives late never starts it.</summary>
     public void StopCq()
     {
-        if (!ModeInfo.IsSlotted(Config.Mode))
+        if (ModeInfo.IsKeyboard(Config.Mode))
         {
             StopKeyboardCq();
             return;
@@ -1139,7 +1139,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         lock (_gate)
         {
             if (ModeInfo.IsSlotted(_config.Mode)) _engine.LogNow(_clock.UtcNow);
-            else _kbd.LogNow(_clock.UtcNow);
+            else if (ModeInfo.IsKeyboard(_config.Mode)) _kbd.LogNow(_clock.UtcNow);
         }
         Publish();
     }
@@ -1741,7 +1741,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         lock (_gate)
         {
             var now = _clock.UtcNow;
-            var keyboard = !ModeInfo.IsSlotted(_config.Mode);
+            var keyboard = ModeInfo.IsKeyboard(_config.Mode);
             var stations = _tracker.Stations.ToList();
             var contestScore = ScoreNow();
             var rank = Ranker.Rank(RankInputAt(stations, now, contestScore));

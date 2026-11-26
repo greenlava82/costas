@@ -240,7 +240,7 @@ public sealed class ContactPanelViewModel
     {
         ArgumentNullException.ThrowIfNull(c);
         ArgumentNullException.ThrowIfNull(s);
-        return ModeInfo.IsSlotted(c.Mode ?? s.Mode) ? From(c, s, nowUtc, units, qrzName) : FromKeyboard(c, s, units, qrzName);
+        return ModeInfo.IsKeyboard(c.Mode ?? s.Mode) ? FromKeyboard(c, s, units, qrzName) : From(c, s, nowUtc, units, qrzName);
     }
 
     /// <summary>

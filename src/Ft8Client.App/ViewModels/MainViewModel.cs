@@ -645,7 +645,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
             foreach (var w in _callers.Fresh) _host.Notifications.Raise(NotificationText.Caller(w, s.Band, modeKey));
         }
         Raw.Units = Operate.Units;
-        Raw.Apply(s.RawDecodes, s.Rank, s.Contact?.DxCall, keyboard: !ModeInfo.IsSlotted(s.Mode), band: s.Band);
+        Raw.Apply(s.RawDecodes, s.Rank, s.Contact?.DxCall, keyboard: ModeInfo.IsKeyboard(s.Mode), band: s.Band);
         Logged.Apply(s.LastLogged);
         if (!ReferenceEquals(s.LastLogged, _lastLogged))
         {
@@ -1131,7 +1131,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     /// <inheritdoc />
     public void KeyboardListen(int hz)
     {
-        if (!ModeInfo.IsSlotted(_host.Session.Config.Mode)) _host.Keyboard.Listen(hz);
+        if (ModeInfo.IsKeyboard(_host.Session.Config.Mode)) _host.Keyboard.Listen(hz);
     }
 
     /// <inheritdoc />
@@ -1412,7 +1412,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
     {
         Operate.CloseDetails();
         var s = _host.Session.Snapshot;
-        if (!ModeInfo.IsSlotted(s.Mode))
+        if (ModeInfo.IsKeyboard(s.Mode))
         {
             // PSK and RTTY: the first Esc stops the over and keeps the contact, the second abandons.
             var action = EscapeDecision(s, _escArmed);
@@ -1606,7 +1606,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         if (s.Contact is { Outcome: ContactOutcome.InProgress } c)
         {
             if (!s.Transmitting) return ($"Waiting for {c.DxCall}.", TextKind.Normal);
-            if (!ModeInfo.IsSlotted(s.Mode)) return ($"Transmitting to {c.DxCall}.", TextKind.Critical);
+            if (ModeInfo.IsKeyboard(s.Mode)) return ($"Transmitting to {c.DxCall}.", TextKind.Critical);
             // An answer decoded after the slot began cannot change what is already on the air (usually still the CQ).
             var onAir = s.TransmittingMessage;
             var toDx = onAir is not null && Callsign.EqualsCall(onAir.Split(' ')[0].Trim('<', '>'), c.DxCall);
@@ -1624,7 +1624,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
         if (s.CqListening) return ("CQ sent. Listening for an answer.", TextKind.Normal);
         if (s.Contact is { Outcome: ContactOutcome.NoReply, Flow: ContactFlow.Hound } fox) return (fox.StatusText, TextKind.Caution);
         var top = s.Rank.Line.FirstOrDefault();
-        if (!ModeInfo.IsSlotted(s.Mode))
+        if (ModeInfo.IsKeyboard(s.Mode))
         {
             var name = KeyboardModeName(s.Mode, rtty ?? RttyFormat.Standard);
             if (s.Transmitting) return ($"Transmitting {name}.", TextKind.Critical);

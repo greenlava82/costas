@@ -6,12 +6,15 @@
 // License, or (at your option) any later version. This program is distributed WITHOUT ANY WARRANTY;
 // see the GNU General Public License in LICENSE for details.
 
+using Ft8Client.Core.Wspr;
+
 namespace Ft8Client.Core;
 
 /// <summary>
 /// Protocol constants per mode. FT8 and FT4 values are from the QEX FT4/FT8 paper and the WSJT-X source; the keyboard
-/// modes are in docs/09-keyboard-modes.md. Every slot, decoder and transmit timing helper is for the slotted modes only
-/// and throws for the others, so FT8 code can never silently treat PSK or RTTY as FT4.
+/// modes are in docs/09-keyboard-modes.md and WSPR in docs/10-wspr.md. The slot and transmit timing helpers are for the modes
+/// with slots (FT8, FT4, WSPR) and throw for the others; the <c>jt9</c> helpers are for FT8 and FT4 only and throw for the
+/// rest, so FT8 code can never silently treat PSK, RTTY or WSPR as FT4.
 /// </summary>
 public static class ModeInfo
 {
@@ -24,11 +27,29 @@ public static class ModeInfo
     /// </summary>
     public static IReadOnlyList<Mode> Operable { get; } = [Mode.Ft8, Mode.Ft4, Mode.Psk31, Mode.Psk63, Mode.Rtty];
 
-    /// <summary>True for modes that run in fixed time slots (FT8, FT4).</summary>
+    /// <summary>
+    /// True for the modes that run the FT8/FT4 pipeline (<c>jt9</c>, the contact engine, the early pass): FT8 and FT4.
+    /// WSPR has slots but is not slotted in this sense; use <see cref="HasSlots"/> for "runs in time slots".
+    /// </summary>
     public static bool IsSlotted(Mode mode) => mode is Mode.Ft8 or Mode.Ft4;
 
+    /// <summary>True for the keyboard modes, which run continuously: PSK31, PSK63 and RTTY.</summary>
+    public static bool IsKeyboard(Mode mode) => mode is Mode.Psk31 or Mode.Psk63 or Mode.Rtty;
+
+    /// <summary>True for WSPR.</summary>
+    public static bool IsWspr(Mode mode) => mode is Mode.Wspr;
+
+    /// <summary>True for the modes that run in fixed time slots: FT8, FT4 and WSPR.</summary>
+    public static bool HasSlots(Mode mode) => mode is Mode.Ft8 or Mode.Ft4 or Mode.Wspr;
+
     /// <summary>Slot length in milliseconds.</summary>
-    public static int SlotMilliseconds(Mode mode) => Slotted(mode) == Mode.Ft8 ? 15_000 : 7_500;
+    public static int SlotMilliseconds(Mode mode) => mode switch
+    {
+        Mode.Ft8 => 15_000,
+        Mode.Ft4 => 7_500,
+        Mode.Wspr => WsprTiming.SlotMilliseconds,
+        _ => throw NoSlots(mode),
+    };
 
     /// <summary>Slot length as a time span.</summary>
     public static TimeSpan SlotLength(Mode mode) => TimeSpan.FromMilliseconds(SlotMilliseconds(mode));
@@ -43,15 +64,33 @@ public static class ModeInfo
     public static char Separator(Mode mode) => Slotted(mode) == Mode.Ft8 ? '~' : '+';
 
     /// <summary>Delay from slot start to the start of transmit audio, in milliseconds.</summary>
-    public static int TxStartMilliseconds(Mode mode) => Slotted(mode) == Mode.Ft8 ? 500 : 500;
+    public static int TxStartMilliseconds(Mode mode) => mode switch
+    {
+        Mode.Ft8 or Mode.Ft4 => 500,
+        Mode.Wspr => WsprTiming.TxStartMilliseconds,
+        _ => throw NoSlots(mode),
+    };
 
-    /// <summary>Length of one transmission in milliseconds: FT8 is 79 symbols of 160 ms, FT4 is 105 symbols of 48 ms.</summary>
-    public static int TxMilliseconds(Mode mode) => Slotted(mode) == Mode.Ft8 ? 12_640 : 5_040;
+    /// <summary>
+    /// Length of one transmission in milliseconds: FT8 is 79 symbols of 160 ms, FT4 is 105 symbols of 48 ms, WSPR is 162
+    /// symbols of 8192/12000 s.
+    /// </summary>
+    public static int TxMilliseconds(Mode mode) => mode switch
+    {
+        Mode.Ft8 => 12_640,
+        Mode.Ft4 => 5_040,
+        Mode.Wspr => WsprTiming.TxMilliseconds,
+        _ => throw NoSlots(mode),
+    };
 
     /// <summary>When a transmission ends, measured from the start of its slot.</summary>
     public static TimeSpan TxEnd(Mode mode) => TimeSpan.FromMilliseconds(TxStartMilliseconds(mode) + TxMilliseconds(mode));
 
-    /// <summary>Signal bandwidth in hertz, used for transmit offset occupancy. RTTY is the 170 Hz shift plus its keying sidebands.</summary>
+    /// <summary>
+    /// Signal bandwidth in hertz, used for transmit offset occupancy and the band-edge guard. RTTY is the 170 Hz shift plus its
+    /// keying sidebands. WSPR is its whole 1400 to 1600 Hz window rather than its 6 Hz signal, so the guard checks the window
+    /// (docs/10-wspr.md section 3, owner 2026-11-26).
+    /// </summary>
     public static int OccupiedBandwidthHz(Mode mode) => mode switch
     {
         Mode.Ft8 => 50,
@@ -59,6 +98,7 @@ public static class ModeInfo
         Mode.Psk31 => 60,
         Mode.Psk63 => 120,
         Mode.Rtty => 250,
+        Mode.Wspr => WsprTiming.WindowHighHz - WsprTiming.WindowLowHz,
         _ => throw Unknown(mode),
     };
 
@@ -76,6 +116,7 @@ public static class ModeInfo
         Mode.Psk31 => ("PSK", "PSK31"),
         Mode.Psk63 => ("PSK", "PSK63"),
         Mode.Rtty => ("RTTY", null),
+        Mode.Wspr => ("WSPR", null),
         _ => throw Unknown(mode),
     };
 
@@ -87,6 +128,7 @@ public static class ModeInfo
         Mode.Psk31 => "PSK31",
         Mode.Psk63 => "PSK63",
         Mode.Rtty => "RTTY",
+        Mode.Wspr => "WSPR",
         _ => throw Unknown(mode),
     };
 
@@ -101,9 +143,11 @@ public static class ModeInfo
         return false;
     }
 
-    /// <summary>Returns a slotted mode unchanged and throws for any other.</summary>
+    /// <summary>Returns FT8 or FT4 unchanged and throws for any other mode (the <c>jt9</c> and FT encoder helpers).</summary>
     public static Mode Slotted(Mode mode) =>
-        IsSlotted(mode) ? mode : throw new ArgumentOutOfRangeException(nameof(mode), mode, $"{mode} has no time slots.");
+        IsSlotted(mode) ? mode : throw new ArgumentOutOfRangeException(nameof(mode), mode, $"{mode} is not FT8 or FT4.");
+
+    private static ArgumentOutOfRangeException NoSlots(Mode mode) => new(nameof(mode), mode, $"{mode} has no time slots.");
 
     private static ArgumentOutOfRangeException Unknown(Mode mode) => new(nameof(mode), mode, "Unknown mode.");
 }

@@ -100,6 +100,12 @@ Tests (`tests/Ft8Client.Core.Tests`): `ModeInfo` cases for WSPR on every member 
 - `--simulate`: replay `samples/wspr/` through the same path (copy `SimulatedSlotSource`).
 - Tests: simulation over `samples/wspr/` yields the golden spots; FT commands refused in WSPR; switching FT8 → WSPR → FT8 leaves FT8 behaviour unchanged.
 
+**Left by W0b for W1 (2026-11-26).** These sites keep `IsSlotted` and need a WSPR decision in W1, not before:
+- FT8-only and safe as they are (WSPR is refused or skipped): `Session.RefuseKeyboardTransmit` (WSPR gets the keyboard wording; give it "Not in WSPR mode"), `Session.AutoCall` (lines 40, 68), `Session.cs` late start (line 1706), `MainViewModel` UDP Reply refusal (line 142; its text names PSK and RTTY), `UdpInteropService.Replay`, `WhyQuiet.Explain`, `ContactPanelViewModel` line 145, `FrequencyTable.TransmitAllowed` "no row for this mode" (line 49, which stays strict for WSPR: W1's `frequencies.json` rows are what let WSPR through).
+- Neutral, where W1 or W5 should switch to `HasSlots` once the WSPR slot clock runs: `SlotClock` constructor and `SetMode`, the waterfall slot marks (`MainWindow.axaml.cs` line 137), the clock countdown (`MainViewModel` line 727), `RemoteStateBuilder` line 63, `SessionSnapshot.InTransmitSlot`, `UdpInteropService` `TrPeriodSeconds`, `HeardMapViewModel` line 175, the band-opening refresh periods (`Session.cs` lines 1627, 1639, 1651), `OperateViewModel.ReportUnit` and `LogComment.Rst`.
+- `SampleFile.IsJt9Slot` now keeps `samples/wspr/` away from `jt9`: the golden test, `SimulatedSlotSource` and DecodeCli use it. W1's WSPR replay reads that folder itself.
+- `FrequencyTable.TransmitAllowed` now treats WSPR like FT8 (the window starts at the offset passed, so W4 passes `WindowLowHz` with a 200 Hz width); only the keyboard modes centre their width on the offset.
+
 ### W2 · Reporting to WSPRnet
 
 Copy `PskSpotUploader` and `PskReporterService` for shape, and `Fakes/FakeQrzServer.cs` for the fake.

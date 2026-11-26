@@ -223,7 +223,7 @@ public partial class MainWindow : Window
         ReceiveWaterfall.Update(null, hz);
         _waterfallWindow?.View.Update(null, hz);
         // In a keyboard mode a click also reads the signal there, and keeps reading it while it is quiet.
-        if (!Core.ModeInfo.IsSlotted(vm.Host.Session.Config.Mode)) vm.Host.Keyboard.Listen(hz);
+        if (Core.ModeInfo.IsKeyboard(vm.Host.Session.Config.Mode)) vm.Host.Keyboard.Listen(hz);
     }
 
     private double WaterfallHeight => BottomGrid.RowDefinitions[2].Height.Value;

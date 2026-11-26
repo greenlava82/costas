@@ -582,7 +582,7 @@ public sealed partial class OperateViewModel : ObservableObject
         // so it re-ranks every few seconds. The full decode after the early pass of the same slot does not reorder the
         // list: rows shown keep their order and new ones go in at their rank (PR #150, owner sign-off 2026-11-14).
         var bandMode = (s.Band, s.Mode);
-        var keyboardDue = !ModeInfo.IsSlotted(s.Mode) && now - _lastKeyboardRank >= KeyboardRankEvery;
+        var keyboardDue = ModeInfo.IsKeyboard(s.Mode) && now - _lastKeyboardRank >= KeyboardRankEvery;
         var listKey = RankedKey(s);
         if (_lastRanked != listKey || _line.Applied is null || _lastRankedBand != bandMode || keyboardDue)
         {
@@ -635,8 +635,8 @@ public sealed partial class OperateViewModel : ObservableObject
         RepeatsSubtitle = $"Heard now and already in your log on {band} {ModeInfo.Name(s.Mode)}.";
         RepeatsEmptyText = Repeats.Count > 0 ? string.Empty : $"Nobody you have worked on {band} is on the air right now.";
 
-        UnnamedText = ModeInfo.IsSlotted(s.Mode) ? string.Empty : UnnamedSignalsText(s.UnnamedSignals);
-        Summary = s.Summary is null ? null : new SummaryViewModel(s.Summary, s.LogIsEmpty, ModeInfo.IsSlotted(s.Mode) ? null : s.Activity,
+        UnnamedText = ModeInfo.IsKeyboard(s.Mode) ? UnnamedSignalsText(s.UnnamedSignals) : string.Empty;
+        Summary = s.Summary is null ? null : new SummaryViewModel(s.Summary, s.LogIsEmpty, ModeInfo.IsKeyboard(s.Mode) ? s.Activity : null,
             s.BandAdvice, Units, now);
         Contact = s.Contact is null ? null : ContactPanelViewModel.For(s.Contact, s, now, Units, QrzName?.Invoke(s.Contact.DxCall));
         OnPropertyChanged(nameof(InContact));
@@ -697,7 +697,7 @@ public sealed partial class OperateViewModel : ObservableObject
     private void UpdateSlot(DateTime now)
     {
         var mode = _snap?.Mode ?? Mode.Ft8;
-        if (!ModeInfo.IsSlotted(mode))
+        if (ModeInfo.IsKeyboard(mode))
         {
             // Keyboard modes have no slot to count down: the readout counts what is typed ahead or still to send.
             SlotProgress = Keyboard.ReadoutProgress;

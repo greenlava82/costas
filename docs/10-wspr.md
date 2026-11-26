@@ -111,3 +111,5 @@ Step-by-step directions, files, traps and stop-and-ask points: `10-wspr-build.md
 | W4 | Beacon scheduler, presence rule, power and attenuation, guards | Automated with `SimulatedRig` and a manual clock: PTT lead and tail, release on fault, refusals off-band and with a 3 s clock error, presence timeout stops after the current transmission, presence time never under 2 min, nothing keys after a restart. Manual: my beacon is heard on WSPRnet |
 | W5 | WSPR view and phone remote | Automated: view-model tests. Manual: matches the approved mockup |
 | W6 | Band hopping | Automated: hop schedule tests with a manual clock; first slot after a hop never transmits. Manual: an evening of hopping across three bands |
+
+Status (2026-11-26, `drt/wspr-plan`): W0 built. V-WSPR1 to V-WSPR8 are in `08-open-questions.md` Findings; `Mode.Wspr`, `ModeInfo.IsKeyboard`/`IsWspr`/`HasSlots` and `WsprTiming` are in Core; WSPR is not yet operable. Owner decisions taken on the way: WSJT-X's slot table (6.2), HTTPS upload (5), the 200 Hz guard window (3).

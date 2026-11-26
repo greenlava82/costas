@@ -19,6 +19,8 @@ captured by `scripts/capture-golden.sh`; its `# args:` line holds the decode con
 | `rtty/synthetic-fading.wav` | Same, mark and space faded independently to -26 dB | Selective fading, read through ATC |
 | `rtty/synthetic-reversed.wav` | Same, mark and space swapped | A station sending upside down; read with Reverse on (`# format:` line in its `.expected.txt`) |
 
+`wspr/150426_0918.wav` (WSJT-X sample set, GPLv3) is a 2-minute WSPR slot for `wsprd`; see `wspr/README.md`. The `jt9` golden tests, FT8 simulation and DecodeCli skip the `wspr` folder (`SampleFile.IsJt9Slot`).
+
 The `psk31`, `psk63` and `rtty` folders hold continuous keyboard-mode audio, not slots: the `jt9` golden tests and FT8
 simulation skip them, and `--simulate` plays them in a loop while the Mode menu is on that mode.
 

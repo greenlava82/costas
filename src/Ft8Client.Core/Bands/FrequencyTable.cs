@@ -59,7 +59,7 @@ public sealed class FrequencyTable(IReadOnlyList<FrequencyEntry> entries)
         }
         // FT8 and FT4 tones sit above the offset; a PSK carrier or an RTTY signal's centre is the offset.
         var width = widthHz ?? ModeInfo.OccupiedBandwidthHz(mode);
-        var low = dialHz + offsetHz - (ModeInfo.IsSlotted(mode) ? 0 : width / 2);
+        var low = dialHz + offsetHz - (ModeInfo.IsKeyboard(mode) ? width / 2 : 0);
         var high = low + width;
         if (low < e.LowHz || high > e.HighHz)
         {

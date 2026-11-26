@@ -246,7 +246,7 @@ public sealed class RemoteControl
                 _target.Resend();
                 return null;
             case "macro" when cmd.Key is { } key:
-                return ModeInfo.IsSlotted(_target.Snapshot.Mode) ? "Macros are for PSK and RTTY." : _target.SendMacro(key);
+                return !ModeInfo.IsKeyboard(_target.Snapshot.Mode) ? "Macros are for PSK and RTTY." : _target.SendMacro(key);
             case "logNow":
                 if (_target.Snapshot.Contact?.CanLogNow == true) _target.LogNow();
                 return null;

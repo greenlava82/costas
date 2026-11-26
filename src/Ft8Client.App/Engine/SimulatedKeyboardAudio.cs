@@ -79,7 +79,7 @@ public sealed class SimulatedKeyboardAudio : IDisposable
             _position = 0;
         }
         if (_audio.TryGetValue(mode, out var a)) return a;
-        if (ModeInfo.IsSlotted(mode) || FolderFor(mode) is not { } folder) return _audio[mode] = [];
+        if (!ModeInfo.IsKeyboard(mode) || FolderFor(mode) is not { } folder) return _audio[mode] = [];
         var list = new List<float>();
         foreach (var f in Directory.EnumerateFiles(folder, "*.wav").Order(StringComparer.Ordinal))
         {

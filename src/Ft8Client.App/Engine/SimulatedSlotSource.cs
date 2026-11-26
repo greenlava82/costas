@@ -36,7 +36,7 @@ public sealed class SimulatedSlotSource : ISlotSource
         }
         var all = Directory.EnumerateFiles(folder, "*.wav", SearchOption.AllDirectories).Order(StringComparer.Ordinal).ToList();
         if (all.Count == 0) throw new FileNotFoundException("No WAV files to simulate with.", folder);
-        _files = [.. all.Where(f => !SampleFile.IsKeyboardMode(f))];
+        _files = [.. all.Where(SampleFile.IsJt9Slot)];
     }
 
     /// <summary>Extra signals to mix into a slot (12 kHz samples), e.g. the simulated partner.</summary>

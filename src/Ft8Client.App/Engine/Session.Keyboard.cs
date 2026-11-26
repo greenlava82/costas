@@ -49,7 +49,7 @@ public sealed partial class Session
     /// <summary>True while PTT is down or audio is going out (the keyboard reader drops its own signal).</summary>
     public bool IsTransmitting => _tx.Transmitting;
 
-    private bool KeyboardMode => !ModeInfo.IsSlotted(_config.Mode);
+    private bool KeyboardMode => ModeInfo.IsKeyboard(_config.Mode);
 
     /// <summary>
     /// Sends the macro on function key <paramref name="key"/>, returning to receive when it has gone. Refused, with the

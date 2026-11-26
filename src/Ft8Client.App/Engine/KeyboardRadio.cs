@@ -61,7 +61,7 @@ public sealed class KeyboardRadio
             var note = mode == Mode.Rtty && rttyPercent is > 0 and < 100
                 ? await CapAsync(rig, rttyPercent / 100.0, ct).ConfigureAwait(false)
                 : await RestoreCoreAsync(rig, ct).ConfigureAwait(false);
-            if (ModeInfo.IsSlotted(mode)) return note;
+            if (!ModeInfo.IsKeyboard(mode)) return note;
             if (await rig.ReadSpeechProcessorAsync(ct).ConfigureAwait(false) != true) return note;
             if (await InDataModeAsync(rig, ct).ConfigureAwait(false)) return note;
             return note is null ? ProcessorWarning : $"{note} {ProcessorWarning}";

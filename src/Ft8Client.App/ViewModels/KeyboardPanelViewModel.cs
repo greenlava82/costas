@@ -229,7 +229,7 @@ public sealed partial class KeyboardPanelViewModel : ObservableObject
     /// <summary>Applies a snapshot. UI thread.</summary>
     public void Apply(SessionSnapshot s)
     {
-        Visible = !ModeInfo.IsSlotted(s.Mode);
+        Visible = ModeInfo.IsKeyboard(s.Mode);
         IsRtty = s.Mode == Mode.Rtty;
         if (!Visible) return;
         // Out of a contact, the box reads the signal last clicked; in one, it holds the conversation.

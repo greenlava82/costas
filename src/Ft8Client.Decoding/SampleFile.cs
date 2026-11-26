@@ -52,6 +52,16 @@ public sealed record SampleFile(string Path, SlotAudio Audio, DecodeContext? Gol
             .Any(p => p.Equals("psk31", StringComparison.OrdinalIgnoreCase) || p.Equals("psk63", StringComparison.OrdinalIgnoreCase)
                       || p.Equals("rtty", StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>
+    /// True for a WSPR recording (in a <c>wspr</c> folder): a 2-minute slot for <c>wsprd</c>, not for <c>jt9</c>
+    /// (docs/10-wspr.md).
+    /// </summary>
+    public static bool IsWsprMode(string path) =>
+        path.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries).Any(p => p.Equals("wspr", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>True for an FT8 or FT4 slot recording, the only kind <c>jt9</c> decodes: not a keyboard-mode or WSPR recording.</summary>
+    public static bool IsJt9Slot(string path) => !IsKeyboardMode(path) && !IsWsprMode(path);
+
     /// <summary>The slot start encoded in a <c>YYMMDD_HHMMSS</c> name; 2000-01-01 when the date part is zero.</summary>
     public static DateTime SlotTimeFromName(string name)
     {

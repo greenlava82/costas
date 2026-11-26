@@ -10,8 +10,8 @@ namespace Ft8Client.Core;
 
 /// <summary>
 /// The digital modes the app knows. FT8 and FT4 run in fixed time slots; the keyboard modes (PSK31, PSK63, RTTY) run
-/// continuously and are not operable yet (docs/09-keyboard-modes.md). New values go at the end so existing ones keep
-/// their numbers.
+/// continuously (docs/09-keyboard-modes.md); WSPR is a slotted beacon mode (docs/10-wspr.md). New values go at the
+/// end so existing ones keep their numbers.
 /// </summary>
 public enum Mode
 {
@@ -29,4 +29,10 @@ public enum Mode
 
     /// <summary>RTTY: 45.45 Bd Baudot, 170 Hz shift by default, continuous.</summary>
     Rtty,
+
+    /// <summary>
+    /// WSPR-2: a beacon mode with 120 s slots on even UTC minutes, 4-FSK at 12000/8192 Hz spacing (docs/10-wspr.md).
+    /// Decoded by <c>wsprd</c>, not <c>jt9</c>; it has slots but does not run the FT8/FT4 pipeline. Not operable yet.
+    /// </summary>
+    Wspr,
 }
