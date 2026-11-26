@@ -267,7 +267,7 @@ The **Radio** tab (on phones and tablets) gathers the controls you would reach f
 
 ![The Radio tab](images/phone-radio.png){ width="320" }
 
-- **Power**: the radio's power setting, the same as the power in the desk's bottom bar. Type a power and press
+- **Power**: the radio's power setting, the same as the power on the desk's Radio row. Type a power and press
   **Use**, or step it with **−5** and **+5**. Anything from 1 W up to the radio's maximum is accepted; anything
   outside that is refused, not rounded. Going up to three quarters of the maximum or more asks first. If the radio
   has its own minimum (5 W on the FT-710), it keeps that and the phone says what it set.
