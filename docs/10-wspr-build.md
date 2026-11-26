@@ -42,7 +42,7 @@ Read these before W0. Each has bitten a mode addition before or will now.
 
 Resolve V-WSPR1 to V-WSPR8 in `08-open-questions.md`. For each: what you ran or read, the exact output or text, the date. Move each resolved row from "Facts to verify" to "Findings".
 
-- Use the WSJT-X **3.0.1** source (the version `third_party/fetch.ps1` downloads), from `git.code.sf.net/p/wsjt/wsjtx`, tag for 3.0.1. Quote file paths and line numbers.
+- Use the WSJT-X **3.0.1** source (the version `third_party/fetch.ps1` downloads), from `github.com/WSJTX/wsjtx`, tag `v3.0.1` (SourceForge's git has no 3.x tags). Quote file paths and line numbers.
 - **V-WSPR2 (`wsprd`):** run `third_party/wsjtx/bin/wsprd.exe` with no arguments to get its usage text and save it. Find WSJT-X's WSPR sample WAVs (in the source tree under `samples/`, or the WSJT-X samples download) and copy two or more into `samples/wspr/` with a `README.md` saying where they came from. Run `wsprd` on each from an empty folder and save stdout and every file it writes as golden output (`samples/wspr/<name>.golden.txt`). Record: arguments WSJT-X passes (find where WSJT-X starts `wsprd` in the source), input length in samples, output line format with an annotated example, files it needs beside it (run from a clean folder and note missing-DLL errors), and decode time.
 - **V-WSPR1 (timing):** from the source, the Tx start offset in the slot, the symbol length and count, and how long into the slot WSJT-X waits before decoding (this sets `WsprTiming.CaptureCutoff`).
 - **V-WSPR3 (dial frequencies):** WSJT-X's default WSPR entries (in its default frequency list in the source). Add them to `src/Ft8Client.Data/Resources/frequencies.json` in W1, not now.
@@ -61,7 +61,7 @@ Copy the pattern of M9 (`09-keyboard-modes.md` section 12 step 1).
 - `ModeInfo.cs`:
   - `IsWspr(mode)`, `IsKeyboard(mode)` (PSK31, PSK63, RTTY), `HasSlots(mode)` (FT8, FT4, WSPR).
   - `SlotMilliseconds`, `SlotLength`, `TxStartMilliseconds`, `TxMilliseconds`, `TxEnd`: WSPR cases from V-WSPR1 (120,000 ms; 1,000 ms; 162 × 8192 / 12000 s = 110,592 ms unless V-WSPR1 says otherwise).
-  - `OccupiedBandwidthHz(Wspr)` = 6; `Adif(Wspr)` = `("WSPR", null)`; `Name(Wspr)` = `"WSPR"`.
+  - `OccupiedBandwidthHz(Wspr)` = 200 (the whole 1400-1600 Hz window, as the spec says; owner 2026-11-26); `Adif(Wspr)` = `("WSPR", null)`; `Name(Wspr)` = `"WSPR"`.
   - `DecoderSamples`, `Separator`, `Slotted` stay FT-only and throw for WSPR.
   - **Not** in `Operable` yet.
 - Replace each `!ModeInfo.IsSlotted(x)` that means "keyboard mode" with `ModeInfo.IsKeyboard(x)`. List every call site in the PR with "keyboard", "FT pipeline" or "neutral", so the reviewer can check each.
@@ -105,7 +105,7 @@ Tests (`tests/Ft8Client.Core.Tests`): `ModeInfo` cases for WSPR on every member 
 Copy `PskSpotUploader` and `PskReporterService` for shape, and `Fakes/FakeQrzServer.cs` for the fake.
 
 - Settings: `Data/Settings/WsprOptions.cs` (copy `PskReporterOptions`): `UploadEnabled` (default false) and the beacon settings W4 needs. Add it to `AppSettings` and the settings migration test.
-- `Integrations/Wsprnet/WsprnetClient.cs`: one request per V-WSPR4, `HttpClient` with a 10 s timeout and the User-Agent `Costas/<version> (<callsign>)` (find how the PSK Reporter and QRZ clients set it and reuse it).
+- `Integrations/Wsprnet/WsprnetClient.cs`: one request per V-WSPR4, over HTTPS (`https://wsprnet.org/post/`; owner 2026-11-26: confirm with one real spot that the reply contains `spot(s) added`, and stop and ask if it does not), `HttpClient` with a 10 s timeout and the User-Agent `Costas/<version> (<callsign>)` (find how the PSK Reporter and QRZ clients set it and reuse it).
 - `Integrations/Wsprnet/WsprnetUploader.cs`: reads pending rows from `WsprSpotRepository`, sends, marks uploaded; on failure backs off 1, 2, 4 … up to 30 minutes; a rejected spot is marked failed and not retried forever.
 - `Integrations/Fakes/FakeWsprnetServer.cs`: accepts, rejects, times out on command. Stops its listener only after its accept loop ends (CLAUDE.md).
 - `App/Services/WsprnetService.cs` and `ServiceNames.Wsprnet`, so the status indicator shows ok, retrying or down. Uploads never run with `--simulate` (copy `uploadsAllowed: !Simulating` in `AppHost.cs`).
@@ -122,14 +122,14 @@ Core, `Wspr/`, one class per file:
 - `WsprPower`: the legal dBm list (0 to 60 ending in 0, 3 or 7), `IsLegal`, `EstimateDbm(watts, attenuationDb)` = 10 × log10(watts × 1000) + attenuationDb, rounded to one decimal for display only.
 - `WsprConvolutional` (K=32, r=1/2, polynomials from the source), `WsprInterleaver` (bit-reversal as in the source), `WsprSync` (the 162-bit sync vector copied from the source, with a test that it has 162 entries), `WsprEncoder` (message → 162 symbols 0 to 3).
 - `WsprWaveform.Render(symbols, offsetHz, sampleRate, attenuationDb)`: continuous-phase 4-FSK, tone k at `offsetHz + k × ToneSpacingHz`, 8192 samples per symbol at 12 kHz (scale for other output rates the way `GfskSynth` does), with a short raised-cosine ramp at both ends to avoid key clicks, amplitude scaled by 10^(attenuationDb / 20). Allocates its output once; called before the slot, never in an audio callback.
-- Vectors: a `scripts/capture-wspr-vectors.sh` (copy `capture-vectors.sh`) using the tool from V-WSPR8, writing `tests/Ft8Client.Core.Tests/Vectors/wspr.tsv` (message, type, 162 symbols). At least 40 messages: plain calls, calls of 3 to 6 characters, every power value, compound calls with prefix and suffix, 6-character grids, and edge grids (AA00, RR99).
+- Vectors: a `scripts/capture-wspr-vectors.sh` (copy `capture-vectors.sh`) using `wsprsim -c` built from `lib/wsprd/` as V-WSPR8 records, writing `tests/Ft8Client.Core.Tests/Vectors/wspr.tsv` (message, type, 162 symbols). At least 40 messages: plain calls, calls of 3 to 6 characters, every power value, compound calls with prefix and suffix, 6-character grids, and edge grids (AA00, RR99).
 - Tests: every vector matches symbol for symbol; `TryPack` refusals (no digit, too long, bad grid, illegal dBm) with the reason text; round trip: render each of 10 messages, write a WAV, decode through the real `wsprd` (skipped without `third_party`), get the same call, grid and dBm with |DT| ≤ 1 s and frequency within 2 Hz.
 
 ### W4 · Beacon transmit
 
 Core, `Wspr/`, all pure logic tested with `ManualClock`:
 - `WsprPresence`: `NoteOperatorInput(utc)`, `Expired(now, watchdogMinutes)` using `max(watchdogMinutes, 2)`. Feed it from the same places the Tx watchdog gets operator input (find them from `ContactEngine.WatchdogExpired` and `Session.SetWatchdogCap`; the watchdog cap applies too). Beacon transmissions, hops and decodes never call it.
-- `WsprBeaconScheduler`: given slot start, Tx percentage, an injected `Random`, the hop state and presence, returns Transmit or Receive with a reason. Algorithm from V-WSPR6, exactly. Receives when: beacon off, presence expired, first slot after a hop, or a guard refusal on the last plan.
+- `WsprBeaconScheduler`: given slot start, Tx percentage, an injected `Random`, the hop state and presence, returns Transmit or Receive with a reason. Algorithm: WSJT-X's `create_tx_schedule`/`next_tx_state` as V-WSPR6 records (owner 2026-11-26), a 60-slot table per 2-hour UTC block rebuilt when the block or the percentage changes, drawn from the injected `Random` (WSJT-X's unseeded C `rand()` cannot be matched, so the method is copied, not its slots). Receives when: beacon off, presence expired, first slot after a hop, or a guard refusal on the last plan.
 
 App, `Session.Wspr.cs`:
 - Commands: `StartBeacon()` (operator input; refuses with a reason if the callsign, grid or dBm cannot be packed), `StopBeacon(reason)`, `NoteWsprPresence()` (the phone's "I'm here").
@@ -149,7 +149,7 @@ Tests (`tests/Ft8Client.App.Tests` with `SimulatedRig`, null output, `ManualCloc
 - Rig fault mid-transmission releases PTT and stops the beacon; no later slot transmits.
 - Refusals: dial out of band, licence class (General on a segment it lacks), clock offset 3 s, offset outside the window, illegal dBm, unpackable callsign. Each gives the reason text and no PTT.
 - Presence: with watchdog 6, no input for 6 minutes stops after the current transmission; with watchdog 1, the limit is 2 minutes; input keeps it running; beacon transmissions do not count.
-- Duty cycle: with a seeded `Random` the chosen slots match V-WSPR6's algorithm; over 1,000 slots the share is 20 % ± 3.
+- Duty cycle: with a seeded `Random` the table follows V-WSPR6's method: at 20 % every gap between transmissions is 3 to 5 receive slots, no two transmissions are consecutive, the first slot of a 2-hour block never transmits, and over 1,000 slots the share is 20 % ± 3.
 - Restart: a new session over the same settings starts with the beacon off.
 - Power restored on Stop, on fault and on leaving WSPR.
 - Manual (owner, dummy load first): beacon heard on WSPRnet.

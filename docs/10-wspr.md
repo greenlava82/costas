@@ -39,7 +39,7 @@ Where this document is silent, the existing docs apply unchanged.
 
 ## 5. Reporting to WSPRnet
 
-- `WsprnetUploader` (Integrations), off by default, per station profile. It uploads my receive spots in the form WSJT-X uses (**VERIFY** V-WSPR4: endpoint, fields, batch size, limits).
+- `WsprnetUploader` (Integrations), off by default, per station profile. It uploads my receive spots in the form WSJT-X uses, over HTTPS (owner 2026-11-26; WSJT-X itself uses plain HTTP) (**VERIFY** V-WSPR4: endpoint, fields, batch size, limits).
 - The queue lives in SQLite and survives a restart. It backs off on failure, shows its state on a status indicator like QRZ and PSK Reporter, and never blocks receive (rule 9). Every request carries `Costas/<version> (<callsign>)` (rule 10).
 - Optional and display only: a "Heard by" list of stations that reported my beacon, read from WSPRnet or wspr.live (**VERIFY** V-WSPR5). Off when the service is unreachable, with the status shown.
 
@@ -56,7 +56,7 @@ The owner first asked for an unattended beacon on 10 m. It is dropped: under 47 
 
 ### 6.2 Schedule
 
-- **Duty cycle:** a Tx percentage, default 20 %, so about one slot in five transmits. Which slots are picked: **VERIFY** V-WSPR6 (follow WSJT-X's method so a Costas beacon behaves like any other).
+- **Duty cycle:** a Tx percentage, default 20 %, so about one slot in five transmits. Which slots are picked: WSJT-X's method (V-WSPR6; owner 2026-11-26), a table of 60 slots per 2-hour UTC block with random gaps, at 20 % 3 to 5 receive slots between transmissions and never two in a row (so a Costas beacon behaves like any other).
 - A transmission is planned before its slot starts. If the guards refuse it, the slot is received instead and the reason is shown.
 
 ### 6.3 Power
