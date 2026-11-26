@@ -38,6 +38,9 @@ public sealed record RemoteState
     /// <summary>True while calling CQ.</summary>
     public bool CallingCq { get; init; }
 
+    /// <summary>PSK and RTTY: my CQ has gone out and answers to it still start a contact (see SessionSnapshot.CqListening).</summary>
+    public bool CqListening { get; init; }
+
     /// <summary>A line when something is wrong or stopped, else null.</summary>
     public string? Fault { get; init; }
 

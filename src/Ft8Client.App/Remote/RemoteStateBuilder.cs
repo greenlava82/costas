@@ -78,6 +78,7 @@ public static class RemoteStateBuilder
             Transmitting = s.Transmitting,
             OnAir = s.TransmittingMessage,
             CallingCq = s.CallingCq,
+            CqListening = s.CqListening,
             Fault = s.Fault,
             Quiet = s.Quiet?.Text,
             QuietGo = s.Transmitting ? null : s.Quiet?.GoToText,

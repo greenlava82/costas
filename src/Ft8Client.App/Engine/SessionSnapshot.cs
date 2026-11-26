@@ -134,6 +134,12 @@ public sealed record SessionSnapshot
     /// <summary>True while calling CQ.</summary>
     public bool CallingCq { get; init; }
 
+    /// <summary>
+    /// PSK and RTTY: my CQ has gone out and the radio is back on receive; a station answering it in the next couple of
+    /// minutes starts a contact. <see cref="CallingCq"/> is then false (in these modes it means the CQ is on the air).
+    /// </summary>
+    public bool CqListening { get; init; }
+
     /// <summary>FT8 and FT4: CQs sent in a row with no answer (see <see cref="Core.Contacts.ContactEngine.UnansweredCqs"/>).</summary>
     public int UnansweredCqs { get; init; }
 

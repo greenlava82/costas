@@ -307,6 +307,7 @@ public sealed partial class OperateViewModel : ObservableObject
     public ContactPanelViewModel Panel => Contact ?? (_snap switch
     {
         { CallingCq: true } s => CqCard(s.UnansweredCqs),
+        { CqListening: true } => ContactPanelViewModel.CqListening,
         { AutoCall: true } => ContactPanelViewModel.IdleAutoCall,
         _ => ContactPanelViewModel.Idle,
     });

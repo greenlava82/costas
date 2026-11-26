@@ -136,6 +136,7 @@ A keyboard-mode contact shows on the same conversation strip as FT8. These are t
   - Their 73 step needs 73 or SK; TU alone no longer closes and logs the contact.
   - After answering a CQ, my F4 73 logs the contact once both exchanges are done.
   - F1 CQ during an unfinished contact ends that contact without logging (Log now keeps it) and listens for answers.
+  - A CQ is one over, never repeated on its own (unlike the FT8 slot loop). Call CQ reads Stop CQ only while the CQ is queued or going out; pressed then, it drops what has not gone, releases PTT and stops listening. Once the CQ has gone the button reads Call CQ again (another press sends another CQ), the idle card reads "CQ sent", and an answer with my call starts a contact for 2 minutes after the CQ ended. Esc during the CQ stops the transmission but keeps listening; Halt Tx stops both. Tune is not blocked by the listening window.
   - Log now does nothing after Abandon. The report sent is logged only once my exchange (F3) went out; otherwise the log has no sent report.
   - A clicked report must be an RST (5NN is read as 599) and a clicked grid a grid; anything else is refused with a note in the bottom bar.
 

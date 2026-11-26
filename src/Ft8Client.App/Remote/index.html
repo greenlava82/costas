@@ -585,11 +585,13 @@ function renderContact(s) {
   if (changed("contactBtns", btns)) {
     $("contactBtns").replaceChildren(...btns.map(([text, cls, type, off, key]) => button(text, cls, () => cmd(type, key ? { key } : {}), off)));
   }
-  if (!changed("contactBody", { c, cq: s.callingCq, wide, talk: s.conversation })) return;
+  if (!changed("contactBody", { c, cq: s.callingCq, heard: s.cqListening, wide, talk: s.conversation })) return;
   const box = $("contactBody"); box.replaceChildren();
   if (idle && kbd) {
-    box.append(el("div", "lbl", s.callingCq ? "Calling CQ" : "Not in a contact"));
-    box.append(el("div", "sub", s.callingCq ? "Waiting for a station to answer." : "Call a station in Next in line, or press F1 to call CQ."));
+    box.append(el("div", "lbl", s.callingCq ? "Calling CQ" : s.cqListening ? "CQ sent" : "Not in a contact"));
+    box.append(el("div", "sub", s.callingCq ? "Sending your CQ. Stop CQ returns to receive."
+      : s.cqListening ? "Back on receive. A station that answers in the next 2 minutes starts a contact."
+      : "Call a station in Next in line, or press F1 to call CQ."));
     box.append(conversation(s.conversation));
     return;
   }

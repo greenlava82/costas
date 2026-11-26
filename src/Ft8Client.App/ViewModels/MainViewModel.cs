@@ -1609,6 +1609,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
             return ((s.Transmitting ? "Transmitting CQ." : "Calling CQ.") + none, s.Transmitting ? TextKind.Critical : TextKind.Normal);
         }
         if (s.KeyboardTx.Active) return ("Transmitting.", TextKind.Critical);
+        if (s.CqListening) return ("CQ sent. Listening for an answer.", TextKind.Normal);
         if (s.Contact is { Outcome: ContactOutcome.NoReply, Flow: ContactFlow.Hound } fox) return (fox.StatusText, TextKind.Caution);
         var top = s.Rank.Line.FirstOrDefault();
         if (!ModeInfo.IsSlotted(s.Mode))
