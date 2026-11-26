@@ -31,7 +31,7 @@ public sealed class WsprOptions
     /// <summary>Percent of the radio's maximum power set while the beacon runs (at least 1 W), 1 to 100.</summary>
     public int PowerPercent { get; set; } = 5;
 
-    /// <summary>Audio frequency of the beacon's lowest tone in hertz, inside the 1400 to 1600 Hz window.</summary>
+    /// <summary>Audio frequency of the centre of the beacon's four tones in hertz (WSJT-X's Tx frequency), inside the 1400 to 1600 Hz window.</summary>
     public int OffsetHz { get; set; } = 1500;
 
     /// <summary>Prefer a type 1 message (4-character grid) even when the profile grid has 6 characters, as WSJT-X's option does.</summary>

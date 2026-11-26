@@ -131,3 +131,11 @@ Status (W2, 2026-11-26): the upload is built and tested against a fake server, a
 - **W2 · Decision:** spots whose call did not resolve (`<...>`) are stored but never queued for upload.
 - **W2 · Decision:** a pending spot more than 24 hours old is marked failed rather than sent.
 - **W2 · Owner to check by hand:** the first real upload over HTTPS answers with text containing `spot(s) added`. A different reply marks every spot failed (as WSJT-X drops its queue), so check it with one spot before relying on it, and say if WSPRnet needs plain HTTP.
+
+Status (W3, 2026-11-26): the encoder is built. `WsprPacker` (a strict port of `wsprsim`'s packing), `WsprHash`, `WsprConvolutional`, `WsprInterleaver`, `WsprSync`, `WsprEncoder` and `WsprWaveform` are in Core. 68 vectors from `wsprsim -cd` (`Vectors/wspr.tsv`, 43 type 1, 16 type 2, 9 type 3, every legal power, the edge grids AA00 and RR99) match symbol for symbol, and 13 messages rendered to audio decode through the real `wsprd` to the same text, the hashed ones resolved by our hash.
+
+- **W3 · Decision:** the audio offset is the **centre** of the four tones, as WSJT-X's Tx frequency is (it sends tone 0 at `offset - 1.5 × 1.4648` Hz), not the lowest tone as `10-wspr-build.md` said; so a Costas beacon reports on the same frequency as WSJT-X's at the same setting. `WsprWaveform.ToneHz` states it.
+- **W3 · Decision:** `WsprPacker` refuses what `wsprsim` packs without checking: a callsign without the digit in the right place or with a digit after it, a two-digit suffix below 10 or a two-letter suffix (`K1ABC/QR` is in the vectors as a refusal), a prefix of more than 3 characters, a type 3 message with a 4-character grid, any power not on the list, lower-case. It never pads or trims.
+- **W3 · Decision:** a prefix whose number is exactly 32768 (`NYN/...`) is packed with `>=` where `wsprsim` has `>`, which makes it unreadable; ours round-trips through `wsprd` (and so has no `wsprsim` vector).
+- **W3 · Decision:** no unpack self-check inside `WsprEncoder` (as `FtxEncoder` has). The strict packer, the vectors and the `wsprd` round trip stand in for it.
+- **W3 · Decision:** the waveform ramps over 20 ms at each end (a raised cosine). WSJT-X's own ramp was not measured.
