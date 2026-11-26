@@ -7,6 +7,7 @@
 // see the GNU General Public License in LICENSE for details.
 
 
+using System.Collections.Concurrent;
 using Ft8Client.App.Engine;
 using Ft8Client.Core;
 using Ft8Client.Core.Mqtt;
@@ -53,9 +54,38 @@ public sealed class MqttService : IAsyncDisposable
     private bool _removeDiscovery;
     private bool _started;
 
+    // Dashboard statistics (null: not published). Counted from the log on a worker of their own, never on the session's
+    // or transmitter's threads.
+    private readonly DashboardStatsSource? _stats;
+    private readonly SemaphoreSlim _statsSignal = new(0);
+    private readonly CancellationTokenSource _statsCts = new();
+    private readonly ConcurrentQueue<(LoggedContact Contact, long DialHz)> _pendingContacts = new();
+    private readonly Dictionary<string, string> _statsPayloads = new(StringComparer.Ordinal);
+    private Task? _statsLoop;
+    private volatile bool _statsDirty = true;
+    private volatile bool _qrzDirty = true;
+    private volatile bool _pskDirty = true;
+    private DateTime _statsDay;
+    private DashboardStats? _lastStats;
+    private (ServiceHealth Health, string Message)? _qrzShown;
+    private long _lastPskTicks;
+    private int? _sessionMinutes;
+
+    /// <summary>
+    /// How long the statistics worker waits after a change before counting, so a burst (an import, a QRZ sync) is
+    /// counted once. A logged contact still reaches the broker well inside 5 seconds.
+    /// </summary>
+    internal static readonly TimeSpan StatsSettle = TimeSpan.FromMilliseconds(400);
+
+    /// <summary>How often psk_spots_15m is counted again.</summary>
+    internal static readonly TimeSpan PskInterval = TimeSpan.FromMinutes(1);
+
     /// <summary>Creates the service; nothing connects until <see cref="Start"/> and only when turned on.</summary>
-    public MqttService(Session session, Transmitter tx, AppSettingsAccessor settings, ISecretStore secrets, IClock clock, bool allowed)
+    /// <param name="stats">Where the dashboard statistics come from, or null to publish none.</param>
+    public MqttService(Session session, Transmitter tx, AppSettingsAccessor settings, ISecretStore secrets, IClock clock, bool allowed,
+                       DashboardStatsSource? stats = null)
     {
+        _stats = stats;
         _session = session;
         _tx = tx;
         _settings = settings;
@@ -86,8 +116,27 @@ public sealed class MqttService : IAsyncDisposable
         _tx.Fault += OnTxFault;
         _session.Changed += OnSessionChanged;
         _settings.Changed += OnSettingsChanged;
+        if (_stats is not null)
+        {
+            _stats.LogChanged += OnLogChanged;
+            _statsLoop = Task.Run(StatsLoopAsync);
+        }
         _timer = new Timer(_ => OnTick(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         _ = ConfigureAsync();
+    }
+
+    private bool StatsOn => _stats is not null && _publishContacts;
+
+    private void OnLogChanged()
+    {
+        _statsDirty = true;
+        SignalStats();
+    }
+
+    private void SignalStats()
+    {
+        // One wake-up is enough however many changes arrive before the worker runs.
+        if (_statsSignal.CurrentCount == 0) _statsSignal.Release();
     }
 
     // The transmitter raises these on its keying path, which must never fail because of MQTT: nothing escapes them.
@@ -143,6 +192,7 @@ public sealed class MqttService : IAsyncDisposable
         if (p is null || t is null) return;
         p.Publish(new MqttOutgoing(t.Session, MqttPayloads.Session(s), true));
         p.Publish(new MqttOutgoing(t.Tx, MqttPayloads.Tx(s.Transmitting), true));
+        PublishSessionDuration(s);
         lock (_gate)
         {
             if (s.Active != _lastActive)
@@ -154,6 +204,22 @@ public sealed class MqttService : IAsyncDisposable
     }
 
     private bool _lastActive;
+
+    // session_duration changes once a minute while a session runs; it is published only when the minute changes.
+    private void PublishSessionDuration(OnAirSnapshot s)
+    {
+        var p = _publisher;
+        var t = _topics;
+        if (p is null || t is null || !StatsOn) return;
+        var minutes = StatsPayloads.SessionMinutes(s, _clock.UtcNow);
+        lock (_gate)
+        {
+            if (_sessionMinutes == minutes) return;
+            _sessionMinutes = minutes;
+            _statsPayloads[t.SessionDuration] = StatsPayloads.SessionDuration(s, _clock.UtcNow);
+        }
+        p.Publish(new MqttOutgoing(t.SessionDuration, StatsPayloads.SessionDuration(s, _clock.UtcNow), true));
+    }
 
     private void OnSessionChanged(SessionSnapshot s) => Safely(() => QueueSession(s));
 
@@ -186,10 +252,146 @@ public sealed class MqttService : IAsyncDisposable
             _seenSnapshot = true;
         }
         if (rigLost) _onAir.End(SessionEndReason.RigLost);
+        if (_stats is not null)
+        {
+            var qrz = s.Services.TryGetValue(ServiceNames.Qrz, out var q) ? (q.Health, q.Message) : ((ServiceHealth, string)?)null;
+            bool qrzChanged;
+            lock (_gate)
+            {
+                qrzChanged = qrz != _qrzShown;
+                _qrzShown = qrz;
+            }
+            if (qrzChanged)
+            {
+                _qrzDirty = true;
+                SignalStats();
+            }
+        }
         if (p is null || t is null) return;
         if (state is not null) p.Publish(new MqttOutgoing(t.State, MqttPayloads.State(state), true));
         if (logged is not null && _publishContacts)
-            p.Publish(new MqttOutgoing(t.QsoEvent, MqttPayloads.QsoEvent(new LoggedQso(logged.Call, logged.Band, ModeInfo.Name(logged.Mode), s.DialHz, logged.LoggedUtc)), false));
+        {
+            if (_stats is not null)
+            {
+                // The event carries the contact's country, distance and whether it is a new one, which take a look at
+                // the log: the statistics worker sends it, followed by the counts it changed.
+                _pendingContacts.Enqueue((logged, s.DialHz));
+                _statsDirty = true;
+                SignalStats();
+            }
+            else
+            {
+                p.Publish(new MqttOutgoing(t.QsoEvent, MqttPayloads.QsoEvent(Basic(logged, s.DialHz)), false));
+            }
+        }
+    }
+
+    private static LoggedQso Basic(LoggedContact c, long dialHz) => new(c.Call, c.Band, ModeInfo.Name(c.Mode), dialHz, c.LoggedUtc);
+
+    private async Task StatsLoopAsync()
+    {
+        var ct = _statsCts.Token;
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await _statsSignal.WaitAsync(ct).ConfigureAwait(false);
+                await Task.Delay(StatsSettle, ct).ConfigureAwait(false);
+                while (_statsSignal.CurrentCount > 0) _statsSignal.Wait(0, CancellationToken.None);
+                RunStats();
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // The database busy or a bad row: log it, and count again on the next change.
+                Serilog.Log.Warning(ex, "MQTT dashboard statistics could not be counted");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Counts and publishes the statistics that changed, and sends any logged-contact events waiting. Runs on the
+    /// statistics worker only.
+    /// </summary>
+    internal void RunStats()
+    {
+        var source = _stats;
+        var p = _publisher;
+        var t = _topics;
+        var contacts = new List<(LoggedContact Contact, long DialHz)>();
+        while (_pendingContacts.TryDequeue(out var c)) contacts.Add(c);
+        if (source is null || p is null || t is null || !StatsOn) return; // events with nowhere to go are dropped, as offline ones are
+        var now = _clock.UtcNow;
+        DashboardStats? stats = null;
+        var countsFailed = false;
+        if (_statsDirty || contacts.Count > 0 || _lastStats is null || now.Date != _statsDay)
+        {
+            _statsDirty = false;
+            try
+            {
+                stats = source.Build(now);
+                _lastStats = stats;
+                _statsDay = stats.TodayUtc;
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // The contact events still go out, without the details that needed the log.
+                Serilog.Log.Warning(ex, "MQTT dashboard statistics could not be counted");
+                _statsDirty = true;
+                countsFailed = true;
+            }
+        }
+        foreach (var (contact, dial) in contacts)
+        {
+            StatsContact? described = null;
+            try
+            {
+                if (!countsFailed && contact.QsoId is { } id && _lastStats is { } last) described = source.Describe(id, last);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                Serilog.Log.Warning(ex, "MQTT contact event details could not be read");
+            }
+            var basic = Basic(contact, dial);
+            p.Publish(new MqttOutgoing(t.QsoEvent, StatsPayloads.ContactEvent("qso_logged", basic, described), false));
+            if (described is { IsNewDxcc: true })
+                p.Publish(new MqttOutgoing(t.QsoEvent, StatsPayloads.ContactEvent("new_dxcc", basic, described), false));
+        }
+        if (stats is not null)
+        {
+            PublishStat(p, t.Stats, StatsPayloads.Counts(stats));
+            PublishStat(p, t.NewDxccToday, StatsPayloads.NewDxccToday(stats));
+            PublishStat(p, t.FarthestToday, StatsPayloads.FarthestToday(stats));
+            PublishStat(p, t.RecentQsos, StatsPayloads.RecentQsos(stats));
+            PublishStat(p, t.DailyQsos, StatsPayloads.DailyQsos(stats));
+            PublishStat(p, t.WorkedWeekMap, StatsPayloads.WorkedWeekMap(stats));
+        }
+        if (_qrzDirty || stats is not null)
+        {
+            _qrzDirty = false;
+            ServiceStatus? qrz = _session.Snapshot.Services.GetValueOrDefault(ServiceNames.Qrz);
+            PublishStat(p, t.QrzSync, StatsPayloads.QrzSync(source.Qrz(qrz)));
+        }
+        if (_pskDirty || stats is not null)
+        {
+            _pskDirty = false;
+            PublishStat(p, t.PskSpots, StatsPayloads.PskSpots(source.Psk(now)));
+        }
+        PublishSessionDuration(_onAir.Snapshot);
+    }
+
+    // Retained statistics go out only when they change; the latest of each is sent again on every connect.
+    private void PublishStat(MqttPublisher p, string topic, string payload)
+    {
+        lock (_gate)
+        {
+            if (_statsPayloads.TryGetValue(topic, out var old) && old == payload) return;
+            _statsPayloads[topic] = payload;
+        }
+        p.Publish(new MqttOutgoing(topic, payload, true));
     }
 
     // A timer callback: an exception here would end the process.
@@ -199,6 +401,23 @@ public sealed class MqttService : IAsyncDisposable
     {
         if (_disposed) return;
         _onAir.Tick();
+        if (StatsOn)
+        {
+            var utc = _clock.UtcNow;
+            // UTC midnight: "today" and the rolling week move on.
+            if (_lastStats is not null && utc.Date != _statsDay)
+            {
+                _statsDirty = true;
+                SignalStats();
+            }
+            if (_clock.Ticks - Interlocked.Read(ref _lastPskTicks) >= PskInterval.Ticks)
+            {
+                Interlocked.Exchange(ref _lastPskTicks, _clock.Ticks);
+                _pskDirty = true;
+                SignalStats();
+            }
+            PublishSessionDuration(_onAir.Snapshot);
+        }
         var now = _clock.Ticks;
         if (now - Interlocked.Read(ref _lastHeartbeatTicks) < TimeSpan.FromSeconds(HaDiscovery.HeartbeatSeconds).Ticks) return;
         Interlocked.Exchange(ref _lastHeartbeatTicks, now);
@@ -216,6 +435,15 @@ public sealed class MqttService : IAsyncDisposable
         if (_discovery) list.Add(new MqttOutgoing(t.Discovery, _discoveryPayload = Discovery(t), true));
         else if (_removeDiscovery) list.Add(new MqttOutgoing(t.Discovery, string.Empty, true));
         list.AddRange(Current());
+        if (StatsOn)
+        {
+            lock (_gate) list.AddRange(_statsPayloads.Select(x => new MqttOutgoing(x.Key, x.Value, true)));
+        }
+        else if (_stats is not null)
+        {
+            // Statistics off: clear any left from when they were on (an empty retained message deletes one).
+            list.AddRange(t.StatsTopics.Select(x => new MqttOutgoing(x, string.Empty, true)));
+        }
         return list;
     }
 
@@ -243,7 +471,9 @@ public sealed class MqttService : IAsyncDisposable
             if (_disposed) return;
             var o = _settings.Current.Mqtt;
             _onAir.Options = OnAirSessionOptions.FromMinutes(o.SessionIdleMinutes, o.SessionMaxMinutes);
+            var statsWere = StatsOn;
             _publishContacts = o.PublishContacts;
+            if (_stats is not null && statsWere != StatsOn) StatsSwitched();
             if (!_allowed || !o.Enabled || string.IsNullOrWhiteSpace(o.Host))
             {
                 await StopPublisherAsync().ConfigureAwait(false);
@@ -293,6 +523,16 @@ public sealed class MqttService : IAsyncDisposable
             _publisher = publisher;
             _publisherKey = key;
             publisher.Start();
+            if (StatsOn)
+            {
+                lock (_gate)
+                {
+                    _statsPayloads.Clear(); // a new broker or station id holds none of them yet
+                    _sessionMinutes = null;
+                }
+                _statsDirty = _qrzDirty = _pskDirty = true;
+                SignalStats();
+            }
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -305,7 +545,26 @@ public sealed class MqttService : IAsyncDisposable
         }
     }
 
-    private string Discovery(MqttTopics t) => HaDiscovery.Build(t, _settings.Current.Profile.Callsign, AppInfo.Version);
+    private string Discovery(MqttTopics t) => HaDiscovery.Build(t, _settings.Current.Profile.Callsign, AppInfo.Version, StatsOn);
+
+    // Statistics turned on or off with Publish contacts: on counts everything afresh, off deletes what was published.
+    private void StatsSwitched()
+    {
+        lock (_gate)
+        {
+            _statsPayloads.Clear();
+            _sessionMinutes = null;
+        }
+        _lastStats = null;
+        if (StatsOn)
+        {
+            _statsDirty = _qrzDirty = _pskDirty = true;
+            SignalStats();
+            return;
+        }
+        if (_publisher is { } p && _topics is { } t)
+            foreach (var topic in t.StatsTopics) p.Publish(new MqttOutgoing(topic, string.Empty, true));
+    }
 
     private async Task StopPublisherAsync()
     {
@@ -326,6 +585,9 @@ public sealed class MqttService : IAsyncDisposable
         try
         {
             if (_timer is not null) await _timer.DisposeAsync().ConfigureAwait(false);
+            await _statsCts.CancelAsync().ConfigureAwait(false);
+            if (_statsLoop is not null) await _statsLoop.ConfigureAwait(false);
+            if (_stats is not null) _stats.LogChanged -= OnLogChanged;
             _session.Changed -= OnSessionChanged;
             _settings.Changed -= OnSettingsChanged;
             _tx.Committed -= OnCommitted;
@@ -342,12 +604,14 @@ public sealed class MqttService : IAsyncDisposable
             {
                 var t = _topics!;
                 var s = _onAir.Snapshot;
-                await p.StopAsync(
+                List<MqttOutgoing> last =
                 [
                     new MqttOutgoing(t.Session, MqttPayloads.Session(s), true),
                     new MqttOutgoing(t.Tx, MqttPayloads.Tx(false), true),
                     new MqttOutgoing(t.SessionEvent, MqttPayloads.SessionEvent(s), false),
-                ], TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+                ];
+                if (StatsOn) last.Add(new MqttOutgoing(t.SessionDuration, StatsPayloads.SessionDuration(s, _clock.UtcNow), true));
+                await p.StopAsync(last, TimeSpan.FromSeconds(2)).ConfigureAwait(false);
                 await p.DisposeAsync().ConfigureAwait(false);
             }
         }

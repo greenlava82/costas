@@ -529,7 +529,8 @@ public sealed class AppHost : IAsyncDisposable
         Cloudlog.Start();
         ClubLog = new ClubLogService(Session, Settings, Secrets, Qsos, Uploads, Clock, ClubLogApiKey, uploadsAllowed: !Simulating);
         ClubLog.Start();
-        Mqtt = new MqttService(Session, Transmitter, Settings, Secrets, Clock, allowed: !Simulating);
+        Mqtt = new MqttService(Session, Transmitter, Settings, Secrets, Clock, allowed: !Simulating,
+            stats: new DashboardStatsSource(Qsos, Uploads, SyncState, Spots, Countries, ReferenceData.LoadAdifTable(), Settings, Secrets));
         Mqtt.Start();
 
         Psk = new PskReporterService(Session, Settings, Spots, Countries, Frequencies, Clock, uploadsAllowed: !Simulating);

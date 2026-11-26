@@ -1314,7 +1314,8 @@
             <Grid Classes="field" ColumnDefinitions="210,*" IsEnabled="{Binding MqttEnabled}">
               <TextBlock Classes="label" Text="Contacts" />
               <StackPanel Grid.Column="1" Spacing="4">
-                <CheckBox Content="Publish each logged contact (call, band, mode, time)" IsChecked="{Binding MqttPublishContacts}" />
+                <CheckBox Content="Publish each logged contact and logbook statistics" IsChecked="{Binding MqttPublishContacts}" />
+                <TextBlock Classes="help" Text="Each contact's call, band, mode, time, country and grid, plus counts from your log (today, this week, countries, recent contacts, a map of this week's stations, QRZ sync and PSK Reporter spots) for a Home Assistant dashboard. Your own grid is not published." />
               </StackPanel>
             </Grid>
           </StackPanel>

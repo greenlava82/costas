@@ -247,6 +247,21 @@ public sealed class QsoRepository(SqliteDatabase db)
         return rows.Select(ToLogContact).ToList();
     }
 
+    /// <summary>
+    /// The earliest contact for each call and logged entity of a station callsign (null: every station), for finding
+    /// when each DXCC entity was first worked. Only id, call, times, DXCC code and entity key are filled in.
+    /// </summary>
+    public IReadOnlyList<QsoRecord> FirstByCallAndEntity(string? stationCallsign)
+    {
+        using var c = db.Open();
+        // SQLite takes the bare columns from the row that holds MIN(qso_date_on) (either one when two share the time).
+        return c.Query<QsoRecord>("""
+            SELECT id AS Id, call AS Call, MIN(qso_date_on) AS QsoDateOn, qso_date_off AS QsoDateOff, dxcc AS Dxcc, entity_key AS EntityKey
+            FROM (SELECT * FROM qso WHERE @s IS NULL OR station_callsign = @s COLLATE NOCASE ORDER BY id)
+            GROUP BY UPPER(call), entity_key, dxcc
+            """, new { s = stationCallsign }).ToList();
+    }
+
     /// <summary>Contacts since a time, oldest first (Worked tonight).</summary>
     public IReadOnlyList<QsoRecord> Since(DateTime utc)
     {
