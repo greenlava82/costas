@@ -45,9 +45,13 @@ public static class TxLevelTuner
     /// The state for the next transmission after one that read <paramref name="alc"/>. The level never goes above
     /// <paramref name="maxDb"/> (at most 0 dBFS) or below <paramref name="minDb"/> (at least <see cref="FloorDb"/>). With
     /// <paramref name="zeroAlc"/> the level aims for no ALC at all (see <see cref="ZeroTarget"/>) instead of the point
-    /// where it starts to act.
+    /// where it starts to act. Below <paramref name="riseToDb"/>, a transmission with no ALC rises straight to it (still
+    /// within the maximum and half a decibel under a remembered ceiling) instead of half a decibel: a level known to be
+    /// safely below the ALC, so the climb to it need not take many transmissions. Once the ALC has acted at or below
+    /// that level it is not safe after all, and the level only ever rises half a decibel at a time from then on.
     /// </summary>
-    public static TxLevelStep Next(TxLevelState state, double alc, double maxDb, double minDb = FloorDb, bool zeroAlc = false)
+    public static TxLevelStep Next(TxLevelState state, double alc, double maxDb, double minDb = FloorDb, bool zeroAlc = false,
+        double? riseToDb = null)
     {
         ArgumentNullException.ThrowIfNull(state);
         maxDb = Math.Min(maxDb, 0);
@@ -60,17 +64,23 @@ public static class TxLevelTuner
         {
             var drop = alc >= 0.75 ? 6.0 : alc >= 0.5 ? 3.0 : 1.0;
             var ceiling = Math.Min(state.CeilingDb ?? g, g);
-            return new(new(Round(Math.Max(floor, g - drop)), ceiling, 0), TxLevelChange.Lowered);
+            var alcBelow = state.AlcBelowRiseTo || (riseToDb is { } r && g <= r + 0.05);
+            return new(new(Round(Math.Max(floor, g - drop)), ceiling, 0, alcBelow), TxLevelChange.Lowered);
         }
         if (alc >= quiet) return new(state with { QuietAtCeiling = 0 }, TxLevelChange.Held);
 
         var limit = state.CeilingDb is { } c ? Math.Min(maxDb, c - RaiseStepDb) : maxDb;
-        if (limit > g + 0.05) return new(new(Round(Math.Min(g + RaiseStepDb, limit)), state.CeilingDb, 0), TxLevelChange.Raised);
+        if (limit > g + 0.05)
+        {
+            var to = state.AlcBelowRiseTo ? null : riseToDb;
+            var step = Math.Max(g + RaiseStepDb, to ?? double.NegativeInfinity);
+            return new(state with { GainDb = Round(Math.Min(step, limit)), QuietAtCeiling = 0 }, TxLevelChange.Raised);
+        }
         if (state.CeilingDb is null || maxDb <= limit) return new(state with { QuietAtCeiling = 0 }, TxLevelChange.AtMaximum);
 
         var quietCount = state.QuietAtCeiling + 1;
         return quietCount >= RelaxAfter
-            ? new(new(g, null, 0), TxLevelChange.AtCeiling)
+            ? new(state with { CeilingDb = null, QuietAtCeiling = 0 }, TxLevelChange.AtCeiling)
             : new(state with { QuietAtCeiling = quietCount }, TxLevelChange.AtCeiling);
     }
 

@@ -133,4 +133,82 @@ public class TxLevelTunerTests
         readings.TakeLast(20).Count(a => a > 0).Should().BeLessThanOrEqualTo(2);
         state.GainDb.Should().BeInRange(-10.5, -9);
     }
+
+    [Fact]
+    public void Next_QuietFarBelowRiseTo_RisesStraightToIt()
+    {
+        var step = TxLevelTuner.Next(new TxLevelState(-26), 0.0, -4, zeroAlc: true, riseToDb: -15.5);
+        step.Change.Should().Be(TxLevelChange.Raised);
+        step.State.Should().Be(new TxLevelState(-15.5));
+    }
+
+    [Fact]
+    public void Next_QuietJustBelowRiseTo_RisesToItNotPastIt()
+    {
+        TxLevelTuner.Next(new TxLevelState(-15.8), 0.0, -4, riseToDb: -15.5).State.GainDb.Should().Be(-15.3);
+        TxLevelTuner.Next(new TxLevelState(-15.6), 0.0, -4, riseToDb: -15.0).State.GainDb.Should().Be(-15.0);
+    }
+
+    [Fact]
+    public void Next_QuietAtOrAboveRiseTo_RisesHalfDecibel()
+    {
+        TxLevelTuner.Next(new TxLevelState(-15.5), 0.0, -4, riseToDb: -15.5).State.GainDb.Should().Be(-15);
+        TxLevelTuner.Next(new TxLevelState(-12), 0.0, -4, riseToDb: -15.5).State.GainDb.Should().Be(-11.5);
+    }
+
+    [Fact]
+    public void Next_RiseToAboveMaximum_StopsAtMaximum()
+    {
+        TxLevelTuner.Next(new TxLevelState(-20), 0.0, -8, riseToDb: -2).State.GainDb.Should().Be(-8);
+        TxLevelTuner.Next(new TxLevelState(-20), 0.0, 3, riseToDb: 2).State.GainDb.Should().Be(0);
+    }
+
+    [Fact]
+    public void Next_RiseToAboveCeiling_StopsHalfDecibelUnderCeiling()
+    {
+        var step = TxLevelTuner.Next(new TxLevelState(-26, -18), 0.0, -4, riseToDb: -15.5);
+        step.State.Should().Be(new TxLevelState(-18.5, -18));
+    }
+
+    [Fact]
+    public void Next_AlcAtRiseTo_LowersAndThenOnlyRisesHalfDecibelAtATime()
+    {
+        var lowered = TxLevelTuner.Next(new TxLevelState(-15.5), 0.02, -4, zeroAlc: true, riseToDb: -15.5);
+        lowered.Change.Should().Be(TxLevelChange.Lowered);
+        lowered.State.Should().Be(new TxLevelState(-16.5, -15.5, 0, AlcBelowRiseTo: true));
+
+        // The ALC set a ceiling; once it is forgotten the level probes upward half a decibel at a time, never jumping.
+        var state = lowered.State with { GainDb = -25 };
+        state = TxLevelTuner.Next(state, 0.0, -4, zeroAlc: true, riseToDb: -15.5).State;
+        state.GainDb.Should().Be(-24.5);
+        state.AlcBelowRiseTo.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Next_CeilingForgottenAfterAlcBelowRiseTo_KeepsRisingSlowly()
+    {
+        var state = new TxLevelState(-16.5, -16, TxLevelTuner.RelaxAfter - 1, AlcBelowRiseTo: true);
+        state = TxLevelTuner.Next(state, 0.0, -4, zeroAlc: true, riseToDb: -15.5).State;
+        state.Should().Be(new TxLevelState(-16.5, null, 0, AlcBelowRiseTo: true));
+        state = TxLevelTuner.Next(state, 0.0, -4, zeroAlc: true, riseToDb: -15.5).State;
+        state.GainDb.Should().Be(-16);
+    }
+
+    [Fact]
+    public void Next_AlcWellAboveRiseTo_StillRisesStraightToItLater()
+    {
+        // ALC acting above the level is no reason to distrust it.
+        var state = TxLevelTuner.Next(new TxLevelState(-10), 0.02, -4, zeroAlc: true, riseToDb: -15.5).State;
+        state.AlcBelowRiseTo.Should().BeFalse();
+        state = TxLevelTuner.Next(state with { GainDb = -25 }, 0.0, -4, zeroAlc: true, riseToDb: -15.5).State;
+        state.GainDb.Should().Be(-15.5);
+    }
+
+    [Fact]
+    public void Next_AlcHeldBelowRiseTo_DoesNotJump()
+    {
+        var step = TxLevelTuner.Next(new TxLevelState(-26), 0.1, -4, riseToDb: -15.5);
+        step.Change.Should().Be(TxLevelChange.Held);
+        step.State.GainDb.Should().Be(-26);
+    }
 }

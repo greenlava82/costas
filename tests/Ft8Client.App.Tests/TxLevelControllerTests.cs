@@ -126,4 +126,120 @@ public sealed class TxLevelControllerTests : IDisposable
         _tx.GainDb.Should().Be(-10 - AudioSettings.AutoLowestBelowDb);
         shown.Warning.Should().Contain(TxMeterCheck.AlcAdvice);
     }
+
+    [Fact]
+    public void LevelFor_PskWithoutItsOwnLevel_StartsFiveDecibelsAboveTheBandsFt8Level()
+    {
+        var audio = new AudioSettings { TxGainDb = -10 };
+        audio.TxGainByBand["20m"] = -20.5;
+        TxLevelController.LevelFor(audio, "20m", "PSK31").Should().Be(-15.5);
+        TxLevelController.LevelFor(audio, "20m", "PSK63").Should().Be(-15.5);
+        TxLevelController.LevelFor(audio, "20m", "FT8").Should().Be(-20.5);
+        TxLevelController.LevelFor(audio, "20m", "RTTY").Should().Be(-20.5);
+    }
+
+    [Fact]
+    public void LevelFor_PskOnBandWithNoLevel_StartsFiveDecibelsAboveSettingsLevel()
+    {
+        TxLevelController.LevelFor(new AudioSettings { TxGainDb = -10 }, "40m", "PSK31").Should().Be(-5);
+    }
+
+    [Fact]
+    public void LevelFor_PskStartAboveFullScale_StopsAtZero()
+    {
+        TxLevelController.LevelFor(new AudioSettings { TxGainDb = -2 }, "40m", "PSK31").Should().Be(0);
+    }
+
+    [Fact]
+    public void LevelFor_PskWithItsOwnLevel_UsesIt()
+    {
+        var audio = new AudioSettings { TxGainDb = -10 };
+        audio.TxGainByBand["20m"] = -20.5;
+        audio.TxGainByBand["20m PSK"] = -26;
+        TxLevelController.LevelFor(audio, "20m", "PSK31").Should().Be(-26);
+    }
+
+    [Fact]
+    public void Apply_PskWithoutItsOwnLevel_SendsAtTheStartLevel()
+    {
+        _settings.Update(s =>
+        {
+            s.Profile.Audio.TxGainByBand["20m"] = -20.5;
+            s.Operating.Mode = "PSK31";
+        });
+        _tx.GainDb.Should().Be(-15.5);
+    }
+
+    [Fact]
+    public void OnMeasured_PskQuietFarBelowStart_RisesStraightToStartLevel()
+    {
+        // Tony's 20m: FT8 settled at -20.5 dB, PSK had crept up only to -26 dB (peaks 11.5 dB below FT8's full power).
+        _settings.Update(s =>
+        {
+            s.Profile.Audio.TxGainByBand["20m"] = -20.5;
+            s.Profile.Audio.TxGainByBand["20m PSK"] = -26;
+            s.Operating.Mode = "PSK31";
+        });
+
+        _level.OnMeasured(Meters(0.0));
+
+        _tx.GainDb.Should().Be(-15.5);
+        _settings.Current.Profile.Audio.TxGainByBand["20m PSK"].Should().Be(-15.5);
+        _settings.Current.Profile.Audio.TxGainByBand["20m"].Should().Be(-20.5);
+    }
+
+    [Fact]
+    public void OnMeasured_PskAlcAtStartLevel_LowersAndThenClimbsHalfDecibelAtATime()
+    {
+        _settings.Update(s =>
+        {
+            s.Profile.Audio.TxGainByBand["20m"] = -20.5;
+            s.Profile.Audio.TxGainByBand["20m PSK"] = -26;
+            s.Operating.Mode = "PSK31";
+        });
+        _level.OnMeasured(Meters(0.0));
+        _level.OnMeasured(Meters(0.05));
+        _tx.GainDb.Should().Be(-16.5);
+
+        // Below the level where the ALC acted, quiet overs hold half a decibel under it rather than jumping back.
+        for (var i = 0; i < 3; i++) _level.OnMeasured(Meters(0.0));
+        _tx.GainDb.Should().Be(-16);
+    }
+
+    [Fact]
+    public void OnMeasured_PskLevelChangedByHand_StartsAfreshAndMayRiseStraightToStart()
+    {
+        _settings.Update(s =>
+        {
+            s.Profile.Audio.TxGainByBand["20m"] = -20.5;
+            s.Profile.Audio.TxGainByBand["20m PSK"] = -15.5;
+            s.Operating.Mode = "PSK31";
+        });
+        _level.OnMeasured(Meters(0.05));
+        _tx.GainDb.Should().Be(-16.5);
+
+        _settings.Update(s => s.Profile.Audio.TxGainByBand["20m PSK"] = -30);
+        _level.OnMeasured(Meters(0.0));
+        _tx.GainDb.Should().Be(-15.5);
+    }
+
+    [Fact]
+    public void OnMeasured_Ft8Quiet_StillRisesHalfDecibel()
+    {
+        _settings.Update(s => s.Profile.Audio.TxGainByBand["20m"] = -26);
+        _level.OnMeasured(Meters(0.0));
+        _tx.GainDb.Should().Be(-25.5);
+    }
+
+    [Fact]
+    public void OnMeasured_PskQuietAboveStart_RisesHalfDecibelUpToTheAutomaticMaximum()
+    {
+        _settings.Update(s =>
+        {
+            s.Profile.Audio.TxGainByBand["20m PSK"] = -5;
+            s.Operating.Mode = "PSK31";
+        });
+        for (var i = 0; i < 5; i++) _level.OnMeasured(Meters(0.0));
+        _tx.GainDb.Should().Be(-10 + TxLevelController.AutoHeadroomDb);
+    }
 }

@@ -10,6 +10,7 @@ namespace Ft8Client.Core.Transmit;
 
 /// <summary>
 /// Where automatic transmit level stands on one band: the audio level in dBFS, the lowest level found to make the
-/// radio's ALC act (null until one has), and how many transmissions in a row read no ALC while held below that level.
+/// radio's ALC act (null until one has), how many transmissions in a row read no ALC while held below that level, and
+/// whether the ALC has acted at or below the level a quiet transmission may rise straight to (so it no longer does).
 /// </summary>
-public sealed record TxLevelState(double GainDb, double? CeilingDb = null, int QuietAtCeiling = 0);
+public sealed record TxLevelState(double GainDb, double? CeilingDb = null, int QuietAtCeiling = 0, bool AlcBelowRiseTo = false);
