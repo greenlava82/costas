@@ -138,9 +138,47 @@ public class RemoteWsprTests
         w.Decoder.Should().Be("1 heard in the last slot.");
         w.Upload.Should().Be("WSPRnet: 3 spots sent");
         w.Heard.Select(h => h.Call).Should().Equal("K1ABC", "PJ4/K1ABC");
-        w.Heard[0].Should().Be(new RemoteWsprSpot("14:02", "K1ABC", "FN42", "-12", w.Heard[0].Distance));
+        w.Heard[0].Should().Be(new RemoteWsprSpot("14:02", "K1ABC", "FN42", "-12", w.Heard[0].Distance, "1,450", "30"));
         w.Heard[0].Distance.Should().Contain("km");
         w.Heard[1].Grid.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Build_Wspr_CarriesTheRxDetailTheWsprScreenShows()
+    {
+        var heard = new[]
+        {
+            new WsprHeardSpot(new WsprSpot(Now.AddMinutes(-1), -12, 0.2, 14_097_050, 0, "K1ABC", "FN42", 30, false, 14_095_600), 3_000),
+            new WsprHeardSpot(new WsprSpot(Now.AddMinutes(-3), -20, 0.1, 14_097_100, 0, "VK3XYZ", "QF22", 37, false, 14_095_600), 13_000),
+            new WsprHeardSpot(new WsprSpot(Now.AddMinutes(-3), -25, 0.1, 14_097_150, 0, "<...>", null, 37, true, 14_095_600), null),
+        };
+        var snap = new SessionSnapshot
+        {
+            MyCall = "W7LIT", Mode = Mode.Wspr, Band = "20m", DialHz = 14_095_600,
+            Wspr = new WsprView(heard, Now.AddSeconds(57), Now.AddMinutes(-1), 1, "") { Beacon = WsprBeaconView.Off },
+        };
+
+        var w = RemoteStateBuilder.Build(snap, Now, new RemoteContext { Units = DistanceUnit.Kilometres }, "you", null).Wspr!;
+
+        w.Band.Should().Be("20m");
+        w.Frequency.Should().Be("14.0956 MHz");
+        w.Transmitting.Should().BeFalse();
+        w.TxPercent.Should().Be(20);
+        w.LastSlot.Should().Be("14:02");
+        w.LastSlotCount.Should().Be(1);
+        w.Farthest.Should().StartWith("VK3XYZ QF22 · ");
+        w.Heard[0].Hz.Should().Be("1,450");
+        w.Heard[0].Dbm.Should().Be("30");
+    }
+
+    [Fact]
+    public void Build_Wspr_SendsAsManySignalsAsTheDecodesTabListsAndNoMore()
+    {
+        var heard = Enumerable.Range(0, 100).Select(i =>
+            new WsprHeardSpot(new WsprSpot(Now.AddMinutes(-2 * i), -10, 0, 14_097_000, 0, "K" + i, "FN42", 30, false, 14_095_600), 100)).ToArray();
+        var snap = new SessionSnapshot { Mode = Mode.Wspr, Band = "20m", DialHz = 14_095_600, Wspr = new WsprView(heard, Now, null, 0, "") };
+
+        RemoteStateBuilder.Build(snap, Now, new RemoteContext(), "you", null).Wspr!.Heard.Should().HaveCount(RemoteStateBuilder.MaxWsprRows);
     }
 
     [Fact]
@@ -164,6 +202,8 @@ public class RemoteWsprTests
     {
         var html = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "Ft8Client.App", "Remote", "index.html"));
 
+        // The card sits in its own pane, which the phone's Operate tab lists; in the operate pane it was never shown on a phone.
+        html.Should().Contain("data-pane=\"wspr\"").And.Contain("operate: [\"dash\", \"wspr\"]");
         html.Should().Contain("id=\"wspr\"").And.Contain("\"wsprStart\"").And.Contain("\"wsprStop\"").And.Contain("\"wsprHere\"");
     }
 }

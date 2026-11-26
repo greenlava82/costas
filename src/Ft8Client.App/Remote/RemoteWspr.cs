@@ -14,7 +14,9 @@ namespace Ft8Client.App.Remote;
 /// <param name="Grid">Locator, or blank.</param>
 /// <param name="Snr">SNR, "-12".</param>
 /// <param name="Distance">Distance in the operator's unit, or blank.</param>
-public sealed record RemoteWsprSpot(string Utc, string Call, string Grid, string Snr, string Distance);
+/// <param name="Hz">Audio frequency in the passband, "1,502", or blank.</param>
+/// <param name="Dbm">The power the sender reported, "30", or blank.</param>
+public sealed record RemoteWsprSpot(string Utc, string Call, string Grid, string Snr, string Distance, string Hz = "", string Dbm = "");
 
 /// <summary>The WSPR card on the phone (docs/10-wspr.md section 8): the beacon's state, the next slot, and what was heard.</summary>
 /// <param name="On">The beacon is running.</param>
@@ -25,6 +27,15 @@ public sealed record RemoteWsprSpot(string Utc, string Call, string Grid, string
 /// <param name="PowerWarning">The 3 dB warning, or null.</param>
 /// <param name="Decoder">What the decoder is doing.</param>
 /// <param name="Upload">The WSPRnet upload state.</param>
-/// <param name="Heard">The newest signals heard.</param>
+/// <param name="Heard">The newest signals heard, newest first; the phone groups them by slot.</param>
+/// <param name="Transmitting">This slot is on the air.</param>
+/// <param name="Band">The band, "20m".</param>
+/// <param name="Frequency">The dial, "14.0956 MHz".</param>
+/// <param name="TxPercent">The share of slots the beacon transmits in (shown, not changed from the phone).</param>
+/// <param name="Message">The message the beacon sends or last sent, or null.</param>
+/// <param name="LastSlot">When the last decoded slot started, "14:02", or null before the first.</param>
+/// <param name="LastSlotCount">Signals decoded in that slot.</param>
+/// <param name="Farthest">The farthest signal heard in the list, "K1ABC FN42 · 3,000 km", or null.</param>
 public sealed record RemoteWspr(bool On, string Status, int NextSlotIn, int? PresenceLeft, string Power, string? PowerWarning, string Decoder, string Upload,
-                                IReadOnlyList<RemoteWsprSpot> Heard);
+                                IReadOnlyList<RemoteWsprSpot> Heard, bool Transmitting = false, string Band = "", string Frequency = "", int TxPercent = 0,
+                                string? Message = null, string? LastSlot = null, int LastSlotCount = 0, string? Farthest = null);

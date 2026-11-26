@@ -20,6 +20,7 @@ using Ft8Client.Core.Services;
 using Ft8Client.Core.Stations;
 using Ft8Client.Core.Time;
 using Ft8Client.Core.Transmit;
+using Ft8Client.Core.Wspr;
 
 namespace Ft8Client.App.Remote;
 
@@ -37,6 +38,9 @@ public static class RemoteStateBuilder
 
     /// <summary>Most band activity lines sent to the phone.</summary>
     public const int MaxDecodes = 60;
+
+    /// <summary>Signals in the phone's WSPR list.</summary>
+    public const int MaxWsprRows = 40;
 
     /// <summary>Most of tonight's contacts and of who-hears-me reports sent to the phone.</summary>
     public const int MaxRecent = 20;
@@ -130,8 +134,20 @@ public static class RemoteStateBuilder
             b is { On: true, PresenceEndsUtc: { } end } ? (int)Math.Max(0, Math.Ceiling((end - nowUtc).TotalSeconds)) : null,
             WsprViewModel.PowerText(b), b.PowerWarning, w.DecoderState,
             s.Services.TryGetValue(ServiceNames.Wsprnet, out var up) ? up.Message : "WSPRnet off",
-            [.. w.Recent.Take(MaxRows).Select(h => new RemoteWsprSpot(h.Spot.SlotStartUtc.ToString("HH:mm", CultureInfo.InvariantCulture), h.Spot.Callsign,
-                h.Spot.Grid ?? string.Empty, h.Spot.Snr.ToString(CultureInfo.InvariantCulture), h.DistanceKm is { } km ? StationText.Distance(km, units) : string.Empty))]);
+            [.. w.Recent.Take(MaxWsprRows).Select(h => WsprRow(h, units))],
+            s.Transmitting, s.Band, $"{(s.DialHz / 1e6).ToString("0.0000", CultureInfo.InvariantCulture)} MHz", b.TxPercent, b.LastMessage,
+            w.LastSlotUtc?.ToString("HH:mm", CultureInfo.InvariantCulture), w.LastSlotCount, Farthest(w.Recent, units));
+    }
+
+    private static RemoteWsprSpot WsprRow(WsprHeardSpot h, DistanceUnit units) =>
+        new(h.Spot.SlotStartUtc.ToString("HH:mm", CultureInfo.InvariantCulture), h.Spot.Callsign, h.Spot.Grid ?? string.Empty,
+            h.Spot.Snr.ToString(CultureInfo.InvariantCulture), h.DistanceKm is { } km ? StationText.Distance(km, units) : string.Empty,
+            h.Spot.AudioHz.ToString("N0", CultureInfo.InvariantCulture), h.Spot.PowerDbm.ToString(CultureInfo.InvariantCulture));
+
+    private static string? Farthest(IReadOnlyList<WsprHeardSpot> heard, DistanceUnit units)
+    {
+        var best = heard.Take(MaxWsprRows).Where(h => h.DistanceKm is not null).MaxBy(h => h.DistanceKm);
+        return best is null ? null : $"{best.Spot.Callsign}{(best.Spot.Grid is { } g ? " " + g : string.Empty)} · {StationText.Distance(best.DistanceKm!.Value, units)}";
     }
 
     // Rows carry the pileup on each station ("3 calling"), as the desk's call-list rows do.

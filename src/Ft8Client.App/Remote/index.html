@@ -128,7 +128,23 @@ main{padding:12px 14px 120px;display:flex;flex-direction:column;gap:12px;flex:1}
 .warnline{font-size:13px}
 .board{display:flex;flex-direction:column;gap:12px}
 .board .col{display:contents}
-[data-pane=dash]{order:0}[data-pane=operate]{order:1}[data-pane=heard]{order:2}[data-pane=stations]{order:3}[data-pane=decodes]{order:4}[data-pane=signal]{order:5}[data-pane=log]{order:6}
+[data-pane=dash]{order:0}[data-pane=wspr]{order:0}[data-pane=operate]{order:1}
+/* WSPR mode: its own screen takes the place of the contact tiles; the phone's dash has nothing to show. */
+body.wsprmode [data-pane=dash]{display:none!important}
+.wsprc .whead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.wsprc .wstate{font-size:26px;font-weight:800;line-height:1.15;margin:4px 0 2px}
+.wsprc .wstate.tx{color:var(--red)}.wsprc .wstate.on{color:var(--grn)}
+.wsprc .wmeta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 2px}
+.wsprc .wmeta div{background:var(--bg);border-radius:8px;padding:6px 8px}
+.wsprc .wmeta b{display:block;font-size:18px;font-variant-numeric:tabular-nums}.wsprc .wmeta span{font-size:10.5px;color:var(--mut)}
+.wslot{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin:12px 0 2px}
+.wrow{display:grid;grid-template-columns:2.6em 1fr 4.2em auto;gap:0 8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--line);font-size:14px}
+.wrow .snr{font-family:Consolas,monospace;font-variant-numeric:tabular-nums;text-align:right}
+.wrow .snr.strong{color:var(--grn);font-weight:700}.wrow .snr.weak{color:var(--mut)}
+.wrow .wc{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wrow .wg{font-family:Consolas,monospace;color:var(--mut);font-size:12.5px}
+.wrow .wd{text-align:right;font-size:13px;white-space:nowrap}
+.wrow .wx{grid-column:2 / span 3;font-size:11px;color:var(--mut)}[data-pane=heard]{order:2}[data-pane=stations]{order:3}[data-pane=decodes]{order:4}[data-pane=signal]{order:5}[data-pane=log]{order:6}
 
 /* The phone's Operate screen: tiles. */
 .dash{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -292,8 +308,8 @@ body.dashon #onair{display:none!important}
         <div id="tLog" class="t span2 tap"></div>
       </div>
     </div>
+    <div data-pane="wspr"><div id="wspr" class="card wsprc hidden"></div></div>
     <div data-pane="operate">
-      <div id="wspr" class="card hidden"></div>
       <div class="card"><div id="contactBody"></div><div id="contactBtns" class="btns"></div></div>
       <div id="callers" class="card list hidden" style="margin-top:12px"></div>
       <div id="line" class="card list" style="margin-top:12px"></div>
@@ -583,26 +599,59 @@ function contactButtons(s) {
 // the station refuses Start unless the settings can be sent exactly as they are, and stops the beacon when nobody gives input.
 function renderWspr(s) {
   const w = s.wspr;
+  document.body.classList.toggle("wsprmode", !!w);
   $("wspr").classList.toggle("hidden", !w);
   $("contactBody").parentElement.classList.toggle("hidden", !!w);
   $("line").classList.toggle("hidden", !!w);
   if (!w || !changed("wspr", w)) return;
   const box = $("wspr"); box.replaceChildren();
   const m = (sec) => Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
-  const head = el("div", "head"); head.append(el("b", null, "WSPR beacon"), el("span", "s", "Next slot in " + m(w.nextSlotIn)));
-  box.append(head, el("div", "lbl", w.status));
+
+  // The state of this slot, large: what the station is doing now.
+  const head = el("div", "whead");
+  head.append(el("b", null, "WSPR · " + w.band + " " + w.frequency), el("span", "s", "Next slot " + m(w.nextSlotIn)));
+  const state = el("div", "wstate" + (w.transmitting ? " tx" : w.on ? " on" : ""), w.transmitting ? "● Transmitting" : w.on ? "Beacon on" : "Receiving");
+  box.append(head, state, el("div", "sub", w.status));
   if (w.on && w.presenceLeft !== null) box.append(el("div", "sub", "Stops in " + m(w.presenceLeft) + " unless you tap I'm here."));
-  box.append(el("div", "sub", w.power));
-  if (w.powerWarning) box.append(el("div", "sub", w.powerWarning));
+
+  // The beacon's controls. Starting is an operator action; the settings (Tx share, power) are shown and changed at the desk.
   const btns = el("div", "btns");
   btns.append(button(w.on ? "Stop beacon" : "Start beacon", w.on ? "" : "go", () => cmd(w.on ? "wsprStop" : "wsprStart")));
   if (w.on) btns.append(button("I'm here", "", () => cmd("wsprHere")));
   box.append(btns);
+
+  // What was heard, at a glance.
+  const meta = el("div", "wmeta");
+  [[w.lastSlotCount, "heard last slot" + (w.lastSlot ? " (" + w.lastSlot + ")" : "")], [w.heard.length, "in the list"], [w.txPercent + "%", "of slots transmit"]]
+    .forEach(([v, k]) => { const d = el("div"); d.append(el("b", null, String(v)), el("span", null, k)); meta.append(d); });
+  box.append(meta);
+  if (w.farthest) box.append(el("div", "sub", "Farthest: " + w.farthest));
+  box.append(el("div", "sub", w.power));
+  if (w.powerWarning) box.append(el("div", "sub", w.powerWarning));
+  if (w.message) box.append(el("div", "sub", "Message: " + w.message));
   box.append(el("div", "sub", w.decoder + " · " + w.upload));
-  if (w.heard.length === 0) box.append(el("div", "s", "Nothing heard yet."));
-  w.heard.forEach(h => {
-    const row = el("div", "dec");
-    row.append(el("span", null, h.utc), el("span", null, h.snr), el("span", "msgt", h.call + (h.grid ? " " + h.grid : "")), el("span", "cty", h.distance));
+
+  // The newest signals, a slot at a time; the Decodes tab has the whole list.
+  box.append(el("div", "wslot", "Heard"));
+  wsprList(box, w.heard, 12, w.lastSlot);
+  if (w.heard.length > 12) box.append(el("div", "s hint", "The Decodes tab lists all " + w.heard.length + "."));
+}
+
+// Signals grouped by the slot they were decoded in, newest slot first.
+function wsprList(box, rows, limit, latest) {
+  if (rows.length === 0) { box.append(el("div", "s", "Nothing heard yet.")); return; }
+  let slot = null, n = 0;
+  rows.slice(0, limit).forEach(h => {
+    if (h.utc !== slot) {
+      slot = h.utc;
+      const count = rows.filter(r => r.utc === slot).length;
+      box.append(el("div", "wslot", slot + " UTC · " + count + (count === 1 ? " signal" : " signals") + (slot === latest ? " · latest" : "")));
+    }
+    const db = parseInt(h.snr, 10);
+    const row = el("div", "wrow");
+    row.append(el("span", "snr" + (db >= -10 ? " strong" : db <= -24 ? " weak" : ""), h.snr), el("span", "wc", h.call), el("span", "wg", h.grid), el("span", "wd", h.distance));
+    const bits = [h.hz && h.hz + " Hz", h.dbm && h.dbm + " dBm"].filter(Boolean).join(" · ");
+    if (bits) row.append(el("span", "wx", bits));
     box.append(row);
   });
 }
@@ -832,6 +881,15 @@ function renderStations(s) {
 }
 
 function renderDecodes(s) {
+  if (s.wspr) {
+    // WSPR has no band-activity lines; the tab lists every signal heard instead.
+    if (!changed("decodes", { wspr: s.wspr.heard, last: s.wspr.lastSlot })) return;
+    const wbox = $("decodes"); wbox.replaceChildren();
+    const wh = el("div", "head"); wh.append(el("b", null, "Heard"), el("span", "s", "Newest first"));
+    wbox.append(wh);
+    wsprList(wbox, s.wspr.heard, 100, s.wspr.lastSlot);
+    return;
+  }
   if (!changed("decodes", s.decodes)) return;
   const box = $("decodes"); box.replaceChildren();
   const head = el("div", "head"); head.append(el("b", null, "Band activity"), el("span", "s", "Newest first · tap a line for the station"));
@@ -1357,8 +1415,8 @@ const TAB = "costas-remote-tab";
 let tab = "operate";
 try { tab = localStorage.getItem(TAB) || "operate"; } catch { }
 // Which parts each tab shows. A tablet shows the whole Operate view at once, like the desk, so it has two tabs.
-const PHONE_TABS = { operate: ["dash"], stations: ["heard", "stations"], decodes: ["decodes"], signal: ["signal"], log: ["log"], radio: ["radio"] };
-const TABLET_TABS = { operate: ["operate", "heard", "stations", "signal", "log"], decodes: ["decodes"], radio: ["radio"] };
+const PHONE_TABS = { operate: ["dash", "wspr"], stations: ["heard", "stations"], decodes: ["decodes"], signal: ["signal"], log: ["log"], radio: ["radio"] };
+const TABLET_TABS = { operate: ["wspr", "operate", "heard", "stations", "signal", "log"], decodes: ["decodes"], radio: ["radio"] };
 const wideQuery = matchMedia("(min-width: 760px)");
 let wide = wideQuery.matches;
 function showTab(t) {
