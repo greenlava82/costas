@@ -117,6 +117,8 @@ public sealed class TxLevelController
         }
         (string Band, string Mode) sent;
         lock (_gate) sent = _onAir ?? (s.Operating.Band, s.Operating.Mode);
+        // The WSPR beacon's attenuation is applied on top of the operator's level; automatic level would undo it (docs/10-wspr-build.md, W4).
+        if (ModeInfo.TryParse(sent.Mode, out var sentMode) && sentMode == Mode.Wspr) return result;
         var band = LevelKey(sent.Band, sent.Mode);
         var psk = IsPsk(sent.Mode);
         var gain = LevelFor(audio, sent.Band, sent.Mode);

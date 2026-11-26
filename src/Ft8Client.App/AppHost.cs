@@ -608,6 +608,10 @@ public sealed class AppHost : IAsyncDisposable
 
         RadioPower = new RadioPowerService(() => _rig, () => Transmitter.Transmitting || Session.Snapshot.Transmitting);
         RadioPower.Start();
+        // The WSPR beacon takes its settings, the radio's power and the power it restores from here.
+        Session.WsprSettings = () => Settings.Current.Profile.Wspr;
+        Session.RadioWatts = () => RadioPower.Power?.Watts;
+        Session.BeaconPower = new BeaconPowerService(RadioPower);
         // Read only while a phone has its Radio tab open, so the radio is not asked about them otherwise.
         RadioControls = new RadioControlsService(() => _rig, () => Transmitter.Transmitting || Session.Snapshot.Transmitting,
             () => Remote?.Control.RadioWanted == true);

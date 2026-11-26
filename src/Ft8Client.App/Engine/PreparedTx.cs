@@ -24,4 +24,10 @@ public sealed record PreparedTx(TxPlan Plan, Mode Mode, int OffsetHz, float[] Sa
 
     /// <summary>The transmitter's Halt count when this was prepared: a Halt since then means it must not be keyed.</summary>
     public long HaltEpoch { get; init; }
+
+    /// <summary>
+    /// The audio offset and width the band-edge guard checks, when they are not the transmit offset and the mode's usual width:
+    /// WSPR is checked over its whole 200 Hz window. Null for everything else.
+    /// </summary>
+    public (int OffsetHz, int WidthHz)? BandCheck { get; init; }
 }

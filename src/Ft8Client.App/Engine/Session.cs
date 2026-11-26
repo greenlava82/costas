@@ -184,7 +184,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// <summary>Completes when the decode in flight (if any) has been applied.</summary>
     public Task DecodeIdle
     {
-        get { lock (_gate) return Task.WhenAll(_decodeTask, _earlyTask); }
+        get { lock (_gate) return Task.WhenAll(_decodeTask, _earlyTask, _beaconTask); }
     }
 
     /// <summary>Decoder runs started so far (full, quick and early), so tests can wait for each to reach the decoder.</summary>
@@ -848,6 +848,8 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
 
     private void OnTxFault(string message)
     {
+        // A radio or audio fault has already released PTT; the beacon does not start again by itself.
+        StopBeacon($"Beacon stopped: {message}");
         lock (_gate)
         {
             _fault = message;
@@ -936,7 +938,11 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// <summary>Operator input (key or click), for the Tx watchdog.</summary>
     public void Activity()
     {
-        lock (_gate) _engine.OperatorActivity(_clock.UtcNow);
+        lock (_gate)
+        {
+            _engine.OperatorActivity(_clock.UtcNow);
+            NotePresenceLocked();
+        }
     }
 
     /// <summary>
@@ -1201,6 +1207,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// <summary>Halt Tx with a reason for the bottom bar (for a stop the operator did not ask for).</summary>
     public async Task HaltAsync(string? reason)
     {
+        StopBeacon("Beacon stopped: Halt Tx.");
         lock (_gate)
         {
             _engine.Halt(_clock.UtcNow);
@@ -1246,7 +1253,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         lock (_gate)
         {
             if (_engine.CallingCq || _engine.InContact || _kbd.InContact || _keys.Active || _tx.Transmitting
-                || _rigTuningUntil > _clock.UtcNow)
+                || _rigTuningUntil > _clock.UtcNow || _beaconOn)
                 return "Tune is only available while nothing else is being sent.";
             offset = _txOffset;
             // PSK and RTTY have no slots, so the clock check does not apply to them (docs/09-keyboard-modes.md section 9).
@@ -1348,6 +1355,8 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         }
         // Nothing on the air follows the radio to another band or mode: an FT8 message, a Tune tone or a PSK or RTTY
         // over is stopped, and anything prepared for the old band is dropped.
+        // A band or mode change by hand ends the beacon (the screen asks first); hopping (W6) does not come through here.
+        StopBeacon("Beacon stopped: the band or mode changed.");
         _keys.Clear();
         _tx.CancelPending();
         if (_keys.Active || _tx.Transmitting) _ = _tx.HaltAsync();
@@ -1371,18 +1380,22 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     public void SetDial(long hz)
     {
         string? outside = null;
+        var moved = false;
         lock (_gate)
         {
             // The dial moved while something is on the air: check it still fits inside the band.
             if (hz != _dialHz) outside = _tx.OnAirOutsideBand(_config.Band, hz);
             if (Math.Abs(hz - _dialHz) > RetuneHz)
             {
+                moved = true;
                 _rxMovedUtc = _clock.UtcNow;
                 _quiet.Reset(_rxMovedUtc);
             }
             _dialHz = hz;
         }
         if (outside is not null) _ = HaltAsync($"Transmission stopped: the dial moved. {outside}");
+        // The beacon was checked at the old dial: a dial moved by more than a retune is the operator's to start again.
+        if (moved) StopBeacon("Beacon stopped: the dial moved.");
         Publish();
     }
 

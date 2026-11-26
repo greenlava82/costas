@@ -72,14 +72,22 @@ public sealed partial class Session
         switch (e.Mark)
         {
             case SlotMark.Start:
-                lock (_gate) _recordingSlot = e.SlotStartUtc;
-                _source.BeginSlot(e.SlotStartUtc, e.Mode);
+                // The operator may have left since this slot was planned: a transmission not yet on the air is dropped.
+                CheckPresenceAtStart();
+                var transmitting = _tx.Pending is { } p && p.Plan.SlotStartUtc == e.SlotStartUtc;
+                lock (_gate) _recordingSlot = transmitting ? null : e.SlotStartUtc;
+                if (transmitting) _source.CancelSlot();
+                else _source.BeginSlot(e.SlotStartUtc, e.Mode);
                 Defer(Publish);
                 break;
             case SlotMark.CaptureCutoff:
+                // The next slot is planned now, six seconds ahead. Any transmission has finished by here (it ends 111.6 s in), so a
+                // beacon that stops for want of the operator never cuts one off.
+                PlanBeaconSlot(e.SlotStartUtc + WsprTiming.SlotLength);
                 OnWsprCutoff(e);
                 break;
         }
+        _tx.OnSlotEvent(e);
     }
 
     private void OnWsprCutoff(SlotEvent e)
@@ -230,6 +238,9 @@ public sealed partial class Session
     // Under _gate: null outside WSPR.
     private WsprView? WsprViewAt(DateTime now) => ModeInfo.IsWspr(_config.Mode)
         ? new WsprView(_wsprHeard.ToList(), SlotMath.SlotStart(now, Mode.Wspr) + WsprTiming.SlotLength, _wsprLastSlot, _wsprLastCount, _wsprState)
+        {
+            Beacon = BeaconViewAt(now),
+        }
         : null;
 }
 
@@ -239,4 +250,8 @@ public sealed partial class Session
 /// <param name="LastSlotUtc">Start of the last slot that was decoded, or null.</param>
 /// <param name="LastSlotCount">How many signals the last decoded slot added to the list.</param>
 /// <param name="DecoderState">One line on what the decoder is doing or why a slot was dropped.</param>
-public sealed record WsprView(IReadOnlyList<WsprHeardSpot> Recent, DateTime NextSlotUtc, DateTime? LastSlotUtc, int LastSlotCount, string DecoderState);
+public sealed record WsprView(IReadOnlyList<WsprHeardSpot> Recent, DateTime NextSlotUtc, DateTime? LastSlotUtc, int LastSlotCount, string DecoderState)
+{
+    /// <summary>The beacon: whether it runs, what the next slot does, how long the operator has, and the power advice.</summary>
+    public WsprBeaconView Beacon { get; init; } = WsprBeaconView.Off;
+}

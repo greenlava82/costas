@@ -14,6 +14,7 @@ using Ft8Client.Core.Contacts;
 using Ft8Client.Core.Encoding;
 using Ft8Client.Core.Time;
 using Ft8Client.Core.Transmit;
+using Ft8Client.Core.Wspr;
 using Ft8Client.Rig;
 
 namespace Ft8Client.App.Engine;
@@ -200,7 +201,7 @@ public sealed class Transmitter
             else if ((_current ?? _next) is { } tx)
             {
                 // A Tune tone is checked as FT8 is when it starts.
-                (mode, offset, width) = (tx.Mode, tx.OffsetHz, null);
+                (mode, offset, width) = tx.BandCheck is { } check ? (tx.Mode, check.OffsetHz, (int?)check.WidthHz) : (tx.Mode, tx.OffsetHz, (int?)null);
             }
             else
             {
@@ -282,14 +283,7 @@ public sealed class Transmitter
     {
         long epoch;
         lock (_gate) epoch = haltEpoch ?? _haltEpoch;
-        refusal = DisabledReason is { } disabled ? Refuse("disabled", disabled)
-            : !guard.AudioReady || _output is null ? Refuse("no_audio", "No audio output device is open; transmitting is disabled.")
-            : _outputFault is { } dead ? Refuse("output_dead", OutputDeadText(dead))
-            : SilencedText() is { } silent ? Refuse("output_muted", silent)
-            : guard.RigFault is not null ? Refuse("radio_fault", $"Radio fault: {guard.RigFault}")
-            : !ClockEstimate.TransmitAllowed(guard.ClockOffsetSeconds, guard.ClockBlockSeconds, out var clockWhy) ? Refuse("clock", clockWhy)
-            : !_frequencies.TransmitAllowed(guard.Band, mode, guard.DialHz, offsetHz, out var bandWhy) ? Refuse("band_edge", bandWhy)
-            : null;
+        refusal = GuardRefusal(guard, mode, offsetHz, null);
         if (refusal is not null || _output is null) return null;
         var enc = FtxEncoder.Encode(plan.Message, mode);
         if (!enc.Ok)
@@ -305,6 +299,55 @@ public sealed class Transmitter
             if (_haltEpoch != epoch) return null;
             _next = tx;
             _hold = hold;
+        }
+        Committed?.Invoke();
+        return tx;
+    }
+
+    // The guards every transmission passes, in one place so a new kind of transmission cannot skip one: transmitting disabled, no audio
+    // device, a dead or muted output, a radio fault, the clock, and the band edge with the licence (over widthHz, or the mode's width).
+    private string? GuardRefusal(TxGuardInput guard, Mode mode, int offsetHz, int? widthHz) =>
+        DisabledReason is { } disabled ? Refuse("disabled", disabled)
+        : !guard.AudioReady || _output is null ? Refuse("no_audio", "No audio output device is open; transmitting is disabled.")
+        : _outputFault is { } dead ? Refuse("output_dead", OutputDeadText(dead))
+        : SilencedText() is { } silent ? Refuse("output_muted", silent)
+        : guard.RigFault is not null ? Refuse("radio_fault", $"Radio fault: {guard.RigFault}")
+        : !ClockEstimate.TransmitAllowed(guard.ClockOffsetSeconds, guard.ClockBlockSeconds, out var clockWhy) ? Refuse("clock", clockWhy)
+        : !_frequencies.TransmitAllowed(guard.Band, mode, guard.DialHz, offsetHz, widthHz, out var bandWhy) ? Refuse("band_edge", bandWhy)
+        : null;
+
+    /// <summary>
+    /// Checks and installs a WSPR transmission for its slot: the same guards as <see cref="Prepare"/>, with the band edge and
+    /// licence checked over the whole 1400 to 1600 Hz window (not only the tone), then renders the audio with
+    /// <paramref name="render"/> (given the output rate and the amplitude for the current level) and refuses audio longer than
+    /// one transmission plus a second. Returns null and a reason when it must not go out.
+    /// </summary>
+    public PreparedTx? PrepareWspr(TxPlan plan, int offsetHz, TxGuardInput guard, Func<int, double, float[]> render, out string? refusal, long? haltEpoch = null)
+    {
+        ArgumentNullException.ThrowIfNull(render);
+        long epoch;
+        lock (_gate) epoch = haltEpoch ?? _haltEpoch;
+        refusal = GuardRefusal(guard, Mode.Wspr, WsprTiming.WindowLowHz, WsprTiming.WindowHighHz - WsprTiming.WindowLowHz);
+        if (refusal is not null || _output is null) return null;
+        if (offsetHz < WsprTiming.WindowLowHz || offsetHz > WsprTiming.WindowHighHz)
+        {
+            refusal = Refuse("band_edge", $"The beacon's audio offset {offsetHz} Hz is outside the WSPR window, {WsprTiming.WindowLowHz} to {WsprTiming.WindowHighHz} Hz. It is not moved for you.");
+            return null;
+        }
+        var samples = render(_output.SampleRate, Math.Pow(10, GainDb / 20));
+        var longest = WsprTiming.TxLength + TimeSpan.FromSeconds(1);
+        if (samples.Length == 0 || (double)samples.Length / _output.SampleRate > longest.TotalSeconds)
+        {
+            refusal = Refuse("message", $"Not sent: the WSPR audio is {(double)samples.Length / _output.SampleRate:0.0} s long; one transmission is {WsprTiming.TxLength.TotalSeconds:0.0} s.");
+            return null;
+        }
+        var tx = new PreparedTx(plan, Mode.Wspr, offsetHz, samples, _output.SampleRate) { HaltEpoch = epoch, BandCheck = (WsprTiming.WindowLowHz, WsprTiming.WindowHighHz - WsprTiming.WindowLowHz) };
+        lock (_gate)
+        {
+            // Halted while this was being checked and rendered: the Halt wins.
+            if (_haltEpoch != epoch) return null;
+            _next = tx;
+            _hold = null;
         }
         Committed?.Invoke();
         return tx;
