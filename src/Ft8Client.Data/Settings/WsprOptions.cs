@@ -40,6 +40,9 @@ public sealed class WsprOptions
     /// <summary>Bands the beacon hops between, such as <c>20m</c>; empty means it stays on the current band.</summary>
     public List<string> HopBands { get; set; } = [];
 
+    /// <summary>How many 2-minute slots the beacon stays on a band before hopping to the next in <see cref="HopBands"/> (the first slot after a hop only receives).</summary>
+    public int HopDwellSlots { get; set; } = 5;
+
     /// <summary>
     /// Hop on WSJT-X's coordinated schedule (the 2-minute slot within each 20 minutes picks the band from the 10
     /// coordinated bands) so hopping stations meet; off hops through <see cref="HopBands"/> in order.

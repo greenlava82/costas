@@ -30,7 +30,7 @@ public sealed class WsprBeaconSessionTests
     private static readonly DateTime T0 = new(2026, 11, 26, 2, 2, 0, DateTimeKind.Utc);
     private static DateTime Slot(int n) => T0.AddMinutes(2 * n);
 
-    private sealed class Rig
+    internal sealed class Rig
     {
         public readonly ManualClock Clock = new(T0.AddSeconds(-10));
         public readonly SimulatedRig Radio;
@@ -39,9 +39,15 @@ public sealed class WsprBeaconSessionTests
         public readonly Session Session;
         public readonly SlotClock Slots;
         public readonly FakePower Power = new();
+        public readonly ScriptSpots Spots = new();
         public readonly FrequencyTable Frequencies = ReferenceData.LoadFrequencies();
         public WsprOptions Options = new() { TxPercent = 100, ReportedDbm = 37, PowerPercent = 5 };
-        public readonly List<string> Stops = [];
+        public readonly List<(DateTime At, string Band)> Hops = [];
+        public readonly List<string> NotesSeen = [];
+        private readonly List<(DateTime At, string Band)> _bandLog = [];
+
+        /// <summary>The band the session was on at a time, from the band changes seen so far.</summary>
+        public string BandAt(DateTime t) => _bandLog.LastOrDefault(b => b.At <= t).Band ?? Session.Config.Band;
 
         public Rig(Mode mode = Mode.Wspr, int watchdogMinutes = 6, string call = "W7LIT", string grid = "DN40")
         {
@@ -50,10 +56,19 @@ public sealed class WsprBeaconSessionTests
             Tx = new Transmitter(Radio, Audio, Clock, Frequencies);
             var config = new SessionConfig { MyCall = call, MyGrid = grid, Mode = mode, Contact = new Ft8Client.Core.Contacts.ContactSettings { WatchdogMinutes = watchdogMinutes } };
             Session = new Session(config, new NoFt(), new Silent(), Tx, Clock, ReferenceData.LoadCountries(), Frequencies);
-            Session.AttachWspr(new NoSpots(), null);
+            Session.AttachWspr(Spots, null);
             Session.WsprSettings = () => Options;
             Session.BeaconPower = Power;
             Session.SetWsprRandom(new Random(3));
+            _bandLog.Add((DateTime.MinValue, Session.Config.Band));
+            Session.Changed += s =>
+            {
+                lock (_bandLog)
+                {
+                    if (_bandLog[^1].Band != s.Band) _bandLog.Add((Clock.UtcNow, s.Band));
+                    if (s.Wspr?.Beacon.NextSlotNote is { Length: > 0 } n && !NotesSeen.Contains(n)) NotesSeen.Add(n);
+                }
+            };
             Slots = new SlotClock(Clock, mode == Mode.Wspr ? Mode.Wspr : Mode.Ft8);
             Slots.Event += Session.OnSlotEvent;
             Slots.Poll();
@@ -85,7 +100,7 @@ public sealed class WsprBeaconSessionTests
         public IEnumerable<DateTime> KeyUps => Radio.PttLog.Where(p => !p.On).Select(p => p.TimeUtc);
     }
 
-    private sealed class FakePower : IBeaconPower
+    internal sealed class FakePower : IBeaconPower
     {
         public List<int> Applied { get; } = [];
 
@@ -106,19 +121,26 @@ public sealed class WsprBeaconSessionTests
         }
     }
 
-    private sealed class NoSpots : IWsprDecoder
+    internal sealed class ScriptSpots : IWsprDecoder
     {
-        public Task<WsprDecodeResult> DecodeAsync(SlotAudio slot, long dialHz, CancellationToken ct) =>
-            Task.FromResult(new WsprDecodeResult([], 0, TimeSpan.Zero, DecodeStatus.Ok));
+        public Dictionary<DateTime, WsprSpot[]> Script { get; } = [];
+
+        public List<(DateTime Slot, long Dial)> Decoded { get; } = [];
+
+        public Task<WsprDecodeResult> DecodeAsync(SlotAudio slot, long dialHz, CancellationToken ct)
+        {
+            lock (Script) Decoded.Add((slot.SlotStartUtc, dialHz));
+            return Task.FromResult(new WsprDecodeResult(Script.GetValueOrDefault(slot.SlotStartUtc) ?? [], 0, TimeSpan.Zero, DecodeStatus.Ok));
+        }
     }
 
-    private sealed class NoFt : IDecoder
+    internal sealed class NoFt : IDecoder
     {
         public Task<DecodeResult> DecodeAsync(SlotAudio slot, DecodeContext ctx, CancellationToken ct) =>
             Task.FromResult(new DecodeResult([], TimeSpan.Zero, DecodeStatus.Ok));
     }
 
-    private sealed class Silent : ISlotSource
+    internal sealed class Silent : ISlotSource
     {
         public void BeginSlot(DateTime slotStartUtc, Mode mode)
         {

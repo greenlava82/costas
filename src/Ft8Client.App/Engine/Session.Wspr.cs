@@ -81,10 +81,11 @@ public sealed partial class Session
                 Defer(Publish);
                 break;
             case SlotMark.CaptureCutoff:
-                // The next slot is planned now, six seconds ahead. Any transmission has finished by here (it ends 111.6 s in), so a
-                // beacon that stops for want of the operator never cuts one off.
-                PlanBeaconSlot(e.SlotStartUtc + WsprTiming.SlotLength);
+                // The slot just recorded goes to the decoder first (it reads the dial before any hop), then the next slot is planned, six
+                // seconds ahead. A transmission has finished by here (it ends 111.6 s in), so a beacon that stops for want of the operator
+                // never cuts one off.
                 OnWsprCutoff(e);
+                PlanBeaconSlot(e.SlotStartUtc + WsprTiming.SlotLength);
                 break;
         }
         _tx.OnSlotEvent(e);

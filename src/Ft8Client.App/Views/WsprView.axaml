@@ -100,6 +100,17 @@
           <CheckBox Content="Prefer type 1 messages" IsChecked="{Binding PreferType1}"
                     ToolTip.Tip="Send the 4-character locator only, even if yours has 6 characters." />
         </StackPanel>
+        <StackPanel Spacing="6" IsEnabled="{Binding CanEditSettings}">
+          <TextBlock Text="Band hopping" FontWeight="SemiBold" />
+          <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Bands to hop between while the beacon runs, such as 20m, 40m, 30m. Leave empty to stay on this band. The first slot after each hop only receives." />
+          <TextBox Text="{Binding HopBandsText}" Watermark="20m, 40m, 30m" />
+          <Grid ColumnDefinitions="*,120">
+            <TextBlock Text="Slots per band" VerticalAlignment="Center" />
+            <NumericUpDown Grid.Column="1" Minimum="1" Maximum="100" Increment="1" FormatString="0" Value="{Binding HopDwellSlots}" />
+          </Grid>
+          <CheckBox Content="Follow WSJT-X's coordinated schedule" IsChecked="{Binding HopCoordinated}"
+                    ToolTip.Tip="The band for each 2-minute slot is the one WSJT-X's schedule names, for the bands in your list, so hopping stations meet. Every slot is then a hop, so the beacon only receives." />
+        </StackPanel>
         <Separator />
         <CheckBox Content="Report what I hear to WSPRnet" IsChecked="{Binding UploadEnabled}"
                   ToolTip.Tip="Uploads the signals heard to wsprnet.org under your callsign and locator. Off until you turn it on." />

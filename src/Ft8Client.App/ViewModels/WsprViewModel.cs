@@ -166,6 +166,18 @@ public sealed partial class WsprViewModel : ObservableObject
     [ObservableProperty]
     public partial bool UploadEnabled { get; set; }
 
+    /// <summary>Bands to hop between, as typed: "20m, 40m, 30m". Empty: stay on this band.</summary>
+    [ObservableProperty]
+    public partial string HopBandsText { get; set; } = string.Empty;
+
+    /// <summary>Slots to stay on a band before hopping (the first one only receives).</summary>
+    [ObservableProperty]
+    public partial decimal HopDwellSlots { get; set; } = 5;
+
+    /// <summary>Follow WSJT-X's coordinated schedule for the bands in the list.</summary>
+    [ObservableProperty]
+    public partial bool HopCoordinated { get; set; }
+
     /// <summary>The settings can be edited (not while the beacon runs).</summary>
     public bool CanEditSettings => !BeaconOn;
 
@@ -184,6 +196,12 @@ public sealed partial class WsprViewModel : ObservableObject
     partial void OnPreferType1Changed(bool value) => Save(o => o.PreferType1 = value);
 
     partial void OnUploadEnabledChanged(bool value) => Save(o => o.UploadEnabled = value);
+
+    partial void OnHopBandsTextChanged(string value) => Save(o => o.HopBands = [.. value.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)]);
+
+    partial void OnHopDwellSlotsChanged(decimal value) => Save(o => o.HopDwellSlots = (int)Math.Clamp(value, 1, 100));
+
+    partial void OnHopCoordinatedChanged(bool value) => Save(o => o.HopCoordinated = value);
 
     private void Save(Action<WsprOptions> change)
     {
@@ -263,7 +281,7 @@ public sealed partial class WsprViewModel : ObservableObject
         : b.NextSlotTransmits switch
         {
             true => "Next slot transmits.",
-            false => string.IsNullOrEmpty(b.NextSlotNote) ? "Next slot receives." : $"Next slot receives ({b.NextSlotNote.ToLowerInvariant()}).",
+            false => string.IsNullOrEmpty(b.NextSlotNote) ? "Next slot receives." : $"Next slot receives ({char.ToLowerInvariant(b.NextSlotNote[0])}{b.NextSlotNote[1..]}).",
             null => "Beacon on. Planning the next slot.",
         };
 
@@ -294,6 +312,10 @@ public sealed partial class WsprViewModel : ObservableObject
             if (OffsetHz != o.OffsetHz) OffsetHz = o.OffsetHz;
             if (PreferType1 != o.PreferType1) PreferType1 = o.PreferType1;
             if (UploadEnabled != o.UploadEnabled) UploadEnabled = o.UploadEnabled;
+            var bands = string.Join(", ", o.HopBands);
+            if (HopBandsText != bands) HopBandsText = bands;
+            if (HopDwellSlots != o.HopDwellSlots) HopDwellSlots = o.HopDwellSlots;
+            if (HopCoordinated != o.HopCoordinated) HopCoordinated = o.HopCoordinated;
         }
         finally
         {

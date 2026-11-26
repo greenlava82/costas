@@ -1,6 +1,6 @@
 # 10 · WSPR mode
 
-Owner decision D29 (2026-11-26): WSPR joins the Mode menu as a beacon mode. It receives and reports what it hears to WSPRnet, and transmits a beacon on a schedule while the operator is present. Nothing here is built yet. Items marked **VERIFY** are listed in `08-open-questions.md` (V-WSPR1 to V-WSPR8) and must be confirmed before the code that depends on them.
+Owner decision D29 (2026-11-26): WSPR joins the Mode menu as a beacon mode. It receives and reports what it hears to WSPRnet, and transmits a beacon on a schedule while the operator is present. Built 2026-11-26 as W0 to W6 (the status notes at the end say what, and what changed from this text). The V-WSPR items are resolved in `08-open-questions.md` Findings.
 
 Where this document is silent, the existing docs apply unchanged.
 
@@ -158,3 +158,24 @@ Status (W5, 2026-11-26): the screen and the phone card are built (`WsprViewModel
 - **W5 · Decision:** the question before leaving WSPR or changing band is an inline bar on the WSPR screen (the menu snaps back to what is running meanwhile), not a dialog. A band or mode change from the phone does not ask (U2, which asks for the other modes, is not built yet); it stops the beacon because `Session.SetBand` does.
 - **W5 · Decision:** the phone's `wsprStart` and `wsprHere` follow D25 as the other transmit commands do (they refuse until the user has pressed Operate as on their own profile); `wsprStop` and Halt work for anyone.
 - **W5 · Not built:** "Heard by" (V-WSPR5), listed as optional in the plan and display only. The query is in `08-open-questions.md` when wanted.
+
+Status (W6, 2026-11-26): band hopping is built, on a simulated radio and a manual clock. `WsprHopSchedule` (Core), `WsprOptions.HopBands` / `HopDwellSlots` / `HopCoordinated`, `Session.HopBand` (the app's band switch), and the hop settings on the WSPR screen.
+
+- **W6 · Decision (needs the owner):** hopping needs a **dwell**. Owner decision 2026-11-26 says the first slot on a new band only receives; with a hop every 2 minutes (WSJT-X's coordinated schedule) that is every slot, so a coordinated beacon would never transmit. `HopDwellSlots` (default 5, 1 to 100) stays on each band of the operator's list for that many slots, so all but the first can transmit. The **coordinated** option is built as the plan describes (the band for each slot is the one WSJT-X's schedule names, among the operator's bands, falling back to the list walk) and, under the receive-only-after-a-hop rule, it only receives. It is kept so the schedule is there; say whether to drop it, or to let a hop that lands on the band the radio was just on count as no hop.
+- **W6 · Decision:** hopping happens only while the beacon runs, on the operator's own list, never on its own: Start beacon is still the only thing that starts it, the presence rule still applies on every band (a hop is not input), and a manual band or mode change still stops it.
+- **W6 · Decision:** the band changes at the cut-off of the slot before (114 s in), right after that slot's audio has gone to the decoder, through the same band switch the menu uses (it tunes the radio and clears the band's station list). The slot just recorded keeps its spots (its audio is complete and was recorded on the old band); the first slot on the new band is receive-only.
+- **W6 · Decision:** a band whose guards refuse transmit (licence class, band edges) is receive-only with the reason shown ("Receive only on 20 m: ..."); the beacon carries on. Any other refusal (the clock, the audio, a radio fault) still stops it.
+- **W6 · Decision:** Start beacon refuses a hop list with a band that has no WSPR frequency in the table (60 m has none) and names it, and a dwell outside 1 to 100; nothing is dropped silently.
+- **W6 · Decision:** if the radio does not arrive on the band, or the band switch throws, the beacon stops with the reason.
+
+## Owner's checklist: what only you can check
+
+Nothing on this list has been done. Everything built so far ran on a simulated radio, a manual clock and a null audio output, except decoding, which ran through the real `wsprd`.
+
+- [ ] **Look at the screen** (W5): WSPR mode on a real run; compare with `mockups/wspr/index.html`; say what to change. It was built before the mockup was approved.
+- [ ] **W2, WSPRnet over HTTPS:** turn on "Report what I hear to WSPRnet" with a real receiver; check spots appear under your callsign on wsprnet.org, and that the Heard indicator reads "WSPRnet: N spots sent". If every spot fails, WSPRnet may need plain HTTP (the reply must contain `spot(s) added`).
+- [ ] **W4, power:** with the radio on a dummy load, start the beacon: the radio's power should drop to 5 % of its maximum (at least 1 W) and come back when you stop it. Try the FT-710 and the Flex (V-WSPR7 only tried the dummy rig). Check what the radio and the meter say against the reported dBm.
+- [ ] **W4, on the air (dummy load first):** the beacon keys 0.8 s into an even-minute slot, sends for 110.6 s, and releases; Halt Tx cuts it; a pulled USB cable or audio device stops it. Then on an antenna: a spot of yours on wsprnet.org or wspr.live.
+- [ ] **W4, presence:** leave the desk: the beacon stops after the Tx watchdog minutes (at least 2); tap I'm here on the phone and see it carry on.
+- [ ] **W6, an evening of hopping across three bands:** a list such as `20m, 40m, 30m`; check the radio and tuner follow, the first slot on each band only receives, and a band your licence does not allow only receives.
+- [ ] **Decisions above that change what goes on the air:** WSJT-X's slot table (D29, done as you chose), the 20 ms ramp, the centred audio offset, the dwell for hopping.

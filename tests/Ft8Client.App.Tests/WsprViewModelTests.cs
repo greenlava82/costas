@@ -251,6 +251,41 @@ public class WsprViewModelTests
     }
 
     [Fact]
+    public void Edit_HopSettings_AreSavedAsAList()
+    {
+        var c = new Commands();
+        var vm = new WsprViewModel(c, () => Slot);
+        vm.Apply(Snap(View()));
+
+        vm.HopBandsText = "20m, 40m  30m;17m";
+        vm.HopDwellSlots = 3;
+        vm.HopCoordinated = true;
+
+        c.Options.HopBands.Should().Equal("20m", "40m", "30m", "17m");
+        (c.Options.HopDwellSlots, c.Options.HopCoordinated).Should().Be((3, true));
+    }
+
+    [Fact]
+    public void Apply_SavedHopSettings_ShownAndNotWrittenBack()
+    {
+        var c = new Commands { Options = new WsprOptions { HopBands = ["20m", "40m"], HopDwellSlots = 7, HopCoordinated = true } };
+        var vm = new WsprViewModel(c, () => Slot);
+
+        vm.Apply(Snap(View()));
+
+        (vm.HopBandsText, vm.HopDwellSlots, vm.HopCoordinated).Should().Be(("20m, 40m", 7m, true));
+    }
+
+    [Fact]
+    public void Status_ReceiveOnlyOnABand_KeepsTheReasonsCapitals()
+    {
+        var vm = new WsprViewModel(new Commands(), () => Slot);
+        vm.Apply(Snap(View(On(false, "Receive only on 20 m: Not sent: your Technician licence doesn't allow data on 20 m."))));
+
+        vm.Status.Should().Be("Next slot receives (receive only on 20 m: Not sent: your Technician licence doesn't allow data on 20 m.).");
+    }
+
+    [Fact]
     public void Edit_OutOfRange_IsClamped()
     {
         var c = new Commands();

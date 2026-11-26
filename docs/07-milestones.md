@@ -166,3 +166,5 @@ Done so far: alerts (Hunt list, docs/04 §16) and LoTW (docs/05 §7b).
 ## M13 · WSPR mode
 
 Spec: `10-wspr.md`, build guide `10-wspr-build.md`, owner decision D29. Build in the order of its section 9 (W0 to W6), each step's acceptance tests passing before the next. Starts after M12.
+
+Status (2026-11-26, `drt/wspr-plan`): W0 to W6 built and tested on a simulated radio and a manual clock; not yet tried on the air. See the checklist at the end of `10-wspr.md`.

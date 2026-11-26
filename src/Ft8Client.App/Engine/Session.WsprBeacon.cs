@@ -7,6 +7,7 @@
 // see the GNU General Public License in LICENSE for details.
 
 using Ft8Client.Core;
+using Ft8Client.Core.Bands;
 using Ft8Client.Core.Contacts;
 using Ft8Client.Core.Services;
 using Ft8Client.Core.Transmit;
@@ -44,10 +45,15 @@ public sealed partial class Session
     private string? _lastBeaconMessage;
     private string? _beaconPowerNote;
     private bool _beaconTransmitRefused;
+    private bool _hopping;
+    private DateTime _hopMovedUtc;
     private Task _beaconTask = Task.CompletedTask;
 
     /// <summary>The beacon's settings for the active profile, read when it starts and before each slot.</summary>
     public Func<WsprOptions> WsprSettings { get; set; } = () => new WsprOptions();
+
+    /// <summary>Changes band and tunes the radio for a hop (the app's band switch). Null: the beacon does not hop.</summary>
+    public Func<string, Mode, Task>? HopBand { get; set; }
 
     /// <summary>Sets and restores the radio's power around a beacon run. Null when there is no radio power control.</summary>
     public IBeaconPower? BeaconPower { get; set; }
@@ -83,6 +89,7 @@ public sealed partial class Session
             (call, grid) = (_config.MyCall, _config.MyGrid);
         }
         if (Check(options, call, grid) is { } why) return Refuse(why);
+        if (HopCheck(options) is { } hopWhy) return Refuse(hopWhy);
         var cycle = new WsprMessageCycle(call, grid, options.ReportedDbm, options.PreferType1);
         var now = _clock.UtcNow;
         lock (_gate)
@@ -127,6 +134,17 @@ public sealed partial class Session
             if (!r.Ok) return $"Beacon not started: \"{m.Text}\" cannot be sent. {r.Refusal}";
         }
         return null;
+    }
+
+    // Why the hop list cannot be used, or null: a band with no WSPR frequency in the table, or a dwell outside 1 to 100 slots. Nothing is
+    // dropped silently (CLAUDE.md rule 4).
+    private string? HopCheck(WsprOptions o)
+    {
+        if (o.HopBands.Count == 0) return null;
+        if (o.HopDwellSlots is < 1 or > 100) return $"Beacon not started: stay on a band for 1 to 100 slots, not {o.HopDwellSlots}.";
+        var missing = o.HopBands.Select(b => b.Trim().Replace(" ", string.Empty, StringComparison.Ordinal).ToLowerInvariant())
+            .Where(b => b.Length > 0 && _frequencies.Find(b, Mode.Wspr) is null).Distinct().ToList();
+        return missing.Count == 0 ? null : $"Beacon not started: the frequency table has no WSPR frequency for {string.Join(", ", missing)}.";
     }
 
     private string Refuse(string why)
@@ -195,7 +213,7 @@ public sealed partial class Session
         StopBeacon(text);
     }
 
-    // Plans the slot that starts at slotStartUtc, on its own task so a long render never holds up the slot clock.
+    // Plans the slot that starts at slotStartUtc, on its own task so a long render or a band change never holds up the slot clock.
     private void PlanBeaconSlot(DateTime slotStartUtc)
     {
         lock (_gate)
@@ -203,15 +221,31 @@ public sealed partial class Session
             if (!_beaconOn || _beaconPlannedSlot == slotStartUtc) return;
             _beaconPlannedSlot = slotStartUtc;
             DecodesStarted++;
-            _beaconTask = Task.WhenAll(_beaconTask, Task.Run(() => PlanBeacon(slotStartUtc)));
+            _beaconTask = Task.WhenAll(_beaconTask, Task.Run(() => PlanBeaconAsync(slotStartUtc)));
         }
     }
 
-    private void PlanBeacon(DateTime slotStartUtc)
+    private async Task PlanBeaconAsync(DateTime slotStartUtc)
     {
         try
         {
             string? stop = null;
+            string? hopTo = null;
+            lock (_gate)
+            {
+                if (!_beaconOn) return;
+                if (PresenceExpiredLocked(_clock.UtcNow)) stop = WsprPresence.StoppedText(PresenceMinutes);
+                else hopTo = HopTargetLocked(slotStartUtc, WsprSettings());
+            }
+            if (stop is not null)
+            {
+                StopBeacon(stop);
+                return;
+            }
+            // A band change between slots: nothing is on the air now (the last transmission ended 2 s ago), and the slot that
+            // follows receives only, so the antenna tuner can settle before anything is sent (owner decision 2026-11-26).
+            if (hopTo is not null && !await HopAsync(hopTo, slotStartUtc).ConfigureAwait(false)) return;
+
             WsprMessage? message = null;
             WsprOptions options;
             TxGuardInput guard;
@@ -219,26 +253,17 @@ public sealed partial class Session
             {
                 if (!_beaconOn) return;
                 options = WsprSettings();
-                var now = _clock.UtcNow;
-                if (PresenceExpiredLocked(now))
-                {
-                    stop = WsprPresence.StoppedText(PresenceMinutes);
-                }
-                else
-                {
-                    var facts = new WsprSlotFacts(true, false, _receiveOnlySlot == slotStartUtc, _beaconTransmitRefused, options.TxPercent);
-                    var decision = _beaconScheduler.Decide(slotStartUtc, facts);
-                    _nextDecision = decision;
-                    _nextDecisionSlot = slotStartUtc;
-                    if (decision.Transmit) message = _cycle?.Next();
-                }
+                var facts = new WsprSlotFacts(true, false, _receiveOnlySlot == slotStartUtc, _beaconTransmitRefused, options.TxPercent);
+                var decision = _beaconScheduler.Decide(slotStartUtc, facts);
+                // Hopping to a band the guards do not allow is not a fault: the beacon receives there and says so, and carries on.
+                if (decision.Transmit && HoppingLocked(options)
+                    && !_frequencies.TransmitAllowed(_config.Band, Mode.Wspr, _dialHz, WsprTiming.WindowLowHz, WsprTiming.WindowHighHz - WsprTiming.WindowLowHz, out var why))
+                    decision = WsprSlotDecision.Rx($"Receive only on {BandPlan.Display(_config.Band)}: {why}");
+                _nextDecision = decision;
+                _nextDecisionSlot = slotStartUtc;
+                if (decision.Transmit) message = _cycle?.Next();
                 guard = new TxGuardInput(_config.Band, _dialHz, ClockEstimate.Offset(_sntpOffset, null), _config.ClockBlockSeconds,
                     _services[ServiceNames.Radio].Health == ServiceHealth.Down ? _services[ServiceNames.Radio].Message : null, true);
-            }
-            if (stop is not null)
-            {
-                StopBeacon(stop);
-                return;
             }
             if (message is not null) PrepareBeaconTx(slotStartUtc, message, options, guard);
             Publish();
@@ -247,6 +272,53 @@ public sealed partial class Session
         {
             Interlocked.Increment(ref _decodesApplied);
         }
+    }
+
+    // Under _gate: the operator's hop bands that have a WSPR frequency, in order.
+    private IReadOnlyList<string> HopBandsLocked(WsprOptions o) => WsprHopSchedule.Clean(o.HopBands, b => _frequencies.Find(b, Mode.Wspr) is not null);
+
+    // Under _gate: the beacon hops (two or more usable bands).
+    private bool HoppingLocked(WsprOptions o) => HopBand is not null && HopBandsLocked(o).Count >= 2;
+
+    // Under _gate: the band the slot belongs on when it is not this one, else null.
+    private string? HopTargetLocked(DateTime slotStartUtc, WsprOptions o)
+    {
+        if (HopBand is null) return null;
+        var want = WsprHopSchedule.BandFor(slotStartUtc, HopBandsLocked(o), o.HopCoordinated, o.HopDwellSlots);
+        return want is not null && !string.Equals(want, _config.Band, StringComparison.OrdinalIgnoreCase) ? want : null;
+    }
+
+    // Changes band for the slot starting at nextSlotUtc. The slot just recorded (if its audio is already with the decoder) keeps its
+    // place: the retune is not "a dial move" for it. A hop is not operator input, and no guard is skipped: the next transmission is
+    // checked on the new band like any other. False when the band did not change; the beacon is then stopped.
+    private async Task<bool> HopAsync(string band, DateTime nextSlotUtc)
+    {
+        var hop = HopBand;
+        if (hop is null) return true;
+        lock (_gate)
+        {
+            _hopping = true;
+            _hopMovedUtc = _recordingSlot is null ? nextSlotUtc - WsprTiming.SlotLength : _clock.UtcNow;
+            _receiveOnlySlot = nextSlotUtc;
+        }
+        try
+        {
+            await hop(band, Mode.Wspr).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            StopBeacon($"Beacon stopped: could not change band to {BandPlan.Display(band)}: {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            lock (_gate) _hopping = false;
+        }
+        bool arrived;
+        lock (_gate) arrived = string.Equals(_config.Band, band, StringComparison.OrdinalIgnoreCase) && ModeInfo.IsWspr(_config.Mode);
+        if (arrived) return true;
+        StopBeacon($"Beacon stopped: the radio did not change band to {BandPlan.Display(band)}.");
+        return false;
     }
 
     // Encodes, checks and installs one transmission. A guard that says no receives the slot instead, shows why and stops the

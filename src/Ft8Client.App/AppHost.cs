@@ -612,6 +612,7 @@ public sealed class AppHost : IAsyncDisposable
         Session.WsprSettings = () => Settings.Current.Profile.Wspr;
         Session.RadioWatts = () => RadioPower.Power?.Watts;
         Session.BeaconPower = new BeaconPowerService(RadioPower);
+        Session.HopBand = (band, mode) => SetBandAsync(band, mode);
         // Read only while a phone has its Radio tab open, so the radio is not asked about them otherwise.
         RadioControls = new RadioControlsService(() => _rig, () => Transmitter.Transmitting || Session.Snapshot.Transmitting,
             () => Remote?.Control.RadioWanted == true);

@@ -1307,12 +1307,14 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
     /// </summary>
     public void SetBand(string band, Mode mode, long? dialHz = null)
     {
+        bool hopping;
         lock (_gate)
         {
             var oldMode = _config.Mode;
+            hopping = _hopping;
             _config = _config with { Band = band, Mode = mode };
             _dialHz = dialHz ?? _frequencies.Find(band, mode)?.DialHz ?? _dialHz;
-            _rxMovedUtc = _clock.UtcNow;
+            _rxMovedUtc = _hopping ? _hopMovedUtc : _clock.UtcNow; // a hop between slots keeps the slot just recorded
             _quiet.Reset(_rxMovedUtc);
             _tracker = new StationTracker(_config.MyCall, _config.MyGrid, _countries, mode);
             _callWhenFree.Clear();
@@ -1356,7 +1358,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         // Nothing on the air follows the radio to another band or mode: an FT8 message, a Tune tone or a PSK or RTTY
         // over is stopped, and anything prepared for the old band is dropped.
         // A band or mode change by hand ends the beacon (the screen asks first); hopping (W6) does not come through here.
-        StopBeacon("Beacon stopped: the band or mode changed.");
+        if (!hopping) StopBeacon("Beacon stopped: the band or mode changed.");
         _keys.Clear();
         _tx.CancelPending();
         if (_keys.Active || _tx.Transmitting) _ = _tx.HaltAsync();
@@ -1385,7 +1387,8 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         {
             // The dial moved while something is on the air: check it still fits inside the band.
             if (hz != _dialHz) outside = _tx.OnAirOutsideBand(_config.Band, hz);
-            if (Math.Abs(hz - _dialHz) > RetuneHz)
+            // A hop between slots tunes the radio itself: the dial arriving at the new band is not a move to stop for.
+            if (Math.Abs(hz - _dialHz) > RetuneHz && !_hopping)
             {
                 moved = true;
                 _rxMovedUtc = _clock.UtcNow;
