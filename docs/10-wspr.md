@@ -124,3 +124,10 @@ Decisions taken while building without the owner, to be confirmed or changed:
 - **W1 · Unresolved hashed calls** (`<...>`) are kept as spots with the call `<...>`, so the count and the signal show; they are not uploaded in W2.
 - **W1 · Stored spots** are kept 30 days unless waiting for upload; nothing calls the prune yet.
 - **W1 · No 60 m WSPR row** in `frequencies.json`; 6 m uses 50.293 MHz (WSJT-X lists it for regions 2 and 3).
+
+Status (W2, 2026-11-26): the upload is built and tested against a fake server, and not yet against wsprnet.org. `WsprnetClient` posts one spot per request over HTTPS in WSJT-X's field set; `WsprnetUploader` works from the `wspr_spot` table (so the queue survives a restart), backs off 1, 2, 4 ... 30 minutes, marks a refused or day-old spot failed, and sets the WSPRnet indicator; `WsprnetService` runs it a random 5 to 25 s apart, only when the profile's `Wspr.UploadEnabled` is on and never in simulation. Until the W5 Settings section exists the switch is `Profile.Wspr.UploadEnabled` in `settings.json`.
+
+- **W2 · Decision:** no `wsprstat` (no-spot status) post is sent; WSJT-X sends it after a slot with no spots and while transmitting to report the Tx percentage. Spots do not need it. Revisit with W4, when the beacon runs.
+- **W2 · Decision:** spots whose call did not resolve (`<...>`) are stored but never queued for upload.
+- **W2 · Decision:** a pending spot more than 24 hours old is marked failed rather than sent.
+- **W2 · Owner to check by hand:** the first real upload over HTTPS answers with text containing `spot(s) added`. A different reply marks every spot failed (as WSJT-X drops its queue), so check it with one spot before relying on it, and say if WSPRnet needs plain HTTP.

@@ -50,6 +50,9 @@ public static class ServiceNames
     /// <summary>Real-time uploads to Club Log.</summary>
     public const string ClubLog = "clublog";
 
+    /// <summary>Uploads of the WSPR signals heard to WSPRnet; shown once turned on.</summary>
+    public const string Wsprnet = "wsprnet";
+
     /// <summary>The connection to a FlexRadio's API for its paired amplifier and tuner.</summary>
     public const string Accessories = "accessories";
 

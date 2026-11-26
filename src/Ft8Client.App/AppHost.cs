@@ -102,7 +102,7 @@ public sealed class AppHost : IAsyncDisposable
     // Services whose health changes are counted: the logbooks and the online feeds.
     private static readonly HashSet<string> TrackedServices = new(StringComparer.Ordinal)
     {
-        ServiceNames.Qrz, ServiceNames.Lotw, ServiceNames.Eqsl, ServiceNames.ClubLog, ServiceNames.Cloudlog, ServiceNames.Psk,
+        ServiceNames.Qrz, ServiceNames.Lotw, ServiceNames.Eqsl, ServiceNames.ClubLog, ServiceNames.Wsprnet, ServiceNames.Cloudlog, ServiceNames.Psk,
         ServiceNames.Rbn, ServiceNames.Cluster, ServiceNames.Pota, ServiceNames.Dxpeditions, ServiceNames.LogCopy,
     };
     private TaskCompletionSource _clockRecheck = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -223,6 +223,9 @@ public sealed class AppHost : IAsyncDisposable
 
     /// <summary>Optional Club Log real-time uploads.</summary>
     public ClubLogService ClubLog { get; private set; } = null!;
+
+    /// <summary>Optional WSPRnet uploads of the WSPR signals heard.</summary>
+    public WsprnetService Wsprnet { get; private set; } = null!;
 
     /// <summary>Publishing station events to the operator's MQTT broker.</summary>
     public MqttService Mqtt { get; private set; } = null!;
@@ -545,6 +548,8 @@ public sealed class AppHost : IAsyncDisposable
         Cloudlog.Start();
         ClubLog = new ClubLogService(Session, Settings, Secrets, Qsos, Uploads, Clock, ClubLogApiKey, uploadsAllowed: !Simulating);
         ClubLog.Start();
+        Wsprnet = new WsprnetService(Session, Settings, WsprSpots, Clock, uploadsAllowed: !Simulating);
+        Wsprnet.Start();
         Mqtt = new MqttService(Session, Transmitter, Settings, Secrets, Clock, allowed: !Simulating,
             stats: new DashboardStatsSource(Qsos, Uploads, SyncState, Spots, Countries, ReferenceData.LoadAdifTable(), Settings, Secrets));
         Mqtt.Start();
@@ -1790,6 +1795,7 @@ public sealed class AppHost : IAsyncDisposable
         if (Eqsl is not null) await Eqsl.DisposeAsync().ConfigureAwait(false);
         if (Cloudlog is not null) await Cloudlog.DisposeAsync().ConfigureAwait(false);
         if (ClubLog is not null) await ClubLog.DisposeAsync().ConfigureAwait(false);
+        if (Wsprnet is not null) await Wsprnet.DisposeAsync().ConfigureAwait(false);
         if (Mqtt is not null) await Mqtt.DisposeAsync().ConfigureAwait(false);
         Udp?.Dispose();
         Updates?.Dispose();

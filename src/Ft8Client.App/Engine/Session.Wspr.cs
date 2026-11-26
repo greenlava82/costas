@@ -160,8 +160,9 @@ public sealed partial class Session
             {
                 call = _config.MyCall;
                 var mine = Grid.ToLatLon(_config.MyGrid);
-                var upload = WsprUploadWanted() ? WsprUploadState.Pending : WsprUploadState.None;
-                rows = [.. result.Spots.Select(s => WsprSpotRow.From(s, call, DistanceTo(mine, s), upload))];
+                var wanted = WsprUploadWanted();
+                // A hash that did not resolve names nobody, so WSPRnet gets nothing for it.
+                rows = [.. result.Spots.Select(s => WsprSpotRow.From(s, call, DistanceTo(mine, s), wanted && s.HasCall ? WsprUploadState.Pending : WsprUploadState.None))];
                 _wsprState = rows.Count == 0 ? "No WSPR signals heard in the last slot." : $"{rows.Count} heard in the last slot.";
             }
         }

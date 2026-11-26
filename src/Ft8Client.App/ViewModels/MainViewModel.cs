@@ -697,6 +697,8 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands
             Indicators.Add(Indicator("Wavelog/Cloudlog", s, ServiceNames.Cloudlog));
         if (s.Services.TryGetValue(ServiceNames.ClubLog, out var clubLog) && clubLog.Health != ServiceHealth.Off)
             Indicators.Add(Indicator("Club Log", s, ServiceNames.ClubLog));
+        if (s.Services.TryGetValue(ServiceNames.Wsprnet, out var wsprnet) && wsprnet.Health != ServiceHealth.Off)
+            Indicators.Add(Indicator("WSPRnet", s, ServiceNames.Wsprnet));
         if (s.Services.TryGetValue(ServiceNames.Mqtt, out var mqtt) && mqtt.Health != ServiceHealth.Off)
             Indicators.Add(Indicator("MQTT", s, ServiceNames.Mqtt));
         // Shown only when the ADIF log copy cannot be written (disk full, folder gone).

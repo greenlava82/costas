@@ -34,6 +34,9 @@ public sealed class StationProfile
     /// <summary>Club Log real-time uploads for this station.</summary>
     public ClubLogOptions ClubLog { get; set; } = new();
 
+    /// <summary>WSPR upload and beacon settings for this station.</summary>
+    public WsprOptions Wspr { get; set; } = new();
+
     /// <summary>This station's LoTW account: confirmations and TQSL uploads.</summary>
     public LotwAccountOptions Lotw { get; set; } = new();
 
