@@ -19,7 +19,7 @@ namespace Ft8Client.Audio.Timing;
 public sealed class SlotRecorder
 {
     private readonly object _gate = new();
-    private readonly float[] _buffer = new float[ModeInfo.DecoderSamples(Mode.Ft8) + ModeInfo.DecoderSampleRate];
+    private readonly float[] _buffer = new float[ModeInfo.RecordSamples(Mode.Wspr) + ModeInfo.DecoderSampleRate];
     private int _count;
     private DateTime _slot;
     private Mode _mode;
@@ -64,7 +64,7 @@ public sealed class SlotRecorder
         lock (_gate)
         {
             if (!_active) return null;
-            var samples = new short[ModeInfo.DecoderSamples(_mode)];
+            var samples = new short[ModeInfo.RecordSamples(_mode)];
             var n = Math.Min(_count, samples.Length);
             AudioLevel.ToInt16(_buffer.AsSpan(0, n), samples);
             return new SlotAudio(_slot, _mode, samples);
@@ -78,7 +78,7 @@ public sealed class SlotRecorder
         {
             if (!_active) return null;
             _active = false;
-            var samples = new short[ModeInfo.DecoderSamples(_mode)];
+            var samples = new short[ModeInfo.RecordSamples(_mode)];
             var n = Math.Min(_count, samples.Length);
             AudioLevel.ToInt16(_buffer.AsSpan(0, n), samples);
             return new SlotAudio(_slot, _mode, samples);

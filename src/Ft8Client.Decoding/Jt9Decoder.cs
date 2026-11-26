@@ -182,7 +182,7 @@ public sealed class Jt9Decoder : IDecoder
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // kept by a later run
     }
 
-    private static void Kill(Process process)
+    internal static void Kill(Process process)
     {
         try
         {
@@ -195,7 +195,7 @@ public sealed class Jt9Decoder : IDecoder
 
     // On Windows a killed process tree can hold its working folder for a moment after the kill returns, so keep
     // trying for about two seconds. Anything still left is removed by CleanTempRoot at the next start.
-    private static void TryDelete(string dir)
+    internal static void TryDelete(string dir)
     {
         for (var i = 0; i < 10; i++)
         {

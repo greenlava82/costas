@@ -60,6 +60,12 @@ public static class ModeInfo
     /// </summary>
     public static int DecoderSamples(Mode mode) => Slotted(mode) == Mode.Ft8 ? 180_000 : 72_576;
 
+    /// <summary>
+    /// Number of 12 kHz samples the slot recorder returns per slot: the decoder length for FT8 and FT4, and the whole 120 s
+    /// for WSPR (what <c>wsprd</c> is given).
+    /// </summary>
+    public static int RecordSamples(Mode mode) => mode == Mode.Wspr ? WsprTiming.RecordSamples : DecoderSamples(mode);
+
     /// <summary>Separator character <c>jt9</c> prints between the frequency and the message.</summary>
     public static char Separator(Mode mode) => Slotted(mode) == Mode.Ft8 ? '~' : '+';
 

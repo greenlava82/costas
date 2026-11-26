@@ -7,6 +7,7 @@
 // see the GNU General Public License in LICENSE for details.
 
 using Ft8Client.Core;
+using Ft8Client.Core.Wspr;
 using Ft8Client.Core.Time;
 
 namespace Ft8Client.Audio.Timing;
@@ -37,7 +38,7 @@ public sealed class SlotClock
     public SlotClock(IClock clock, Mode mode, int pttLeadMs = 200)
     {
         _clock = clock;
-        _mode = ModeInfo.IsSlotted(mode) ? mode : Mode.Ft8;
+        _mode = ModeInfo.HasSlots(mode) ? mode : Mode.Ft8;
         PttLeadMs = pttLeadMs;
     }
 
@@ -85,18 +86,27 @@ public sealed class SlotClock
     /// </summary>
     public void SetMode(Mode mode)
     {
-        if (!ModeInfo.IsSlotted(mode)) return;
+        if (!ModeInfo.HasSlots(mode)) return;
         lock (_gate) _pendingMode = mode;
     }
 
     /// <summary>Offset of a mark from the slot start.</summary>
-    public TimeSpan OffsetOf(SlotMark mark, Mode mode) => mark switch
+    public TimeSpan OffsetOf(SlotMark mark, Mode mode) => mode == Mode.Wspr ? WsprOffsetOf(mark) : mark switch
     {
         SlotMark.Start => TimeSpan.Zero,
         SlotMark.PttOn => TimeSpan.FromMilliseconds(ModeInfo.TxStartMilliseconds(mode) - PttLeadMs),
         SlotMark.TxStart => TimeSpan.FromMilliseconds(ModeInfo.TxStartMilliseconds(mode)),
         SlotMark.EarlyDecode when mode == Mode.Ft8 => TimeSpan.FromSeconds(11.85),
         _ => ModeInfo.Slotted(mode) == Mode.Ft8 ? TimeSpan.FromSeconds(13.6) : TimeSpan.FromSeconds(6.1),
+    };
+
+    // WSPR has no early pass: both decode marks fall at the capture cut-off (V-WSPR1), and the session ignores the early one.
+    private TimeSpan WsprOffsetOf(SlotMark mark) => mark switch
+    {
+        SlotMark.Start => TimeSpan.Zero,
+        SlotMark.PttOn => WsprTiming.TxStart - TimeSpan.FromMilliseconds(PttLeadMs),
+        SlotMark.TxStart => WsprTiming.TxStart,
+        _ => WsprTiming.CaptureCutoff,
     };
 
     /// <summary>Checks the time and raises any marks that are due, in order.</summary>
