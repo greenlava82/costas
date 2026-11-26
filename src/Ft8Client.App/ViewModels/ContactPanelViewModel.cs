@@ -113,6 +113,17 @@ public sealed class ContactPanelViewModel
         Received = NotYet,
     };
 
+    /// <summary>PSK and RTTY: the idle card once my CQ has gone out and the radio is back on receive.</summary>
+    public static ContactPanelViewModel CqListening { get; } = new()
+    {
+        Caption = "CQ sent",
+        Call = "—",
+        IsIdle = true,
+        Subline = "Back on receive. A station that answers in the next 2 minutes starts a contact. Call CQ sends another.",
+        Sent = NotYet,
+        Received = NotYet,
+    };
+
     /// <summary>
     /// The idle card while calling CQ, with the CQs sent in a row that nobody answered: "Calling CQ · 5 with no answer".
     /// The same instance for 0.

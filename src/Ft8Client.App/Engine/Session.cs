@@ -1231,7 +1231,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         int offset;
         lock (_gate)
         {
-            if (_engine.CallingCq || _engine.InContact || _kbd.CallingCq || _kbd.InContact || _keys.Active || _tx.Transmitting
+            if (_engine.CallingCq || _engine.InContact || _kbd.InContact || _keys.Active || _tx.Transmitting
                 || _rigTuningUntil > _clock.UtcNow)
                 return "Tune is only available while nothing else is being sent.";
             offset = _txOffset;
@@ -1781,7 +1781,8 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 Transmitting = _tx.Transmitting,
                 LastTxSlotUtc = _tx.LastStartedSlot,
                 TransmittingMessage = _tx.CurrentMessage,
-                CallingCq = keyboard ? _kbd.CallingCq : _engine.CallingCq,
+                CallingCq = keyboard ? KeyboardCqOnAir() : _engine.CallingCq,
+                CqListening = keyboard && KeyboardCqListening(now),
                 UnansweredCqs = keyboard ? 0 : _engine.UnansweredCqs,
                 RigTuningUntilUtc = _rigTuningUntil is { } until && until > now ? until : null,
                 TxOffsetHz = keyboard && _kbd.InContact ? _kbd.PartnerOffsetHz : _txOffset,
@@ -1801,7 +1802,7 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 Pileups = _pileups.All(now),
                 KeyboardTx = keyboard ? _keys.View : KeyboardTxView.Idle,
                 Conversation = keyboard ? _conversation.ToList() : [],
-                NextMacro = keyboard ? _kbd.NextMacro : null,
+                NextMacro = keyboard && !KeyboardCqOnAir() ? _kbd.NextMacro : null,
                 Macros = _config.Macros,
                 MacroPreviews = keyboard ? MacroPreviews() : new Dictionary<int, string>(),
                 RadioNote = keyboard ? _radioNote : null,

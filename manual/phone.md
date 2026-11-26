@@ -195,7 +195,8 @@ The phone's **Operate** tab is a set of tiles built for a small screen rather th
 - **Contact**, across the top: the station, where it is and why you need it, the message going out (or the one you are
   waiting for), the reports, a five-part progress bar labelled CQ, Grid, Report, R-rpt and RR73, the seconds left in
   the slot, and **Resend**, **Log now** and **Abandon**. The tile turns red while you transmit. Tap an underlined step to
-  send it next. With no contact it shows **Call CQ** or **Stop CQ**.
+  send it next. With no contact it shows **Call CQ** or **Stop CQ**. In PSK and RTTY **Stop CQ** shows
+  only while the CQ is going out, as on the desk.
 - **Calling you**: who is answering you, with **Answer** or **Answer next**, and **✕** to leave a caller unanswered
   (as on the desk: nothing is sent, and it comes back only if it calls again after 2 minutes quiet). It turns amber
   when someone is calling.

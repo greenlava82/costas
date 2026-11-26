@@ -297,4 +297,97 @@ public class KeyboardContactEngineTests
         e.CallingCq.Should().BeFalse();
         e.Partner.Should().Be("KP4JRS");
     }
+
+    [Fact]
+    public void CqEnded_AnswerWithinWindow_StartsContact()
+    {
+        _e.CqSent(At(0));
+        _e.CqEnded(At(10));
+        _e.ListeningForAnswers(At(10) + KeyboardContactEngine.CqAnswerWindow).Should().BeTrue();
+
+        _e.Heard("W7LIT DE EA8TL EA8TL K", "EA8TL", 1400, At(70));
+
+        _e.Partner.Should().Be("EA8TL");
+        _e.InContact.Should().BeTrue();
+        _e.CallingCq.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CqEnded_AnswerAfterWindow_StartsNothing()
+    {
+        _e.CqSent(At(0));
+        _e.CqEnded(At(10));
+        var late = At(10) + KeyboardContactEngine.CqAnswerWindow + TimeSpan.FromSeconds(1);
+
+        _e.ListeningForAnswers(late).Should().BeFalse();
+        _e.Heard("W7LIT DE EA8TL EA8TL K", "EA8TL", 1400, late);
+
+        _e.Partner.Should().BeNull();
+    }
+
+    [Fact]
+    public void ListeningForAnswers_CqStillGoingOut_TrueHoweverLong()
+    {
+        _e.CqSent(At(0));
+
+        // An over can run for minutes (the 3-minute watchdog); the window only starts once it has ended.
+        _e.ListeningForAnswers(At(0) + TimeSpan.FromMinutes(10)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CqEnded_NoCqOut_DoesNothing()
+    {
+        _e.CqEnded(At(0));
+
+        _e.CallingCq.Should().BeFalse();
+        _e.ListeningForAnswers(At(0)).Should().BeFalse();
+        _e.Heard("W7LIT DE EA8TL EA8TL K", "EA8TL", 1400, At(5));
+        _e.Partner.Should().BeNull();
+    }
+
+    [Fact]
+    public void CqEnded_CalledTwice_WindowStartsAtTheFirst()
+    {
+        _e.CqSent(At(0));
+        _e.CqEnded(At(10));
+        _e.CqEnded(At(100));
+
+        _e.ListeningForAnswers(At(10) + KeyboardContactEngine.CqAnswerWindow + TimeSpan.FromSeconds(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CqSent_AfterWindowEnded_ListensAgain()
+    {
+        _e.CqSent(At(0));
+        _e.CqEnded(At(10));
+        var again = At(10) + KeyboardContactEngine.CqAnswerWindow + TimeSpan.FromSeconds(30);
+
+        _e.CqSent(again);
+
+        _e.ListeningForAnswers(again + TimeSpan.FromMinutes(5)).Should().BeTrue("the new CQ is still going out");
+        _e.Heard("W7LIT DE EA8TL EA8TL K", "EA8TL", 1400, again + TimeSpan.FromSeconds(20));
+        _e.Partner.Should().Be("EA8TL");
+    }
+
+    [Fact]
+    public void StopCq_WhileListening_AnswerStartsNothing()
+    {
+        _e.CqSent(At(0));
+        _e.CqEnded(At(10));
+
+        _e.StopCq();
+
+        _e.ListeningForAnswers(At(20)).Should().BeFalse();
+        _e.Heard("W7LIT DE EA8TL EA8TL K", "EA8TL", 1400, At(20));
+        _e.Partner.Should().BeNull();
+    }
+
+    [Fact]
+    public void NextMacro_WhileListeningForAnswers_IsCqAgain()
+    {
+        _e.CqSent(At(0));
+        _e.CqEnded(At(10));
+
+        _e.NextMacro.Should().Be(Macro.CqKey);
+    }
 }

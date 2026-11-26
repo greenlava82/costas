@@ -377,4 +377,209 @@ public class KeyboardContactSessionTests : IDisposable
         _session.SendMacro(Macro.AnswerKey).Should().Contain("needs a station");
         _rig.PttLog.Should().BeEmpty();
     }
+
+    // Plays part of my over (the first 600 ms), as the radio's audio device would.
+    private void SendPartOfOver()
+    {
+        for (var i = 0; i < 60; i++)
+        {
+            _clock.Advance(TimeSpan.FromMilliseconds(10));
+            _tx.Poll();
+            _session.Keys.Pump();
+            _out.Pull(_tx.OutputSampleRate / 100);
+        }
+    }
+
+    // Waits (without fixed sleeps) for a condition the transmitter reaches on its own, such as PTT released after Halt.
+    private static void WaitFor(Func<bool> condition, string because)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline) throw new TimeoutException(because);
+            Thread.Yield();
+        }
+    }
+
+    [Fact]
+    public void ToggleCq_PressedWhileCqGoesOut_StopsTransmittingNow()
+    {
+        _session.SetTxOffset(1600);
+        _session.ToggleCq();
+        SendPartOfOver();
+        _session.Snapshot.CallingCq.Should().BeTrue();
+        _session.Snapshot.NextMacro.Should().BeNull("Enter does not queue a second CQ behind the one going out");
+
+        _session.ToggleCq();
+
+        WaitFor(() => !_rig.Ptt, "Stop CQ releases PTT");
+        _rig.PttLog.Select(p => p.On).Should().Equal(true, false);
+        _tx.Transmitting.Should().BeFalse();
+        var snap = _session.Snapshot;
+        snap.CallingCq.Should().BeFalse("the button goes back to Call CQ");
+        snap.CqListening.Should().BeFalse("a CQ the operator stopped is not waiting for answers");
+        snap.KeyboardTx.Active.Should().BeFalse();
+        snap.NextMacro.Should().Be(Macro.CqKey);
+        snap.Fault.Should().BeNull();
+    }
+
+    [Fact]
+    public void ToggleCq_StoppedCqThenAnswered_StartsNoContact()
+    {
+        _session.SetTxOffset(1600);
+        _session.ToggleCq();
+        SendPartOfOver();
+        _session.ToggleCq();
+        WaitFor(() => !_rig.Ptt, "Stop CQ releases PTT");
+
+        Hear("W7LIT W7LIT DE KP4JRS KP4JRS K\n");
+
+        _session.Snapshot.Contact.Should().BeNull();
+        _rig.PttLog.Should().HaveCount(2, "nothing is sent on its own");
+    }
+
+    [Fact]
+    public void ToggleCq_CqHasGoneOut_BackToReceiveAndListening()
+    {
+        _session.SetTxOffset(1600);
+        _session.ToggleCq();
+        SendOver();
+
+        var snap = _session.Snapshot;
+        snap.CallingCq.Should().BeFalse("a PSK CQ is one over, not a loop: the button says Call CQ again");
+        snap.CqListening.Should().BeTrue();
+        snap.NextMacro.Should().Be(Macro.CqKey);
+        snap.KeyboardTx.Active.Should().BeFalse();
+        _rig.PttLog.Select(p => p.On).Should().Equal(true, false);
+    }
+
+    [Fact]
+    public void ToggleCq_AfterCqHasGoneOut_SendsAnotherCq()
+    {
+        _session.SetTxOffset(1600);
+        _session.ToggleCq();
+        SendOver();
+
+        _session.ToggleCq();
+
+        _session.Snapshot.CallingCq.Should().BeTrue();
+        SendOver();
+        Sent.Should().Be("CQ CQ CQ DE W7LIT W7LIT W7LIT DN40 K|", "a new CQ starts the conversation box afresh");
+        _rig.PttLog.Select(p => p.On).Should().Equal(true, false, true, false);
+        _session.Snapshot.CqListening.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ToggleCq_AnsweredAfterWindow_StartsNoContact()
+    {
+        _session.SetTxOffset(1600);
+        _session.ToggleCq();
+        SendOver();
+
+        _clock.Advance(KeyboardContactEngine.CqAnswerWindow + TimeSpan.FromSeconds(1));
+        _keyboard.Drain(); // the reader refreshes the screen at least once a second
+        _session.Snapshot.CqListening.Should().BeFalse();
+        Hear("W7LIT W7LIT DE KP4JRS KP4JRS K\n");
+
+        _session.Snapshot.Contact.Should().BeNull();
+        _session.Snapshot.CqListening.Should().BeFalse();
+    }
+
+    [Fact]
+    public void StopCq_WhileListening_StopsListeningAndSendsNothing()
+    {
+        _session.SetTxOffset(1600);
+        _session.ToggleCq();
+        SendOver();
+
+        _session.StopCq();
+
+        _session.Snapshot.CqListening.Should().BeFalse();
+        _session.Snapshot.CallingCq.Should().BeFalse();
+        Hear("W7LIT W7LIT DE KP4JRS KP4JRS K\n");
+        _session.Snapshot.Contact.Should().BeNull();
+        _rig.PttLog.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void StopCq_WhileCqGoesOut_ReleasesPtt()
+    {
+        _session.SetTxOffset(1600);
+        _session.ToggleCq();
+        SendPartOfOver();
+
+        _session.StopCq();
+
+        WaitFor(() => !_rig.Ptt, "Stop CQ releases PTT");
+        _session.Snapshot.CallingCq.Should().BeFalse();
+        _session.Snapshot.KeyboardTx.Active.Should().BeFalse();
+    }
+
+    [Fact]
+    public void StopCq_NothingOut_StartsNothing()
+    {
+        _session.StopCq();
+
+        _rig.PttLog.Should().BeEmpty();
+        _session.Snapshot.CallingCq.Should().BeFalse();
+        _session.Snapshot.CqListening.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ToggleCq_EscDuringCq_StillListensForAnswers()
+    {
+        _session.SetTxOffset(1600);
+        _session.ToggleCq();
+        SendPartOfOver();
+
+        await _session.HoldAsync();
+
+        WaitFor(() => !_rig.Ptt, "Esc releases PTT");
+        _session.Snapshot.CallingCq.Should().BeFalse();
+        _session.Snapshot.CqListening.Should().BeTrue("Esc stops the transmission; whoever heard the CQ can still answer");
+        Hear("W7LIT W7LIT DE KP4JRS KP4JRS K\n");
+        _session.Snapshot.Contact!.DxCall.Should().Be(Partner);
+    }
+
+    [Fact]
+    public async Task HaltAsync_DuringCq_StopsListening()
+    {
+        _session.SetTxOffset(1600);
+        _session.ToggleCq();
+        SendPartOfOver();
+
+        await _session.HaltAsync("test");
+
+        _session.Snapshot.CallingCq.Should().BeFalse();
+        _session.Snapshot.CqListening.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task TuneAsync_ListeningAfterCq_NotRefused()
+    {
+        _session.SetTxOffset(1600);
+        _session.ToggleCq();
+        SendOver();
+        _session.Snapshot.CqListening.Should().BeTrue();
+
+        (await _session.TuneAsync(1)).Should().NotContain("only available while nothing else");
+        await _session.HaltAsync();
+    }
+
+    [Fact]
+    public void Snapshot_ListeningWindowEnded_ConversationBoxReadsTheClickedSignalAgain()
+    {
+        _session.SetTxOffset(1600);
+        _session.ToggleCq();
+        SendOver();
+        Hear("CQ CQ CQ DE KP4JRS KP4JRS KP4JRS PSE K\n");
+        _keyboard.Listen(PartnerHz);
+        _session.Snapshot.Reading.Should().BeNull("while listening for answers the box holds what my CQ brings");
+
+        _clock.Advance(KeyboardContactEngine.CqAnswerWindow);
+        _keyboard.Drain(); // the reader refreshes the screen at least once a second
+
+        _session.Snapshot.CqListening.Should().BeFalse();
+        _session.Snapshot.Reading!.Call.Should().Be(Partner);
+    }
 }

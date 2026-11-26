@@ -56,8 +56,12 @@ reason shows in red under the macro keys.
 4. Your exchange (F3)
 5. Their 73: the contact is logged
 
-**Calling CQ.** Press F1 or **Call CQ**. A station that answers with your call starts the contact, and the strip runs
-CQ, their call, your exchange (F3), their exchange, then your 73 (F4), which logs it.
+**Calling CQ.** Press F1 or **Call CQ**. Unlike FT8, a PSK or RTTY CQ is sent once, not repeated every slot: the
+button says **Stop CQ** while it goes out, and pressing it then stops the CQ at once and returns to receive. When the
+CQ has gone, the radio is back on receive, the card says **CQ sent** and the button says **Call CQ** again, so press it
+(or F1) whenever you want to call once more. A station that answers with your call within two minutes of your CQ
+starts the contact, and the strip runs CQ, their call, your exchange (F3), their exchange, then your 73 (F4), which
+logs it. Esc during the CQ also stops it, but an answer from someone who heard it still counts.
 
 **The conversation box** under the strip shows what each of you sent, with your own text dimmed. Their text appears
 as it is read, on a line marked "now", rather than waiting for the line to end. It keeps its size

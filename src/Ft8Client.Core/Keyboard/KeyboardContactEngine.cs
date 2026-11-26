@@ -39,6 +39,7 @@ public sealed partial class KeyboardContactEngine
     private bool _reportSent;
     private bool _heardToMe;
     private DateTime? _tailEndersUntil;
+    private DateTime? _cqAnswersUntil;
 
     // Their text kept since my last over, read as a whole so an exchange split across lines is found.
     private const int MaxHeard = 2000;
@@ -46,14 +47,29 @@ public sealed partial class KeyboardContactEngine
     /// <summary>How long after a logged contact a station calling me (a tail-ender) starts a new contact.</summary>
     public static readonly TimeSpan TailEnderWindow = TimeSpan.FromMinutes(2);
 
+    /// <summary>
+    /// How long after my CQ has gone out a station answering it still starts a contact. A keyboard-mode CQ is one over,
+    /// not a loop: once it has gone the radio is back on receive and only this listening window is left.
+    /// </summary>
+    public static readonly TimeSpan CqAnswerWindow = TimeSpan.FromMinutes(2);
+
     /// <summary>Creates an engine for my call.</summary>
     public KeyboardContactEngine(string myCall) => _myCall = Callsign.Normalize(myCall);
 
     /// <summary>Raised when a contact is logged.</summary>
     public event Action<KeyboardLogEntry>? Logged;
 
-    /// <summary>True from when a CQ is sent until a station answers it or the operator stops.</summary>
+    /// <summary>
+    /// True from when a CQ is queued until a station answers it, the operator stops, or <see cref="CqAnswerWindow"/>
+    /// has passed since it went out (see <see cref="ListeningForAnswers"/>, which applies the window).
+    /// </summary>
     public bool CallingCq { get; private set; }
+
+    /// <summary>
+    /// True while an answer to my CQ starts a contact: while the CQ is going out, and for <see cref="CqAnswerWindow"/>
+    /// after <see cref="CqEnded"/>.
+    /// </summary>
+    public bool ListeningForAnswers(DateTime utc) => CallingCq && (_cqAnswersUntil is not { } until || utc <= until);
 
     /// <summary>The report I send: 599 unless the operator changes it.</summary>
     public int ReportToSend { get; set; } = DefaultReport;
@@ -79,7 +95,7 @@ public sealed partial class KeyboardContactEngine
     {
         get
         {
-            if (_partner is null || _outcome != ContactOutcome.InProgress) return CallingCq ? null : Macro.CqKey;
+            if (_partner is null || _outcome != ContactOutcome.InProgress) return Macro.CqKey;
             foreach (var s in _steps)
             {
                 if (s.State == StepState.Done) continue;
@@ -100,12 +116,27 @@ public sealed partial class KeyboardContactEngine
     {
         if (InContact) _outcome = ContactOutcome.Abandoned;
         CallingCq = true;
+        _cqAnswersUntil = null;
         _tailEndersUntil = null;
         _timeOn = utc;
     }
 
+    /// <summary>
+    /// My CQ over has ended (sent, or cut short): answers still start a contact for <see cref="CqAnswerWindow"/>.
+    /// Does nothing when no CQ is out.
+    /// </summary>
+    public void CqEnded(DateTime utc)
+    {
+        if (!CallingCq || _cqAnswersUntil is not null) return;
+        _cqAnswersUntil = utc + CqAnswerWindow;
+    }
+
     /// <summary>Stops waiting for answers to my CQ.</summary>
-    public void StopCq() => CallingCq = false;
+    public void StopCq()
+    {
+        CallingCq = false;
+        _cqAnswersUntil = null;
+    }
 
     /// <summary>
     /// Starts a contact with a station whose CQ I am answering. <paramref name="theirText"/> is what they last sent,
@@ -293,7 +324,7 @@ public sealed partial class KeyboardContactEngine
 
     private bool CanStart(string? sender, bool toMe, string? addressee, DateTime utc) =>
         sender is not null && toMe && !IsMe(sender) && (addressee is null || IsMe(addressee))
-        && (CallingCq || (_tailEndersUntil is { } until && utc <= until && !SameStation(sender, _partner)));
+        && (ListeningForAnswers(utc) || (_tailEndersUntil is { } until && utc <= until && !SameStation(sender, _partner)));
 
     private void Append(string upper)
     {

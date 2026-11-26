@@ -207,25 +207,60 @@ public sealed partial class Session
         if (theirText is { Length: > 0 } t) AddConversation(station?.Call ?? Callsign.Normalize(call), t, mine: false);
     }
 
+    // PSK and RTTY: a CQ is one over (the F1 macro), not a slot loop. Call CQ sends it; pressed again while it is going
+    // out (the button then says Stop CQ) it stops the CQ there and returns to receive. Once the CQ has gone, the button
+    // says Call CQ again and sends another; answers to the last one still start a contact for a while.
     private void ToggleKeyboardCq()
     {
+        bool cut;
         lock (_gate)
         {
-            if (_kbd.CallingCq) _kbd.StopCq();
+            cut = KeyboardCqOnAir();
+            if (cut) CutKeyboardCq();
             else _fault = QueueMacro(Macro.CqKey);
         }
+        if (cut) HaltKeyboardOver();
         Publish();
     }
 
+    // Stop CQ from the phone (or a late tap): stops a CQ going out, or stops listening for answers to the last one; it
+    // never sends one.
     private void StopKeyboardCq()
     {
+        bool cut;
         lock (_gate)
         {
-            if (!_kbd.CallingCq) return;
-            _kbd.StopCq();
+            cut = KeyboardCqOnAir();
+            if (cut) CutKeyboardCq();
+            else if (_kbd.CallingCq) _kbd.StopCq();
+            else return;
         }
+        if (cut) HaltKeyboardOver();
         Publish();
     }
+
+    // Under _gate. True while my CQ macro is queued or still going out.
+    private bool KeyboardCqOnAir() => _keys.MacroWaiting(Macro.CqKey);
+
+    // Under _gate. Stops the CQ: text not yet sent is dropped and nothing answers the cut CQ. The caller then halts the
+    // over (outside _gate, since the over ending takes it).
+    private void CutKeyboardCq()
+    {
+        _kbd.StopCq();
+        _macroTexts.Remove(Macro.CqKey);
+        _keys.Clear();
+        _fault = null;
+    }
+
+    // Not under _gate. Releases PTT and ends the over now, as Esc does.
+    private void HaltKeyboardOver()
+    {
+        _ = _tx.HaltAsync();
+        _keys.EndIfNotOnAir();
+    }
+
+    // Under _gate. Listening for answers to a CQ that has gone out (not while it is still on the air).
+    private bool KeyboardCqListening(DateTime now) => !_kbd.InContact && _kbd.ListeningForAnswers(now) && !KeyboardCqOnAir();
 
     // Under _gate.
     private string? QueueMacro(int key)
@@ -409,7 +444,7 @@ public sealed partial class Session
     // Under _gate. The clicked signal, shown in the conversation box while no contact is under way and no CQ is out.
     private KeyboardReading? ShownReading()
     {
-        if (_reading is not { } r || _kbd.InContact || _kbd.CallingCq) return null;
+        if (_reading is not { } r || _kbd.InContact || _kbd.ListeningForAnswers(_clock.UtcNow)) return null;
         return r with { Country = r.Call is null ? null : _countries.Lookup(r.Call)?.Entity.Name };
     }
 
@@ -443,6 +478,8 @@ public sealed partial class Session
             AddConversation(_config.MyCall, over.Sent, mine: true);
             foreach (var key in over.Macros.Where(k => k != Macro.CqKey))
                 _kbd.Sent(key, _macroTexts.GetValueOrDefault(key) ?? string.Empty, now);
+            // The CQ has gone (or was cut by Esc or a guard): back on receive, answers still count for a while.
+            _kbd.CqEnded(now);
             _macroTexts.Clear();
             if (over.Watchdog && over.Idle)
             {
