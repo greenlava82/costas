@@ -56,6 +56,8 @@ public sealed partial class StationRowViewModel : ObservableObject
         Rank = rank;
         Call = r.Station.Call;
         Where = StationText.Where(r.Station, units);
+        Place = StationText.Place(r.Station);
+        Distance = StationText.Distance(r.Station, units);
         // In a contest the Why column says what the contact is worth to the score: a new multiplier, or a dupe.
         Why = r.ContestTag ?? StationText.Why(r.Need.Tag, r.Station.Grid, band);
         WhyTip = r.ContestDupe ? "Already worked in this contest on this band: it would not score again"
@@ -123,10 +125,20 @@ public sealed partial class StationRowViewModel : ObservableObject
     [ObservableProperty]
     public partial string Where { get; private set; }
 
+    /// <summary>The place alone, for the Where column; updated with <see cref="Where"/>.</summary>
+    [ObservableProperty]
+    public partial string Place { get; private set; }
+
+    /// <summary>The distance alone ("1,550 mi"), for the Distance column, or empty when not known; updated with <see cref="Where"/>.</summary>
+    [ObservableProperty]
+    public partial string Distance { get; private set; }
+
     /// <summary>Shows the latest place for the station (a QRZ lookup may have filled in its city and state).</summary>
     public void UpdatePlace(Core.Stations.Station s, DistanceUnit units)
     {
         Where = StationText.Where(s, units);
+        Place = StationText.Place(s);
+        Distance = StationText.Distance(s, units);
         // A held list keeps its rows, but the age counts from the station's newest decode.
         if (s.LastHeardEndUtc > _heardEndUtc) _heardEndUtc = s.LastHeardEndUtc;
     }

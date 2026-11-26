@@ -169,28 +169,34 @@ public class ResizableColumnsTests
                 var calls = window.GetVisualDescendants().OfType<Grid>().Where(g => ResizableColumns.GetLayout(g) == "Calls").ToList();
                 var header = calls.First(ResizableColumns.GetIsHeader);
                 var repeatsHeader = calls.Where(ResizableColumns.GetIsHeader).Last();
-                header.ColumnDefinitions[2].Width.Value.Should().Be(190, "Where starts at its default width");
+                header.ColumnDefinitions[2].Width.Value.Should().Be(160, "Where starts at its default width");
 
-                // The grip on the right edge of Where (column 2).
+                // The grip on the right edge of Where (column 2), between it and Distance.
                 var grip = header.Children.OfType<Thumb>().Single(t => Grid.GetColumn(t) == 2);
                 var start = grip.TranslatePoint(new Point(grip.Bounds.Width / 2, grip.Bounds.Height / 2), window)!.Value;
                 window.MouseDown(start, MouseButton.Left);
-                window.MouseMove(start + new Point(60, 0));
-                window.MouseUp(start + new Point(60, 0), MouseButton.Left);
+                window.MouseMove(start + new Point(40, 0));
+                window.MouseUp(start + new Point(40, 0), MouseButton.Left);
                 window.UpdateLayout();
 
-                header.ColumnDefinitions[2].Width.Value.Should().Be(250);
-                header.ColumnDefinitions[3].Width.Value.Should().Be(100, "Why, on the other side of the edge, gives up the room");
-                repeatsHeader.ColumnDefinitions[2].Width.Value.Should().Be(250, "Repeats keeps lining up with Next in line");
-                repeatsHeader.ColumnDefinitions[3].Width.Value.Should().Be(100);
+                header.ColumnDefinitions[2].Width.Value.Should().Be(200);
+                header.ColumnDefinitions[3].Width.Value.Should().Be(36, "Distance, on the other side of the edge, gives up the room");
+                repeatsHeader.ColumnDefinitions[2].Width.Value.Should().Be(200, "Repeats keeps lining up with Next in line");
+                repeatsHeader.ColumnDefinitions[3].Width.Value.Should().Be(36);
                 saved.Should().NotBeNull();
                 saved!.Value.Name.Should().Be("Calls");
-                saved.Value.Widths[2].Should().Be(250);
-                saved.Value.Widths[3].Should().Be(100);
+                saved.Value.Widths[2].Should().Be(200);
+                saved.Value.Widths[3].Should().Be(36);
 
                 // Widths remembered from an earlier session are applied.
-                view.LoadColumns(new Dictionary<string, List<double>> { ["Calls"] = [36, 100, 300, 160, 100, 46, 64, 230, 120, 74] });
+                view.LoadColumns(new Dictionary<string, List<double>> { ["Calls"] = [36, 100, 300, 76, 160, 100, 46, 64, 230, 120, 74] });
                 header.ColumnDefinitions[2].Width.Value.Should().Be(300);
+
+                // Widths saved before Distance had its own column still apply: Where gives the distance's room to Distance.
+                view.LoadColumns(new Dictionary<string, List<double>> { ["Calls"] = [36, 100, 300, 170, 100, 46, 64, 230, 120, 74] });
+                header.ColumnDefinitions[2].Width.Value.Should().Be(224);
+                header.ColumnDefinitions[3].Width.Value.Should().Be(OperateView.DistanceWidth);
+                header.ColumnDefinitions[4].Width.Value.Should().Be(170, "Why keeps the width the operator gave it");
             }
             finally
             {

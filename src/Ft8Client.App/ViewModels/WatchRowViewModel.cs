@@ -20,6 +20,12 @@ public sealed class WatchRowViewModel(RankedStation r, DateTime nowUtc, Distance
     /// <summary>Place and distance.</summary>
     public string Where { get; } = StationText.Where(r.Station, units);
 
+    /// <summary>The place alone, for the Where column.</summary>
+    public string Place { get; } = StationText.Place(r.Station);
+
+    /// <summary>The distance alone, for the Distance column, or empty when not known.</summary>
+    public string Distance { get; } = StationText.Distance(r.Station, units);
+
     /// <summary>Need tag, with the grid for a new grid.</summary>
     public string Why { get; } = StationText.Why(r.Need.Tag, r.Station.Grid, band);
 

@@ -202,18 +202,50 @@ public partial class OperateView : UserControl
     {
         _savedColumns = saved;
         foreach (var (name, layout) in _columns)
-            if (saved.TryGetValue(name, out var widths)) layout.Load(widths);
+            if (saved.TryGetValue(name, out var widths)) layout.Load(UpgradeSaved(name, widths));
     }
+
+    /// <summary>
+    /// Widths saved before Distance had a column of its own (2026-11-26) get one, at its default width, so the
+    /// operator's other widths still line up. Where loses the room the distance took: the old default becomes the new
+    /// one, a wider Where gives up the distance column's width, a narrower one stays. Anything else is returned as is.
+    /// </summary>
+    internal static IReadOnlyList<double> UpgradeSaved(string name, IReadOnlyList<double> saved)
+    {
+        // name: (fixed columns before, index of Where among them, old Where default, new Where default)
+        (int Count, int Where, double OldWhere, double NewWhere)? old = name switch
+        {
+            "Calls" => (10, 2, 190, 160),
+            "Watching" => (4, 1, 180, 150),
+            _ => null,
+        };
+        if (old is not { } o || saved.Count != o.Count) return saved;
+        List<double> upgraded = [.. saved];
+        var where = upgraded[o.Where];
+        upgraded[o.Where] = where <= o.OldWhere ? Math.Min(where, o.NewWhere) : Math.Max(o.NewWhere, where - DistanceWidth);
+        upgraded.Insert(o.Where + 1, DistanceWidth);
+        return upgraded;
+    }
+
+    /// <summary>The Distance column's default width, as written in the view.</summary>
+    internal const double DistanceWidth = 76;
 
     /// <summary>The shared widths for a table, made from the first grid that asks (its widths are the defaults).</summary>
     internal ColumnLayout ColumnsFor(string name, Grid template)
     {
         if (_columns.TryGetValue(name, out var layout)) return layout;
         layout = new ColumnLayout([.. template.ColumnDefinitions.Select(c => c.Width.IsAbsolute ? c.Width.Value : double.NaN)]);
-        if (_savedColumns.TryGetValue(name, out var widths)) layout.Load(widths);
-        // Next in line and Repeats on a laptop: Chance and Where trim first, then Last worked, Signal, the rank and,
-        // only as a last resort, Last heard hide, so the Call button never falls off the right edge.
-        if (name == "Calls") layout.GiveWay([(8, 120), (2, 120)], [9, 7, 0, 5]);
+        if (_savedColumns.TryGetValue(name, out var widths)) layout.Load(UpgradeSaved(name, widths));
+        // Next in line and Repeats on a laptop: Chance and Where trim first, then Last worked, Signal, Distance, the
+        // rank and, only as a last resort, Last heard hide, so the Call button never falls off the right edge. On a wide
+        // window Where and Why widen to show their text in full, from room Doing now does not need.
+        if (name == "Calls")
+        {
+            layout.GiveWay([(9, 120), (2, 120)], [10, 8, 3, 0, 6]);
+            layout.AutoSize(star: 5, grow: [2, 4]);
+        }
+        // Watching the same way: Where and Why widen into Doing now's spare room.
+        if (name == "Watching") layout.AutoSize(star: 5, grow: [1, 3]);
         _columns[name] = layout;
         return layout;
     }

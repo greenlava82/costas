@@ -168,7 +168,8 @@ it is heard working someone else, and moves to Watching once the time is up.
 | --- | --- |
 | **#** | Rank |
 | **Call** | Callsign. A small amber tag under it, such as *3 calling*, means you can hear other stations calling them right now, so you know it is a pileup before you click **Call**. Hover the tag to see who, with their signal at your station |
-| **Where** | Country (or state for the USA, province for Canada) and distance |
+| **Where** | Country (or state for the USA, province for Canada), with the city once QRZ has it. Hover for the place and distance together |
+| **Distance** | How far away they are, in miles or kilometres (Settings › Appearance). Blank until their grid is known |
 | **Why** | Why you need them: **New DXCC** (a DXCC entity not in your log), **New DXCC 20 m** (in your log, but not on this band; hover to see which bands you already have it on), **New grid** with the grid, such as **New grid DO62**, or **New call**. A new DXCC also gets a small rarity meter, five cells from common to very rare, from Club Log's most-wanted list. Hover for its rank. A station activating a park for Parks on the Air gets a second line: **New park US-1234** when that park is not in your log yet, *Park US-1234* when it is, or *POTA* when it is calling CQ POTA but nobody has spotted it on this band yet. Hover for the park's name. A station at a new park moves up: it comes right after your first need (new DXCC, unless you changed the order), and it is listed even if you have already worked that call on this band, because a new park is a new contact for park hunters. You can turn this off in Settings › Who to call. With [DX cluster spots](settings.md#who-to-call) on, a station spotted on this band in the last 30 minutes shows *Spotted 4 min ago*; hover to see the band, the spotter and the comment. It does not change the order |
 | **Doing now** | *Calling CQ, 3 slots*, *Calling CQ DX*, *Calling you*, and *fading* when their signal is dropping |
 | **Last heard** | How long ago their last decoded transmission ended, counting up every second |
@@ -212,9 +213,14 @@ widths. Costas remembers your widths the next time it starts.
 
 A column can't grow past the point where *Doing now* would disappear.
 
+Columns also size themselves to what is in them. When a place name or a *Why* is too long for its column and
+*Doing now* has more room than its own text needs, **Where** and **Why** widen until the text fits, and *Doing now*
+keeps the rest. A column you have dragged keeps the width you gave it; double-click its edge to let it size itself
+again. Watching does the same with its **Where** and **Why**.
+
 On a small window, such as a 13-inch laptop, the **Call** buttons always stay on screen. To make room, the table first
 narrows **Chance** and **Where** (long text ends in "…"; hover for the full reason), then hides *Doing now*,
-**Last worked**, **Signal** and the **#** rank, in that order. **Last heard** is the last to go. Widen the window and
+**Last worked**, **Signal**, **Distance** and the **#** rank, in that order. **Last heard** is the last to go. Widen the window and
 they come back at the widths you set.
 
 How the order works: stations heard in the most recent slot come first, so the top row is one you can call right

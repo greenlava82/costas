@@ -100,4 +100,28 @@ public class BandSummaryAndSlotTests
         StationText.Where(s, DistanceUnit.Miles).Should().Be("Illinois, USA · 1,190 mi");
         StationText.Where(s, DistanceUnit.Kilometres).Should().Be("Illinois, USA · 1,915 km");
     }
+
+    [Fact]
+    public void PlaceAndDistance_KnownDistance_SplitWhere()
+    {
+        var s = St("W9RDL", StationState.CallingCq) with { Region = "IL", DistanceKm = 1915.1 };
+        StationText.Place(s).Should().Be("Illinois, USA");
+        StationText.Distance(s, DistanceUnit.Miles).Should().Be("1,190 mi");
+        StationText.Distance(s, DistanceUnit.Kilometres).Should().Be("1,915 km");
+    }
+
+    [Fact]
+    public void Distance_UnknownGrid_IsEmpty()
+    {
+        var s = St("W9RDL", StationState.CallingCq) with { Region = "IL", DistanceKm = null };
+        StationText.Distance(s, DistanceUnit.Miles).Should().BeEmpty();
+        StationText.Place(s).Should().Be(StationText.Where(s, DistanceUnit.Miles), "with no distance Where is the place alone");
+    }
+
+    [Fact]
+    public void Place_NoEntity_IsUnknown()
+    {
+        var s = St("W9RDL", StationState.CallingCq) with { Entity = null, DistanceKm = 100 };
+        StationText.Place(s).Should().Be("Unknown");
+    }
 }

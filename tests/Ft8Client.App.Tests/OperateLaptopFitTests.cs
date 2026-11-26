@@ -121,7 +121,7 @@ public class OperateLaptopFitTests
 
                 // Last heard is the last column to go (owner decision): it is still shown at every supported width.
                 var header = list.GetVisualDescendants().OfType<Grid>().First(g => ResizableColumns.GetLayout(g) == "Calls" && ResizableColumns.GetIsHeader(g));
-                header.ColumnDefinitions[5].Width.Value.Should().BeGreaterThan(0);
+                header.ColumnDefinitions[6].Width.Value.Should().BeGreaterThan(0);
             }
             finally
             {
