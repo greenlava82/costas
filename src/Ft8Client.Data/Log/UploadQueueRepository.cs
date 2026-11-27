@@ -46,6 +46,13 @@ public sealed class UploadQueueRepository(SqliteDatabase db)
             new { target, nowUtc, limit }).ToList();
     }
 
+    /// <summary>Number of items queued for one target, such as <c>qrz</c>.</summary>
+    public int CountFor(string target)
+    {
+        using var c = db.Open();
+        return c.ExecuteScalar<int>("SELECT COUNT(*) FROM upload_queue WHERE target=@target", new { target });
+    }
+
     /// <summary>All queued items.</summary>
     public IReadOnlyList<UploadQueueItem> All()
     {

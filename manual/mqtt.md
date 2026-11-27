@@ -8,7 +8,7 @@ Publishing goes **one way only**. Costas publishes and never subscribes, so noth
 make it transmit. It is off until you turn it on, and off while Costas replays recordings (`--simulate`).
 
 !!! note "Untested on the air"
-    MQTT publishing has been tested against a test broker but not yet with a real radio and Home Assistant.
+    MQTT publishing has been tested against a test broker but not yet with a real radio. The dashboard sensors' discovery and payloads were checked in a real Home Assistant.
 
 ## Turning it on
 
@@ -53,7 +53,10 @@ device with these entities, without any setup on the Home Assistant side:
 | `sensor.costas_<id>_mode` | Text | FT8, FT4, PSK31, RTTY, ... |
 | `sensor.costas_<id>_session_end_reason` | Enum | none, idle_timeout, max_length, rig_lost, app_closed |
 | `event.costas_<id>_session_event` | Event | session_started, session_ended |
-| `event.costas_<id>_qso_event` | Event | qso_logged |
+| `event.costas_<id>_qso_event` | Event | qso_logged, new_dxcc |
+
+With **Publish each logged contact and logbook statistics** ticked (the default) the device also has the dashboard
+sensors described in [Dashboard statistics](#dashboard-statistics).
 
 `<id>` is your station id, normally your callsign in lower case (`w7lit`). It is set the first time you turn
 publishing on and then kept, so switching station profile does not move the topics or create a second device.
@@ -87,6 +90,160 @@ actions:
 The 15 second delay covers an over still finishing when the radio connection drops. Leaving `from: "on"` without a
 `to:` makes the plug come back on when the session goes off or unavailable.
 
+## Dashboard statistics
+
+Costas counts these from its own log, the same log it syncs with QRZ, so they are right after Home Assistant or Costas
+restarts and need no templates or counting on the Home Assistant side. Contacts are those of the current profile's
+callsign, as on the Log page.
+
+- **Today** is the current UTC day, and resets at 00:00 UTC. **Week** is the last 7 UTC days, today included.
+- They update a moment after a contact is logged, edited, imported or synced, when a session starts or ends, and at
+  UTC midnight. The PSK Reporter count is refreshed once a minute and the session length when its minute changes.
+- They stay available with their last values while the radio is disconnected. Like everything else on the device
+  they show unavailable while Costas is closed.
+- Every count has `state_class: measurement`, so Home Assistant keeps long-term statistics for it.
+- Attributes stay under 8 KB per entity (Home Assistant's recorder stops storing attributes at 16 KB). Times are ISO
+  8601 UTC, distances kilometres (Home Assistant shows miles if your system uses them).
+
+| Entity | State | Unit / class | Attributes |
+| --- | --- | --- | --- |
+| `sensor.costas_<id>_qsos_today` | Contacts this UTC day | QSOs | |
+| `sensor.costas_<id>_qsos_week` | Contacts over the last 7 UTC days | QSOs | |
+| `sensor.costas_<id>_qsos_total` | Contacts in the log | QSOs | |
+| `sensor.costas_<id>_dxcc_worked_total` | DXCC entities worked, all time | entities | |
+| `sensor.costas_<id>_new_dxcc_today` | Entities worked today for the first time ever | entities | `entities`: list of `{dxcc, country, call, ts}`, oldest first |
+| `sensor.costas_<id>_farthest_today` | Distance to today's farthest contact (unknown with none) | km, distance | `call`, `country`, `grid`, `ts` |
+| `sensor.costas_<id>_session_duration` | Minutes in the on-air session, 0 with none | min, duration | |
+| `sensor.costas_<id>_recent_qsos` | Time of the latest contact | timestamp | `qsos`: the last 10 contacts, newest first |
+| `sensor.costas_<id>_daily_qsos` | Contacts today | QSOs | `days`: the last 7 UTC days, oldest first, each `{date, total, by_band}` |
+| `sensor.costas_<id>_worked_week_map` | Unique grids worked this week | grids | `points`: stations worked this week, newest first, each `{call, lat, lon, country, band, ts}` |
+| `sensor.costas_<id>_qrz_sync` | `ok`, `pending`, `error` or `disabled` | enum | `last_sync_ts`, `pending_count`, `last_error` |
+| `sensor.costas_<id>_psk_spots_15m` | PSK Reporter spots of your signal in the last 15 minutes | spots | `farthest_km`, `farthest_reporter`, `farthest_grid` |
+
+Each contact in `recent_qsos` (and in the `qso_logged` and `new_dxcc` events) has `call`, `band`, `mode`,
+`frequency_hz`, `ts`, `country`, `dxcc` (the ADIF entity code), `state_or_region`, `grid`, `lat`, `lon`,
+`distance_km`, `is_new_dxcc` (the first contact ever with that entity), `rst_sent`, `rst_rcvd` and `qrz_synced`.
+Fields Costas does not know are `null`. The position is the centre of the contact's grid, or of its country when no
+grid was logged.
+
+Notes on a few of them:
+
+- `worked_week_map` sends at most 200 points and only as many as fit in 8 KB (usually 70 to 90 stations), keeping
+  the newest. Its state still counts every grid worked this week.
+- `new_dxcc_today` and `daily_qsos` by band count each contact's entity and band as logged; entities the country file
+  does not list are not counted, as on the Awards page.
+- `qrz_sync` is `disabled` without a QRZ logbook key, `error` while the QRZ indicator in the bottom bar shows a
+  failure (`last_error` says what), `pending` while contacts wait to upload, else `ok`. `last_sync_ts` is the last
+  logbook download.
+- `psk_spots_15m` counts PSK Reporter spots only (not Reverse Beacon Network or cluster spots). PSK Reporter keeps one
+  spot per receiver, band and 5 minutes.
+
+### A "new country" notification
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: event.costas_w7lit_qso_event
+    attribute: event_type
+    to: new_dxcc
+actions:
+  - action: notify.mobile_app_my_phone
+    data:
+      title: New country worked
+      message: >-
+        {{ trigger.to_state.attributes.country }} with {{ trigger.to_state.attributes.call }}
+        on {{ trigger.to_state.attributes.band }}
+```
+
+Every new entity's `new_dxcc` event comes right after its `qso_logged` event, so this triggers for each one.
+
+### Example dashboard
+
+A status bar, stat tiles, the recent contacts as a table and a contacts-per-day chart, all with Home Assistant's own
+cards. Replace `w7lit` with your station id.
+
+```yaml
+type: sections
+sections:
+  - type: grid
+    cards:
+      - type: glance
+        title: Station
+        columns: 5
+        entities:
+          - entity: binary_sensor.costas_w7lit_session_active
+            name: On air
+          - entity: binary_sensor.costas_w7lit_transmitting
+            name: TX
+          - entity: sensor.costas_w7lit_band
+          - entity: sensor.costas_w7lit_mode
+          - entity: sensor.costas_w7lit_frequency
+      - type: tile
+        entity: sensor.costas_w7lit_qsos_today
+      - type: tile
+        entity: sensor.costas_w7lit_qsos_week
+      - type: tile
+        entity: sensor.costas_w7lit_dxcc_worked_total
+      - type: tile
+        entity: sensor.costas_w7lit_new_dxcc_today
+      - type: tile
+        entity: sensor.costas_w7lit_farthest_today
+      - type: tile
+        entity: sensor.costas_w7lit_session_duration
+      - type: tile
+        entity: sensor.costas_w7lit_qrz_sync
+      - type: tile
+        entity: sensor.costas_w7lit_psk_spots_15m
+  - type: grid
+    cards:
+      - type: markdown
+        title: Recent contacts
+        content: >-
+          | UTC | Call | Band | Mode | Country | km | |
+
+          |---|---|---|---|---|---:|---|
+
+          {% for q in state_attr('sensor.costas_w7lit_recent_qsos', 'qsos') or [] -%}
+
+          | {{ q.ts[11:16] }} | {{ q.call }} | {{ q.band }} | {{ q.mode }} | {{ q.country or '' }} | {{ q.distance_km or '' }} | {{ '🆕' if q.is_new_dxcc }} |
+
+          {% endfor %}
+      - type: statistics-graph
+        title: Contacts per day
+        entities:
+          - sensor.costas_w7lit_qsos_today
+        stat_types: [max]
+        period: day
+        days_to_show: 7
+        chart_type: bar
+```
+
+The statistics graph reads Home Assistant's own long-term statistics, so it fills in over the first week. For the
+chart split by band straight away, [ApexCharts card](https://github.com/RomRider/apexcharts-card) (from HACS) can read
+the `days` attribute, one series per band:
+
+```yaml
+type: custom:apexcharts-card
+header: { show: true, title: Contacts per day }
+graph_span: 7d
+span: { end: day }
+stacked: true
+series:
+  - entity: sensor.costas_w7lit_daily_qsos
+    name: 20m
+    type: column
+    data_generator: |
+      return entity.attributes.days.map(d => [new Date(d.date + "T12:00:00Z").getTime(), d.by_band["20m"] || 0]);
+  - entity: sensor.costas_w7lit_daily_qsos
+    name: 40m
+    type: column
+    data_generator: |
+      return entity.attributes.days.map(d => [new Date(d.date + "T12:00:00Z").getTime(), d.by_band["40m"] || 0]);
+```
+
+Home Assistant's own map card plots entities rather than a list of points, so for the worked map use a custom card
+that can read a list of `lat`/`lon` points from an attribute, pointed at `sensor.costas_w7lit_worked_week_map`.
+
 ## Topics and payloads
 
 Everything is under `costas/<id>/`. Any MQTT client can read these topics; the format is meant to stay stable.
@@ -98,7 +255,9 @@ Everything is under `costas/<id>/`. Any MQTT client can read these topics; the f
 | `costas/<id>/tx` | Yes | `ON` or `OFF` |
 | `costas/<id>/state` | Yes | JSON, see below |
 | `costas/<id>/event/session` | No | JSON event |
-| `costas/<id>/event/qso` | No | JSON event (if **Publish each logged contact** is ticked) |
+| `costas/<id>/event/qso` | No | JSON event (if **Publish each logged contact and logbook statistics** is ticked) |
+| `costas/<id>/stats` | Yes | `{"qsos_today":12,"qsos_week":84,"qsos_total":4321,"dxcc_worked_total":151}` |
+| `costas/<id>/stats/<sensor>` | Yes | `{"state":…,"attributes":{…}}` for `new_dxcc_today`, `farthest_today`, `session_duration` (no attributes), `recent_qsos`, `daily_qsos`, `worked_week_map`, `qrz_sync`, `psk_spots_15m` |
 | `homeassistant/device/costas_<id>/config` | Yes | Home Assistant discovery (if ticked) |
 
 Session:
@@ -121,8 +280,11 @@ Events:
 ```json
 {"event_type":"session_started","session_id":"3f9a1c0b7d2e","reason":null,"ts":"2026-11-24T18:00:05Z"}
 {"event_type":"session_ended","session_id":"3f9a1c0b7d2e","reason":"idle_timeout","ts":"2026-11-24T19:42:10Z"}
-{"event_type":"qso_logged","call":"K1ABC","band":"20m","mode":"FT8","frequency":14074000,"ts":"2026-11-24T18:03:40Z"}
+{"event_type":"qso_logged","call":"KP4JRS","band":"20m","mode":"FT8","frequency":14074000,"ts":"2026-11-24T18:03:40Z","frequency_hz":14075180,"country":"Puerto Rico","dxcc":202,"state_or_region":null,"grid":"FK68","lat":18.5,"lon":-65,"distance_km":4893,"is_new_dxcc":true,"rst_sent":"-10","rst_rcvd":"-12","qrz_synced":false}
 ```
+
+A `new_dxcc` event with the same fields follows the `qso_logged` event of a contact with a new entity. `frequency`
+is the dial frequency, `frequency_hz` the logged frequency (dial plus audio offset).
 
 Times are UTC. Frequencies are in hertz.
 
@@ -138,5 +300,6 @@ How Costas keeps the retained topics honest:
 
 ## Privacy
 
-Nothing leaves your network unless you point Costas at a broker elsewhere. Contacts are published only with
-**Publish each logged contact** ticked. Your grid square is not published.
+Nothing leaves your network unless you point Costas at a broker elsewhere. Contacts and the logbook statistics are
+published only with **Publish each logged contact and logbook statistics** ticked; untick it and Costas removes the
+statistics from the broker and the sensors from Home Assistant. Your own grid square is not published.

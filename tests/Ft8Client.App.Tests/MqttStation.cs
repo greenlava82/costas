@@ -15,11 +15,13 @@ using Ft8Client.Core.Decoding;
 using Ft8Client.Core.Mqtt;
 using Ft8Client.Core.Services;
 using Ft8Client.Core.Time;
+using Ft8Client.Data.Database;
 using Ft8Client.Data.Log;
 using Ft8Client.Data.Reference;
 using Ft8Client.Data.Secrets;
 using Ft8Client.Data.Settings;
 using Ft8Client.Integrations.Tests.Mqtt;
+using Ft8Client.Modems.Psk;
 using Ft8Client.Rig;
 
 namespace Ft8Client.App.Tests;
@@ -58,17 +60,36 @@ public sealed class MqttStation : IAsyncDisposable
     }
 
     /// <summary>A station whose MQTT settings point at <paramref name="port"/> (null: publishing off).</summary>
-    public MqttStation(int? port, Mode mode = Mode.Ft8, Action<AppSettings>? configure = null, string? password = null)
+    /// <param name="port">Broker port, or null for publishing off.</param>
+    /// <param name="mode">Operating mode.</param>
+    /// <param name="configure">Changes to the settings.</param>
+    /// <param name="password">MQTT password.</param>
+    /// <param name="stats">Log to a real (in-memory) database and publish the dashboard statistics from it.</param>
+    /// <param name="now">Start time of the clock.</param>
+    public MqttStation(int? port, Mode mode = Mode.Ft8, Action<AppSettings>? configure = null, string? password = null, bool stats = false,
+                       DateTime? now = null)
     {
-        Clock = new ManualClock(Now);
+        Clock = new ManualClock(now ?? Now);
+        ISessionLog log = new NoLog();
+        if (stats)
+        {
+            Database = SqliteDatabase.InMemory(out var keepAlive);
+            _keepAlive = keepAlive;
+            Qsos = new QsoRepository(Database);
+            Uploads = new UploadQueueRepository(Database);
+            Sync = new SyncStateRepository(Database);
+            Spots = new SpotRepository(Database);
+            log = new DatabaseSessionLog(Qsos, Uploads, () => "home", () => QrzUploads);
+        }
         var freqs = ReferenceData.LoadFrequencies();
         Rig = new SimulatedRig(Clock);
         Output = new NullAudioOutput { Now = () => Clock.UtcNow };
         Tx = new Transmitter(Rig, Output, Clock, freqs);
         Session = new Session(new SessionConfig { MyCall = "W7LIT", MyGrid = "DN40", Band = "20m", Mode = mode }, new NoDecoder(),
-            new NoAudio(), Tx, Clock, ReferenceData.LoadCountries(), freqs, new NoLog());
+            new NoAudio(), Tx, Clock, ReferenceData.LoadCountries(), freqs, log);
         var s = new AppSettings();
         s.Profile.Callsign = "W7LIT";
+        s.Profile.Grid = "DN40";
         s.Mqtt.Enabled = port is not null;
         s.Mqtt.Host = port is null ? string.Empty : "127.0.0.1";
         s.Mqtt.Port = port ?? 1883;
@@ -78,8 +99,34 @@ public sealed class MqttStation : IAsyncDisposable
         Settings = new AppSettingsAccessor(new SettingsStore(Path.Combine(_dir, "settings.json")), s);
         Secrets = new InMemorySecretStore();
         if (password is not null) Secrets.Set(SecretNames.MqttPassword, password);
-        Service = new MqttService(Session, Tx, Settings, Secrets, Clock, allowed: true);
+        Stats = stats
+            ? new DashboardStatsSource(Qsos!, Uploads!, Sync!, Spots, ReferenceData.LoadCountries(), ReferenceData.LoadAdifTable(), Settings, Secrets)
+            : null;
+        Service = new MqttService(Session, Tx, Settings, Secrets, Clock, allowed: true, Stats);
     }
+
+    private readonly IDisposable? _keepAlive;
+
+    /// <summary>The log database (with <c>stats</c>), else null.</summary>
+    public SqliteDatabase? Database { get; }
+
+    /// <summary>The log (with <c>stats</c>), else null.</summary>
+    public QsoRepository? Qsos { get; }
+
+    /// <summary>The upload queue (with <c>stats</c>), else null.</summary>
+    public UploadQueueRepository? Uploads { get; }
+
+    /// <summary>The sync state (with <c>stats</c>), else null.</summary>
+    public SyncStateRepository? Sync { get; }
+
+    /// <summary>The stored spots (with <c>stats</c>), else null.</summary>
+    public SpotRepository? Spots { get; }
+
+    /// <summary>The statistics source (with <c>stats</c>), else null.</summary>
+    public DashboardStatsSource? Stats { get; }
+
+    /// <summary>Whether a contact logged through the session is queued for QRZ.</summary>
+    public bool QrzUploads { get; set; }
 
     public ManualClock Clock { get; }
 
@@ -153,6 +200,43 @@ public sealed class MqttStation : IAsyncDisposable
         Tx.Transmitting.Should().BeFalse("the tone ends after a second");
     }
 
+    /// <summary>Hears KP4JRS call CQ in PSK31, answers and logs the contact.</summary>
+    public void WorkKp4jrs(KeyboardSession keyboard)
+    {
+        const int partnerHz = 1180;
+        void Hear(string text)
+        {
+            var random = new Random(1);
+            var audio = new PskModulator(Mode.Psk31, ModeInfo.DecoderSampleRate, partnerHz, 0.3).Modulate(text)
+                .Select(s => s + (float)((random.NextDouble() - 0.5) * 0.02)).ToArray();
+            for (var i = 0; i < audio.Length; i += 1200)
+            {
+                keyboard.Input.Write(audio.AsSpan(i, Math.Min(1200, audio.Length - i)));
+                Clock.Advance(TimeSpan.FromMilliseconds(100));
+                keyboard.Drain();
+            }
+            Clock.Advance(TimeSpan.FromSeconds(4));
+            keyboard.Drain();
+        }
+
+        Hear("CQ CQ CQ DE KP4JRS KP4JRS KP4JRS PSE K\n");
+        keyboard.Listen(partnerHz);
+        Session.CallStation("KP4JRS").Should().BeTrue();
+        var end = Clock.UtcNow + TimeSpan.FromSeconds(60);
+        while (Tx.Transmitting && Clock.UtcNow < end)
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                Clock.Advance(TimeSpan.FromMilliseconds(1));
+                Tx.Poll();
+            }
+            Session.Keys.Pump();
+            Output.Pull(Tx.OutputSampleRate / 100);
+        }
+        Tx.Transmitting.Should().BeFalse();
+        Session.LogNow();
+    }
+
     /// <summary>Marks the radio connected (or lost), as the rig service does.</summary>
     public void Radio(ServiceHealth health) => Session.SetService(ServiceNames.Radio, new ServiceStatus(health, health.ToString(), Clock.UtcNow));
 
@@ -160,6 +244,7 @@ public sealed class MqttStation : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await Service.DisposeAsync();
+        _keepAlive?.Dispose();
         try
         {
             Directory.Delete(_dir, recursive: true);

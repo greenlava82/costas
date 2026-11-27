@@ -352,39 +352,5 @@ public sealed class MqttServiceBehaviourTests
     }
 
     // A PSK31 contact with KP4JRS, logged: what the Logged notice and the qso_logged event come from.
-    private static void WorkKp4jrs(MqttStation st, KeyboardSession keyboard)
-    {
-        const int partnerHz = 1180;
-        void Hear(string text)
-        {
-            var random = new Random(1);
-            var audio = new PskModulator(Mode.Psk31, ModeInfo.DecoderSampleRate, partnerHz, 0.3).Modulate(text)
-                .Select(s => s + (float)((random.NextDouble() - 0.5) * 0.02)).ToArray();
-            for (var i = 0; i < audio.Length; i += 1200)
-            {
-                keyboard.Input.Write(audio.AsSpan(i, Math.Min(1200, audio.Length - i)));
-                st.Clock.Advance(TimeSpan.FromMilliseconds(100));
-                keyboard.Drain();
-            }
-            st.Clock.Advance(TimeSpan.FromSeconds(4));
-            keyboard.Drain();
-        }
-
-        Hear("CQ CQ CQ DE KP4JRS KP4JRS KP4JRS PSE K\n");
-        keyboard.Listen(partnerHz);
-        st.Session.CallStation("KP4JRS").Should().BeTrue();
-        var end = st.Clock.UtcNow + TimeSpan.FromSeconds(60);
-        while (st.Tx.Transmitting && st.Clock.UtcNow < end)
-        {
-            for (var i = 0; i < 10; i++)
-            {
-                st.Clock.Advance(TimeSpan.FromMilliseconds(1));
-                st.Tx.Poll();
-            }
-            st.Session.Keys.Pump();
-            st.Output.Pull(st.Tx.OutputSampleRate / 100);
-        }
-        st.Tx.Transmitting.Should().BeFalse();
-        st.Session.LogNow();
-    }
+    private static void WorkKp4jrs(MqttStation st, KeyboardSession keyboard) => st.WorkKp4jrs(keyboard);
 }

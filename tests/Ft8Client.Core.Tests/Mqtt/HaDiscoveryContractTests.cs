@@ -24,6 +24,9 @@ public partial class HaDiscoveryContractTests
     private static readonly MqttTopics Topics = new("w7lit");
     private static readonly DateTime At = new(2026, 11, 24, 20, 15, 0, DateTimeKind.Utc);
 
+    private static readonly StatsContact Contact = new("KP4JRS", "20m", "FT8", 14_074_500, At, "Puerto Rico", 202, null, "FK68", 18.5, -65.0,
+        5000, true, "-10", "-12", false);
+
     private static JsonObject Components() =>
         JsonNode.Parse(HaDiscovery.Build(Topics, "W7LIT", "0.1.0"))!["cmps"]!.AsObject();
 
@@ -33,6 +36,12 @@ public partial class HaDiscoveryContractTests
         var running = new OnAirSnapshot(true, "abc123", At, null, true);
         var sessions = new List<OnAirSnapshot> { OnAirSnapshot.Idle, running, running with { Transmitting = false } };
         sessions.AddRange(Enum.GetValues<SessionEndReason>().Select(r => running with { Active = false, Transmitting = false, EndReason = r }));
+        var empty = new DashboardStats(At.Date, 0, 0, 0, 0, [], null, [],
+            [.. Enumerable.Range(0, 7).Select(i => new DayCount(At.Date.AddDays(i - 6), 0, []))], 0, []);
+        var busy = new DashboardStats(At.Date, 2, 5, 900, 120, [new NewEntity(202, "Puerto Rico", "KP4JRS", At)], Contact, [Contact],
+            [.. Enumerable.Range(0, 7).Select(i => new DayCount(At.Date.AddDays(i - 6), 1, [new("20m", 1)]))], 4,
+            [new MapPoint("KP4JRS", 18.2, -66.5, "Puerto Rico", "20m", At)]);
+        var stats = new[] { empty, busy };
         var states = Enum.GetValues<StationActivity>()
             .SelectMany(a => new[] { new StationState("W7LIT", true, a, "20m", 14_074_000, "FT8"), new StationState("W7LIT", false, a, "20m", 14_074_000, "FT8") })
             .ToList();
@@ -42,9 +51,28 @@ public partial class HaDiscoveryContractTests
             [Topics.Tx] = [MqttPayloads.Tx(true), MqttPayloads.Tx(false)],
             [Topics.State] = [.. states.Select(MqttPayloads.State)],
             [Topics.SessionEvent] = [.. sessions.Skip(1).Select(MqttPayloads.SessionEvent)],
-            [Topics.QsoEvent] = [MqttPayloads.QsoEvent(new LoggedQso("KP4JRS", "20m", "FT8", 14_074_000, At))],
+            [Topics.QsoEvent] =
+            [
+                MqttPayloads.QsoEvent(new LoggedQso("KP4JRS", "20m", "FT8", 14_074_000, At)),
+                StatsPayloads.ContactEvent("qso_logged", new LoggedQso("KP4JRS", "20m", "FT8", 14_074_000, At), null),
+                StatsPayloads.ContactEvent("new_dxcc", new LoggedQso("KP4JRS", "20m", "FT8", 14_074_000, At), Contact),
+            ],
+            [Topics.Stats] = [.. stats.Select(StatsPayloads.Counts)],
+            [Topics.NewDxccToday] = [.. stats.Select(StatsPayloads.NewDxccToday)],
+            [Topics.FarthestToday] = [.. stats.Select(StatsPayloads.FarthestToday)],
+            [Topics.SessionDuration] = [.. sessions.Select(x => StatsPayloads.SessionDuration(x, At.AddMinutes(42)))],
+            [Topics.RecentQsos] = [.. stats.Select(StatsPayloads.RecentQsos)],
+            [Topics.DailyQsos] = [.. stats.Select(StatsPayloads.DailyQsos)],
+            [Topics.WorkedWeekMap] = [.. stats.Select(StatsPayloads.WorkedWeekMap)],
+            [Topics.QrzSync] = [.. Enum.GetValues<QrzSyncState>().Select(q => StatsPayloads.QrzSync(new QrzSyncStatus(q, null, 0, null)))],
+            [Topics.PskSpots] = [StatsPayloads.PskSpots(PskSpotSummary.None), StatsPayloads.PskSpots(new PskSpotSummary(3, 1200, "K1ABC", "FN42"))],
         };
     }
+
+    [GeneratedRegex(@"^\{\{ value_json\.(\w+) \}\}$")]
+    private static partial Regex Simple();
+
+    private static string Scalar(JsonNode v) => v.GetValueKind() == System.Text.Json.JsonValueKind.String ? v.GetValue<string>() : v.ToJsonString();
 
     [GeneratedRegex(@"value_json\.(\w+)")]
     private static partial Regex Field();
@@ -56,12 +84,14 @@ public partial class HaDiscoveryContractTests
         var json = JsonNode.Parse(payload)!.AsObject();
         return template switch
         {
-            "{{ value_json.state }}" => json["state"]!.GetValue<string>(),
+            "{{ value_json.state }}" => Scalar(json["state"]!),
             "{{ value_json.band }}" => json["band"]!.GetValue<string>(),
             "{{ value_json.mode }}" => json["mode"]!.GetValue<string>(),
             "{{ value_json.frequency }}" => json["frequency"]!.ToJsonString(),
             "{{ 'ON' if value_json.rig_connected else 'OFF' }}" => json["rig_connected"]!.GetValue<bool>() ? "ON" : "OFF",
             "{{ value_json.reason if value_json.reason else 'none' }}" => json["reason"]?.GetValue<string>() ?? "none",
+            HaDiscovery.NullableStateTemplate => json["state"] is { } v ? Scalar(v) : "None",
+            _ when Simple().Match(template) is { Success: true } m => Scalar(json[m.Groups[1].Value]!),
             _ => throw new InvalidOperationException($"No rendering for template {template}; add one so it is checked."),
         };
     }
@@ -129,6 +159,47 @@ public partial class HaDiscoveryContractTests
             foreach (var payload in payloads[c["state_topic"]!.GetValue<string>()])
                 types.Should().Contain(JsonNode.Parse(payload)!["event_type"]!.GetValue<string>(), $"{key} drops events it does not declare");
         }
+    }
+
+    [Fact]
+    public void Build_AttributeTemplates_ReadAnAttributesObjectUnder8KB()
+    {
+        var payloads = Payloads();
+        foreach (var (key, c) in Components())
+        {
+            if (c!["json_attributes_topic"]?.GetValue<string>() is not { } topic) continue;
+            c["json_attributes_template"]!.GetValue<string>().Should().Be(HaDiscovery.AttributesTemplate);
+            topic.Should().Be(c["state_topic"]!.GetValue<string>());
+            foreach (var payload in payloads[topic])
+            {
+                JsonNode.Parse(payload)!["attributes"].Should().BeOfType<JsonObject>($"{key} reads attributes from {payload}");
+                StatsPayloads.AttributeBytes(payload).Should().BeLessThanOrEqualTo(StatsPayloads.AttributeLimitBytes);
+            }
+        }
+    }
+
+    [Fact]
+    public void Build_NumericSensors_RenderANumberOrNone()
+    {
+        var payloads = Payloads();
+        foreach (var (key, c) in Components())
+        {
+            if (c!["state_class"] is null) continue;
+            foreach (var payload in payloads[c["state_topic"]!.GetValue<string>()])
+            {
+                var v = Render(c["value_template"]!.GetValue<string>(), payload);
+                (v == "None" || double.TryParse(v, System.Globalization.CultureInfo.InvariantCulture, out _)).Should().BeTrue($"{key} renders {v} from {payload}");
+            }
+        }
+    }
+
+    [Fact]
+    public void Build_TimestampSensor_RendersIsoUtcOrNone()
+    {
+        var c = Components()["recent_qsos"]!;
+        var rendered = Payloads()[c["state_topic"]!.GetValue<string>()].Select(p => Render(c["value_template"]!.GetValue<string>(), p)).ToList();
+
+        rendered.Should().Contain("None").And.Contain("2026-11-24T20:15:00Z");
     }
 
     [Fact]

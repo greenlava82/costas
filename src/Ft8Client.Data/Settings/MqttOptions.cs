@@ -51,6 +51,6 @@ public sealed class MqttOptions
     /// <summary>Longest an on-air session may run before it is ended as a failsafe, in minutes.</summary>
     public int SessionMaxMinutes { get; set; } = 240;
 
-    /// <summary>Publish a qso_logged event (call, band, mode, time) for each logged contact.</summary>
+    /// <summary>Publish a qso_logged event for each logged contact, and the logbook statistics (dashboard sensors).</summary>
     public bool PublishContacts { get; set; } = true;
 }
