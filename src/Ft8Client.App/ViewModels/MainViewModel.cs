@@ -697,7 +697,7 @@ public sealed partial class MainViewModel : ObservableObject, IOperateCommands, 
             _applyingStatus = false;
         }
         (MeterText, MeterWarningTip, MeterKind) = TxMeterText.Warning(s.TxMeters);
-        ApplyMeters(TxMeterText.Strip(s.TxMetersLive, s.TxMeters, _host.RadioPower.Power?.MaxWatts));
+        ApplyMeters(TxMeterText.Strip(s.TxMetersLive, s.TxMeters, _host.RadioPower.Power?.MaxWatts, s.Wspr?.Beacon.EstimateWatts));
         Indicators.Clear();
         Indicators.Add(Indicator("Radio", s, ServiceNames.Radio));
         Indicators.Add(Indicator("Audio", s, ServiceNames.Audio));

@@ -36,7 +36,14 @@ public static class TxMeterText
     /// The meter strip: the live reading while one is on the air, otherwise the last transmission's result. Null when
     /// neither has a meter value. <paramref name="maxWatts"/> scales the power bar (the radio's most, when known).
     /// </summary>
-    public static TxMeterStrip? Strip(TxMeterReading? live, TxMeterResult? held, int? maxWatts)
+    /// <param name="live">The reading while on the air, or null.</param>
+    /// <param name="held">The last transmission's result, or null.</param>
+    /// <param name="maxWatts">The radio's most power, when known.</param>
+    /// <param name="estimateWatts">
+    /// What the power setting and attenuation should give (WSPR), or null. Shown beside a reading at the meter's floor,
+    /// which cannot say how far under it the output is.
+    /// </param>
+    public static TxMeterStrip? Strip(TxMeterReading? live, TxMeterResult? held, int? maxWatts, double? estimateWatts = null)
     {
         var isLive = live is { Any: true };
         var (alc, swr, watts) = isLive ? (live!.Alc, live.Swr, live.Watts) : (held?.Alc, held?.Swr, held?.Watts);
@@ -55,7 +62,7 @@ public static class TxMeterText
             isLive,
             isLive ? "TX" : "Last TX",
             tip,
-            watts is { } w ? WattsText(w) : null,
+            watts is { } w ? WattsText(w, estimateWatts) : null,
             watts is { } w2 ? Math.Clamp(w2 / full, 0, 1) : 0,
             alc is null ? null : alcHigh ? "High" : "OK",
             alc ?? 0,
@@ -73,8 +80,33 @@ public static class TxMeterText
         ? "≤5 W"
         : Math.Round(watts).ToString("0", CultureInfo.InvariantCulture) + " W";
 
+    /// <summary>
+    /// As <see cref="WattsText(double)"/>, with the estimate beside a reading at the floor: "≤5 W · est. 50 mW".
+    /// </summary>
+    public static string WattsText(double watts, double? estimateWatts) =>
+        watts <= LowestReliableWatts && estimateWatts is { } e && e > 0
+            ? $"{WattsText(watts)} · est. {PreciseWattsText(e)}"
+            : WattsText(watts);
+
+    /// <summary>
+    /// Power to two significant figures: "5 W", "2.5 W", "50 mW", "500 mW", "0.5 mW". WSPR's dBm steps are nominal
+    /// (17 dBm is 50.1 mW), so a third figure would only be noise.
+    /// </summary>
+    public static string PreciseWattsText(double w)
+    {
+        var (value, unit) = w >= 1 ? (w, "W") : (w * 1000, "mW");
+        return string.Create(CultureInfo.InvariantCulture, $"{TwoFigures(value):0.##} {unit}");
+    }
+
+    private static double TwoFigures(double v)
+    {
+        if (v <= 0) return 0;
+        var scale = Math.Pow(10, Math.Floor(Math.Log10(v)) - 1);
+        return Math.Round(v / scale) * scale;
+    }
+
     /// <summary>The lowest power some radios' meters can tell apart from none (Hamlib's FT-710 table starts here).</summary>
-    public const double LowestReliableWatts = 5;
+    public const double LowestReliableWatts = TxMeterCheck.MeterFloorWatts;
 
     private static string Percent(double fraction) => Math.Round(fraction * 100).ToString("0", CultureInfo.InvariantCulture) + "%";
 }

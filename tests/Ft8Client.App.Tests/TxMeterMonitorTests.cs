@@ -221,4 +221,27 @@ public class TxMeterMonitorTests
     [InlineData(24.4, "24 W")]
     public void WattsText_AtHamlibFloor_ShowsAtMostFive(double watts, string expected) =>
         TxMeterText.WattsText(watts).Should().Be(expected);
+
+    [Theory]
+    [InlineData(5.0, 0.05, "≤5 W · est. 50 mW")]
+    [InlineData(5.0, 0.005, "≤5 W · est. 5 mW")]
+    [InlineData(24.4, 0.05, "24 W")]
+    [InlineData(5.0, 0.0, "≤5 W")]
+    public void WattsText_EstimateAtTheFloor_ShownBesideTheReading(double watts, double estimate, string expected) =>
+        TxMeterText.WattsText(watts, estimate).Should().Be(expected);
+
+    [Theory]
+    [InlineData(5.0, "5 W")]
+    [InlineData(5.012, "5 W")]
+    [InlineData(2.5, "2.5 W")]
+    [InlineData(0.0501, "50 mW")]
+    [InlineData(0.501, "500 mW")]
+    [InlineData(0.005, "5 mW")]
+    [InlineData(0.0005, "0.5 mW")]
+    public void PreciseWattsText_Power_IsTwoSignificantFigures(double watts, string expected) =>
+        TxMeterText.PreciseWattsText(watts).Should().Be(expected);
+
+    [Fact]
+    public void Strip_WsprEstimateAndAFloorReading_ShowsTheEstimate() =>
+        TxMeterText.Strip(new TxMeterReading(0.1, 1.2, 5.0), null, 100, 0.05)!.Watts.Should().Be("≤5 W · est. 50 mW");
 }

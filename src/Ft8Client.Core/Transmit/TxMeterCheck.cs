@@ -26,6 +26,12 @@ public static class TxMeterCheck
     /// <summary>SWR at or above this risks the radio; check the antenna before sending again.</summary>
     public const double SwrCritical = 3.0;
 
+    /// <summary>
+    /// The lowest output power, in watts, that some radios' meters can tell apart from none: Hamlib's FT-710 power table
+    /// starts here, so anything from nothing to 5 W reads 5 W. A reading at or below it says only "at most this much".
+    /// </summary>
+    public const double MeterFloorWatts = 5;
+
     /// <summary>The advice that ends an ALC warning, replaced when automatic transmit level has already acted.</summary>
     public const string AlcAdvice = "Lower Transmit level in Settings or the radio's USB audio level.";
 

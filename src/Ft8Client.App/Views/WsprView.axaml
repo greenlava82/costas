@@ -91,8 +91,8 @@
             <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding DbmChoices}" SelectedItem="{Binding ReportedDbm}" HorizontalAlignment="Stretch" />
             <TextBlock Grid.Row="2" Text="Radio power (%)" VerticalAlignment="Center" ToolTip.Tip="Set on the radio over CAT while the beacon runs, as a share of its maximum (at least 1 W), and put back after." />
             <NumericUpDown Grid.Row="2" Grid.Column="1" Minimum="1" Maximum="100" Increment="1" FormatString="0" Value="{Binding PowerPercent}" />
-            <TextBlock Grid.Row="3" Text="Attenuation (dB)" VerticalAlignment="Center" ToolTip.Tip="Audio drive reduction on top of the radio's power, 0 to -20. WSPR has a constant envelope, so it stays clean." />
-            <NumericUpDown Grid.Row="3" Grid.Column="1" Minimum="-20" Maximum="0" Increment="1" FormatString="0" Value="{Binding AttenuationDb}" />
+            <TextBlock Grid.Row="3" Text="Attenuation (dB)" VerticalAlignment="Center" ToolTip.Tip="Audio drive reduction on top of the radio's power, 0 to -30 (5 W at -30 dB is 5 mW). WSPR has a constant envelope, so it stays clean." />
+            <NumericUpDown Grid.Row="3" Grid.Column="1" Minimum="-30" Maximum="0" Increment="1" FormatString="0" Value="{Binding AttenuationDb}" />
             <TextBlock Grid.Row="4" Text="Audio offset (Hz)" VerticalAlignment="Center" ToolTip.Tip="The centre of the four tones, inside the 1400 to 1600 Hz WSPR window." />
             <NumericUpDown Grid.Row="4" Grid.Column="1" Minimum="1400" Maximum="1600" Increment="10" FormatString="0" Value="{Binding OffsetHz}" />
           </Grid>

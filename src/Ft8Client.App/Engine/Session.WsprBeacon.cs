@@ -133,7 +133,8 @@ public sealed partial class Session
     {
         if (call.Length == 0 || grid.Length == 0) return "Beacon not started: set your callsign and locator in Settings.";
         if (o.TxPercent is < 1 or > 100) return $"Beacon not started: Tx percent is {o.TxPercent}; use 1 to 100.";
-        if (o.AttenuationDb is > 0 or < -20) return $"Beacon not started: attenuation is {o.AttenuationDb} dB; use 0 to -20.";
+        if (o.AttenuationDb > 0 || o.AttenuationDb < WsprPower.MinAttenuationDb)
+            return $"Beacon not started: attenuation is {o.AttenuationDb} dB; use 0 to {WsprPower.MinAttenuationDb}.";
         if (o.PowerPercent is < 1 or > 100) return $"Beacon not started: power is {o.PowerPercent} %; use 1 to 100.";
         if (!WsprPower.IsLegal(o.ReportedDbm)) return $"Beacon not started: {o.ReportedDbm} dBm cannot be sent. WSPR power is 0 to 60 dBm ending in 0, 3 or 7.";
         if (o.OffsetHz < WsprTiming.WindowLowHz || o.OffsetHz > WsprTiming.WindowHighHz)
@@ -370,7 +371,11 @@ public sealed partial class Session
         bool? nextTx = _nextDecisionSlot == nextSlot ? _nextDecision?.Transmit : null;
         var watts = RadioWatts();
         double? estimate = watts is { } w ? WsprPower.EstimateDbm(w, options.AttenuationDb) : null;
-        var meter = _txMetersLive?.Watts is { } mw && mw > 0 ? WsprPower.EstimateDbm(mw, 0) : (double?)null;
+        // A reading at or below the meter's floor says only "at most 5 W": it is no measure of a low-power beacon, so it is
+        // neither shown as dBm nor compared with the reported power.
+        var liveWatts = _txMetersLive?.Watts;
+        var meterBelowFloor = liveWatts is { } lw && lw <= TxMeterCheck.MeterFloorWatts;
+        var meter = liveWatts is { } mw && mw > TxMeterCheck.MeterFloorWatts ? WsprPower.EstimateDbm(mw, 0) : (double?)null;
         string? warning = null;
         if (estimate is { } e && Math.Abs(e - options.ReportedDbm) > 3)
             warning = $"The radio is set for about {WsprPower.Display(e)} dBm, but the message says {options.ReportedDbm} dBm.";
@@ -379,7 +384,8 @@ public sealed partial class Session
         return new WsprBeaconView(_beaconOn, nextTx, _nextDecisionSlot == nextSlot ? _nextDecision?.Reason ?? string.Empty : string.Empty,
             null,
             _beaconPowerNote, _lastBeaconMessage, options.TxPercent, options.ReportedDbm, options.AttenuationDb,
-            estimate is null ? null : WsprPower.Display(estimate.Value), meter is null ? null : WsprPower.Display(meter.Value), warning);
+            estimate is null ? null : WsprPower.Display(estimate.Value), meter is null ? null : WsprPower.Display(meter.Value), warning,
+            watts, meterBelowFloor);
     }
 }
 
@@ -394,11 +400,17 @@ public sealed partial class Session
 /// <param name="ReportedDbm">The power the message reports.</param>
 /// <param name="AttenuationDb">The audio attenuation.</param>
 /// <param name="EstimateDbm">What the radio's power and the attenuation should give, or null when the radio does not report its power.</param>
-/// <param name="MeterDbm">What the radio's output meter reads, or null.</param>
+/// <param name="MeterDbm">What the radio's output meter reads, or null (also when the reading is at or below the meter's floor).</param>
 /// <param name="PowerWarning">A warning when the estimate or the meter differs from the reported power by more than 3 dB, or null. Advice only.</param>
+/// <param name="RadioWatts">The radio's power setting in watts, or null when the radio does not report it.</param>
+/// <param name="MeterBelowFloor">True when the radio's meter reads at or below <see cref="TxMeterCheck.MeterFloorWatts"/>, which it cannot measure under.</param>
 public sealed record WsprBeaconView(bool On, bool? NextSlotTransmits, string NextSlotNote, DateTime? PresenceEndsUtc, string? PowerNote,
-    string? LastMessage, int TxPercent, int ReportedDbm, int AttenuationDb, double? EstimateDbm, double? MeterDbm, string? PowerWarning)
+    string? LastMessage, int TxPercent, int ReportedDbm, int AttenuationDb, double? EstimateDbm, double? MeterDbm, string? PowerWarning,
+    double? RadioWatts = null, bool MeterBelowFloor = false)
 {
+    /// <summary>What the radio's power and the attenuation should give, in watts, or null when the radio does not report its power.</summary>
+    public double? EstimateWatts => RadioWatts is { } w ? WsprPower.EstimateWatts(w, AttenuationDb) : null;
+
     /// <summary>A beacon that is off, with the settings shown.</summary>
     public static WsprBeaconView Off { get; } = new(false, null, string.Empty, null, null, null, 20, 37, 0, null, null, null);
 }

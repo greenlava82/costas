@@ -155,8 +155,41 @@ public class WsprViewModelTests
 
         vm.Apply(Snap(View(b)));
 
-        vm.PowerLine.Should().Be("Reports 37 dBm (5 W). Radio and attenuation give about 33.0 dBm. Meter reads about 40.0 dBm.");
+        vm.PowerLine.Should().Be("Radio and attenuation give about 33.0 dBm. Reports 37 dBm (5 W). Meter reads about 40.0 dBm.");
         vm.PowerWarning.Should().Contain("meter reads about 40 dBm");
+    }
+
+    [Fact]
+    public void PowerLine_RadioPowerAndAttenuation_ShowsTheSumInMilliwatts()
+    {
+        var vm = new WsprViewModel(new Commands(), () => Slot);
+        var b = WsprBeaconView.Off with { ReportedDbm = 17, AttenuationDb = -20, EstimateDbm = 17.0, RadioWatts = 5, MeterBelowFloor = true };
+
+        vm.Apply(Snap(View(b)));
+
+        vm.PowerLine.Should().Be("Radio 5 W − 20 dB ≈ 50 mW (17.0 dBm). Reports 17 dBm (50 mW). Meter can't read below 5 W; using the radio setting and attenuation.");
+    }
+
+    [Fact]
+    public void PowerLine_NoAttenuation_ShowsRadioPowerAlone()
+    {
+        var vm = new WsprViewModel(new Commands(), () => Slot);
+        var b = WsprBeaconView.Off with { ReportedDbm = 37, AttenuationDb = 0, EstimateDbm = 37.0, RadioWatts = 5 };
+
+        vm.Apply(Snap(View(b)));
+
+        vm.PowerLine.Should().Be("Radio 5 W (37.0 dBm). Reports 37 dBm (5 W).");
+    }
+
+    [Fact]
+    public void PowerLine_ThirtyDbDown_IsFiveMilliwatts()
+    {
+        var vm = new WsprViewModel(new Commands(), () => Slot);
+        var b = WsprBeaconView.Off with { ReportedDbm = 7, AttenuationDb = -30, EstimateDbm = 7.0, RadioWatts = 5 };
+
+        vm.Apply(Snap(View(b)));
+
+        vm.PowerLine.Should().StartWith("Radio 5 W − 30 dB ≈ 5 mW (7.0 dBm). Reports 7 dBm (5 mW).");
     }
 
     [Fact]
@@ -296,7 +329,7 @@ public class WsprViewModelTests
         vm.AttenuationDb = -50;
         vm.PowerPercent = 0;
 
-        (c.Options.TxPercent, c.Options.AttenuationDb, c.Options.PowerPercent).Should().Be((100, -20, 1));
+        (c.Options.TxPercent, c.Options.AttenuationDb, c.Options.PowerPercent).Should().Be((100, -30, 1));
     }
 
     [Fact]

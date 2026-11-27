@@ -133,7 +133,7 @@ public class RemoteWsprTests
         w.Status.Should().Be("Next slot transmits.");
         w.NextSlotIn.Should().Be(57);
         w.PresenceLeft.Should().Be(270);
-        w.Power.Should().StartWith("Reports 37 dBm (5 W).");
+        w.Power.Should().Be("Radio and attenuation give about 37.0 dBm. Reports 37 dBm (5 W).");
         w.PowerWarning.Should().Be("The radio is set for about 33 dBm.");
         w.Decoder.Should().Be("1 heard in the last slot.");
         w.Upload.Should().Be("WSPRnet: 3 spots sent");

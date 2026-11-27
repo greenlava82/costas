@@ -584,4 +584,31 @@ public sealed class WsprBeaconSessionTests
         actual.Should().Equal(slots);
     }
 
+    [Fact]
+    public void BeaconView_MeterAtItsFloor_IsNotComparedWithTheReportedPower()
+    {
+        var r = new Rig();
+        r.Options = new WsprOptions { ReportedDbm = 17, AttenuationDb = -20 };
+        r.Session.RadioWatts = () => 5;
+
+        r.Session.SetTxMetersLive(new Ft8Client.Core.Transmit.TxMeterReading(0.1, 1.2, 5.0));
+        var b = r.Session.Snapshot.Wspr!.Beacon;
+
+        (b.EstimateDbm, b.EstimateWatts!.Value, b.MeterDbm, b.MeterBelowFloor, b.PowerWarning)
+            .Should().Be((17.0, 0.05, (double?)null, true, (string?)null), "the meter reads 5 W for anything from nothing to 5 W");
+    }
+
+    [Fact]
+    public void BeaconView_MeterAboveItsFloor_IsStillCompared()
+    {
+        var r = new Rig();
+        r.Options = new WsprOptions { ReportedDbm = 37, AttenuationDb = 0 };
+        r.Session.RadioWatts = () => 5;
+
+        r.Session.SetTxMetersLive(new Ft8Client.Core.Transmit.TxMeterReading(0.1, 1.2, 20.0));
+        var b = r.Session.Snapshot.Wspr!.Beacon;
+
+        b.MeterBelowFloor.Should().BeFalse();
+        b.PowerWarning.Should().Contain("meter reads about 43 dBm");
+    }
 }

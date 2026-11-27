@@ -25,7 +25,7 @@ public sealed class WsprOptions
     /// </summary>
     public int ReportedDbm { get; set; } = 37;
 
-    /// <summary>Audio attenuation in dB applied on top of the RF power setting, 0 to -20.</summary>
+    /// <summary>Audio attenuation in dB applied on top of the RF power setting, 0 to -30.</summary>
     public int AttenuationDb { get; set; }
 
     /// <summary>Percent of the radio's maximum power set while the beacon runs (at least 1 W), 1 to 100.</summary>

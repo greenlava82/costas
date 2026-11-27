@@ -24,6 +24,14 @@ public static class WsprPower
     public static double EstimateDbm(double watts, double attenuationDb) =>
         watts > 0 ? 10 * Math.Log10(watts * 1000) + attenuationDb : double.NegativeInfinity;
 
+    /// <summary>
+    /// The same estimate in watts: <c>watts × 10^(attenuation / 10)</c>, or 0 when the radio has no power set. Advice only.
+    /// </summary>
+    public static double EstimateWatts(double watts, double attenuationDb) => watts > 0 ? watts * Math.Pow(10, attenuationDb / 10) : 0;
+
+    /// <summary>The deepest audio attenuation the beacon accepts, in dB (owner decision 2026-11-26: 5 W at -30 dB is 5 mW).</summary>
+    public const int MinAttenuationDb = -30;
+
     /// <summary>The estimate rounded to one decimal, for display.</summary>
     public static double Display(double dbm) => Math.Round(dbm, 1);
 

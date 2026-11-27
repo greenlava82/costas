@@ -14,6 +14,7 @@ using Ft8Client.App.Engine;
 using Ft8Client.Core;
 using Ft8Client.Core.Ranking;
 using Ft8Client.Core.Services;
+using Ft8Client.Core.Transmit;
 using Ft8Client.Core.Wspr;
 using Ft8Client.Data.Settings;
 
@@ -146,7 +147,7 @@ public sealed partial class WsprViewModel : ObservableObject
     [ObservableProperty]
     public partial int ReportedDbm { get; set; } = 37;
 
-    /// <summary>Audio attenuation in dB (0 to -20).</summary>
+    /// <summary>Audio attenuation in dB (0 to -30).</summary>
     [ObservableProperty]
     public partial decimal AttenuationDb { get; set; }
 
@@ -187,7 +188,7 @@ public sealed partial class WsprViewModel : ObservableObject
 
     partial void OnReportedDbmChanged(int value) => Save(o => o.ReportedDbm = value);
 
-    partial void OnAttenuationDbChanged(decimal value) => Save(o => o.AttenuationDb = (int)Math.Clamp(value, -20, 0));
+    partial void OnAttenuationDbChanged(decimal value) => Save(o => o.AttenuationDb = (int)Math.Clamp(value, WsprPower.MinAttenuationDb, 0));
 
     partial void OnPowerPercentChanged(decimal value) => Save(o => o.PowerPercent = (int)Math.Clamp(value, 1, 100));
 
@@ -285,18 +286,30 @@ public sealed partial class WsprViewModel : ObservableObject
             null => "Beacon on. Planning the next slot.",
         };
 
-    /// <summary>"Reports 37 dBm (5 W)." with the estimate and meter reading when there are any.</summary>
+    /// <summary>
+    /// "Radio 5 W − 20 dB ≈ 50 mW (17.0 dBm). Reports 17 dBm (50 mW)." The estimate leads when the radio reports its power;
+    /// the meter reading follows, or a note that the meter cannot read this low.
+    /// </summary>
     public static string PowerText(WsprBeaconView b)
     {
-        var watts = WsprPower.Watts(b.ReportedDbm);
-        var text = string.Create(CultureInfo.InvariantCulture, $"Reports {b.ReportedDbm} dBm ({FormatWatts(watts)}).");
-        if (b.EstimateDbm is { } e) text += string.Create(CultureInfo.InvariantCulture, $" Radio and attenuation give about {e:0.0} dBm.");
+        var text = string.Empty;
+        if (b.RadioWatts is { } rw && b.EstimateWatts is { } ew && b.EstimateDbm is { } ed)
+        {
+            var radio = TxMeterText.PreciseWattsText(rw);
+            text = b.AttenuationDb == 0
+                ? string.Create(CultureInfo.InvariantCulture, $"Radio {radio} ({ed:0.0} dBm). ")
+                : string.Create(CultureInfo.InvariantCulture, $"Radio {radio} − {-b.AttenuationDb} dB ≈ {TxMeterText.PreciseWattsText(ew)} ({ed:0.0} dBm). ");
+        }
+        else if (b.EstimateDbm is { } e)
+        {
+            text = string.Create(CultureInfo.InvariantCulture, $"Radio and attenuation give about {e:0.0} dBm. ");
+        }
+        text += string.Create(CultureInfo.InvariantCulture, $"Reports {b.ReportedDbm} dBm ({TxMeterText.PreciseWattsText(WsprPower.Watts(b.ReportedDbm))}).");
         if (b.MeterDbm is { } m) text += string.Create(CultureInfo.InvariantCulture, $" Meter reads about {m:0.0} dBm.");
+        else if (b.MeterBelowFloor)
+            text += string.Create(CultureInfo.InvariantCulture, $" Meter can't read below {TxMeterCheck.MeterFloorWatts:0} W; using the radio setting and attenuation.");
         return text;
     }
-
-    private static string FormatWatts(double w) =>
-        w >= 1 ? string.Create(CultureInfo.InvariantCulture, $"{w:0.#} W") : string.Create(CultureInfo.InvariantCulture, $"{w * 1000:0.#} mW");
 
     // The settings boxes show the saved values; they are not written back while loading.
     private void LoadOptions()
