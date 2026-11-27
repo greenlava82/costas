@@ -31,6 +31,7 @@ public sealed class RadioPowerService : IAsyncDisposable
     private readonly CancellationTokenSource _cts = new();
     private Task _loop = Task.CompletedTask;
     private RigPower? _power;
+    private RigPower? _shown;
 
     /// <summary>Creates the service over whichever radio is open now.</summary>
     /// <param name="rig">The radio open now.</param>
@@ -45,10 +46,17 @@ public sealed class RadioPowerService : IAsyncDisposable
     public event Action? Changed;
 
     /// <summary>The power setting as last read, or null when the radio does not report it in watts.</summary>
-    public RigPower? Power => Volatile.Read(ref _power);
+    public RigPower? Power => Volatile.Read(ref _shown) ?? Volatile.Read(ref _power);
 
     /// <summary>False while transmitting.</summary>
     public bool CanChange => !_transmitting();
+
+    /// <summary>Shows <paramref name="power"/> as if the radio had reported it (layout tests, no radio).</summary>
+    internal void ShowForTests(RigPower power)
+    {
+        Volatile.Write(ref _shown, power);
+        Changed?.Invoke();
+    }
 
     /// <summary>Starts reading the power every few seconds.</summary>
     public void Start() => _loop = Task.Run(LoopAsync);

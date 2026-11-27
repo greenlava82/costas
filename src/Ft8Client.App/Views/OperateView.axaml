@@ -55,6 +55,29 @@
     <Style Selector="Border#ContactCard.idle StackPanel.report, Border#ContactCard.idle StackPanel#CallRow, Border#ContactCard.idle StackPanel#ContactButtons">
       <Setter Property="IsVisible" Value="False" />
     </Style>
+    <!-- The Radio row: a divider above it under the contact's buttons; on the folded idle line, a divider to its left. -->
+    <Style Selector="Border#RadioRow">
+      <Setter Property="BorderBrush" Value="{DynamicResource RowDividerBrush}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+      <Setter Property="Padding" Value="0,10,0,0" />
+    </Style>
+    <!-- Never wider than the contact's buttons above it (or 480 px): a longer row (a FlexRadio's amp and tuner) wraps
+         instead of squeezing the call on the left. -->
+    <Style Selector="Border#ContactCard:not(.idle) Border#RadioRow">
+      <Setter Property="MaxWidth" Value="{Binding #ActionRow.Bounds.Width, Converter={x:Static v:Converters.RadioRowWidth}}" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Border#ContactCard.idle Border#RadioRow">
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button#RadioMenu, Border#ContactCard.idle DockPanel#RadioFull">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Border#ContactCard.idle Button#RadioMenu">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
     <Style Selector="TextBlock.reportValue">
       <Setter Property="FontSize" Value="24" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -228,7 +251,7 @@
                                    Foreground="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).Transmitting, Converter={x:Static v:Converters.ProgressBrush}}" />
                     </StackPanel>
                   </Grid>
-                  <StackPanel Orientation="Horizontal" Spacing="8">
+                  <StackPanel x:Name="ActionRow" Orientation="Horizontal" Spacing="8">
                     <Button Content="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).CqText}"
                             Command="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).ToggleCqCommand}" MinWidth="80" />
                     <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).CqModifiers}"
@@ -267,6 +290,33 @@
                     <Button Content="Abandon (Esc)" Classes="critical" Command="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).AbandonCommand}" IsEnabled="{Binding Active}" />
                     </StackPanel>
                   </StackPanel>
+                  <!-- The radio's row (owner pick 2026-11-26): power, amp and tuner, Tune, transmit offset and Auto-select under the
+                       contact's buttons, so every control sits in this one panel. Off Operate the same controls are in the bottom bar. -->
+                  <Border x:Name="RadioRow">
+                    <Panel>
+                      <!-- A DockPanel, not a horizontal StackPanel, so the row's width limit reaches the controls and they wrap. -->
+                      <DockPanel x:Name="RadioFull">
+                        <TextBlock DockPanel.Dock="Left" Text="Radio" Classes="secondary" VerticalAlignment="Top" Margin="0,6,10,0" />
+                        <v:RadioControls x:Name="CardRadio" DataContext="{Binding $parent[Window].DataContext}" />
+                      </DockPanel>
+                      <!-- The folded idle line (small windows, no contact) has no room for the row: one button, the power on
+                           its face, opens the same controls. A contact unfolds the card and the full row is back. -->
+                      <Button x:Name="RadioMenu" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:MainViewModel"
+                              AutomationProperties.Name="Radio controls" VerticalAlignment="Center" Padding="8,5"
+                              ToolTip.Tip="Power, Tune, transmit offset and Auto-select.">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                          <TextBlock Text="Radio" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding PowerText}" Classes="num" FontWeight="SemiBold" VerticalAlignment="Center" IsVisible="{Binding HasPower}" />
+                          <TextBlock Text="▾" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <Button.Flyout>
+                          <Flyout Placement="BottomEdgeAlignedRight">
+                            <v:RadioControls x:Name="MenuRadio" MaxWidth="360" Margin="4" />
+                          </Flyout>
+                        </Button.Flyout>
+                      </Button>
+                    </Panel>
+                  </Border>
                 </StackPanel>
               </Border>
               <StackPanel x:Name="PanelWho">

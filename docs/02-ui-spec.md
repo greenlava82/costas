@@ -45,7 +45,8 @@ One window, minimum 1100 × 720, default 1440 × 900, remembers size and positio
 | Element | Behaviour |
 | --- | --- |
 | Status text | One plain line: "Not in a contact. Enter calls ZL2RPA, the top of the line." / "Transmitting to ZL2RPA." / "Waiting for ZL2RPA." / fault text in critical colour |
-| Tx offset | "Tx offset 1650 Hz · clear". Click opens a small flyout: automatic (default) or a manual value |
+| Radio controls | Power, amp and tuner, Tune, Tx offset and Auto-select (described in the rows below). Shown only on views other than Operate; on Operate the contact card's Radio row has them (owner pick 2026-11-26) |
+| Tx offset | "Tx 1650 Hz ▾" with the full "Tx offset 1650 Hz · clear" as its tooltip. Click opens a small flyout: automatic (default) or a manual value |
 | Call CQ | Starts calling CQ in the next slot of the chosen parity. Becomes "Stop CQ" while running. Shown only on views other than Operate; on Operate the contact card's on-air panel has it |
 | Tune | Owner request 2026-10-12: a toggle with a 10 s limit that starts the radio's own tuner when it has one. First it sends Hamlib's TUNE operation (`G TUNE`) after the radio and band-edge guards; if the radio accepts, the button reads "Stop tune" and the status line "The radio's antenna tuner is tuning." for 10 s (the radio runs its own cycle; Stop tune or Halt sends PTT off). If the radio has no TUNE operation or refuses it, a steady tone at the Tx offset (centred on where an FT8 signal sits) for up to 10 s (the Tune watchdog), PTT on at once, after the same radio, audio and band-edge guards as any transmission. Reads "Stop tune" while the tone is on. Disabled while CQ, a contact or another transmission is under way; a transmission the operator starts meanwhile replaces the tone |
 | Amp and tuner | Customer request 2026-11-18, FlexRadio only (`05-integrations.md` section 2a). Shown only while the FlexRadio at the address in Settings › Station › FlexRadio amp and tuner (or a radio set up as SmartSDR Slice A to H) reports a paired amplifier or tuner: a button reading "Amp: Standby  Tuner: Operate ▾" (each device as a label with a colon, its state in bold), drawn like the other bottom-bar buttons so it reads as the way into the controls (owner, 2026-11-18). Amp text in caution colour in operate, critical while the amplifier transmits or has a fault, normal otherwise. A click opens a flyout: the amplifier's name and state with **Operate** and **Standby**; the tuner's name and state (Operate, Bypass, Standby, Tuning) with **Operate**, **Standby**, **Bypass** and **In line**. Each button is enabled only when it would change something; all are disabled while anything is on the air, while the amplifier transmits and while the tuner tunes, and a refusal says why in one line. Nothing switches without a click |
@@ -138,7 +139,7 @@ Idle (no contact): caption "Not in a contact" (or "Calling CQ" with the subline 
 | Subline | Name from QRZ lookup (blank until it arrives) · country or state · distance |
 | On-air panel | A bordered panel on the right of the card that holds everything about the next transmission, described below |
 
-**On-air panel**: one row of readouts above one row of buttons.
+**On-air panel**: one row of readouts above one row of buttons, and under them the Radio row (owner pick 2026-11-26, "Rethink radio controls placement", option B).
 
 | Element | Content |
 | --- | --- |
@@ -149,6 +150,7 @@ Idle (no contact): caption "Not in a contact" (or "Calling CQ" with the subline 
 | Resend | Sends the current step again in my next slot |
 | Log now | Logs the contact as it stands. Enabled once both reports are exchanged |
 | Abandon (Esc) | Stops transmitting, ends the contact, logs nothing |
+| Radio row | Under a divider, "Radio" then the radio's settings, moved from the bottom bar: power ("50 W ▾", only when the radio reports it), the FlexRadio amp and tuner button (only when paired), Tune, "Tx 1650 Hz ▾" (adds "manual" or "busy" when they apply; the whole "Tx offset 1650 Hz · clear" line is the tooltip; the same flyout as before) and Auto-select. Each control behaves exactly as described under Bottom bar. The row is never wider than the button row above it (at least 480 px) and wraps instead. On the folded idle line (compact layout, no contact) it is replaced by one "Radio 50 W ▾" button whose flyout holds the same row. On views other than Operate the bottom bar shows the row instead, so one copy is on screen |
 
 **Conversation strip**: one box per step in a row, mine raised 12 px, theirs lowered 12 px. Above the boxes a progress track has one numbered marker per step: a tick on a filled accent marker once the step is done, a filled critical marker while it is on the air, an accent ring for the step being waited for, and a grey ring ahead. The track is accent up to the furthest step reached.
 
