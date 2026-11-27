@@ -52,7 +52,7 @@ Two banners can appear under the top bar:
 
 - **ON AIR** (red) while Costas is transmitting, with the message being sent and a **Halt (Esc)** button. Next to
   Halt are the radio's own meters, read over CAT twice a second: **PO** (the watts the radio's PO meter reads, which
-  can differ from the power setting in the bottom bar), an **ALC** bar with *OK* or *High*, and **SWR**. A high reading
+  can differ from the power setting on the contact card's Radio row), an **ALC** bar with *OK* or *High*, and **SWR**. A high reading
   turns yellow (SWR 2 or more, ALC high); hover for advice. A meter your radio does not report is left out, and power
   out needs Hamlib 4.6 or newer. With an instrument skin the faceplate shows the meters instead. Display only: the
   meters never stop or change a transmission.
@@ -364,25 +364,45 @@ big window there is no fold; the column comes back folded the next time the wind
 
 ![The folded side column](images/side-column-folded.png){ width="400" }
 
+## Radio controls
+
+The radio's own settings sit together on a **Radio** row at the foot of the contact card's on-air panel, under
+**Call CQ**, **Resend**, **Log now** and **Abandon**, so everything you click while operating is in one place. On
+the other views (Raw decodes, Reach, Log, Awards) the same controls are in the bottom bar instead, since the contact
+card is out of sight there. Only one copy is ever on screen.
+
+![The Radio row under the contact's buttons](images/radio-row.png){ width="572" }
+
+| Item | What it does |
+| --- | --- |
+| **50 W** | The radio's power setting, shown when the radio reports it over CAT. Click to type a new power and press **Use** (or ++enter++), or step it with **−5** and **+5**. Anything outside 1 W to the radio's maximum is refused; a radio with its own minimum (5 W on the FT-710) keeps it and Costas says so. Changes the setting only, never keys the radio, and not while a transmission is on the air. On the FT-710 it needs Hamlib 4.6 or newer, which the Windows installer includes. If the range is wrong for your radio (for example 1 to 200 W on a 100 W radio, so asking for 100 W gives 50 W), type the radio's top power in **Settings › Station › Radio's top power** |
+| **Amp: Standby  Tuner: Operate ▾** | FlexRadio only: shown when the radio reports a paired PowerGenius XL or TunerGenius XL, once its address is set in **Settings › Station › FlexRadio amp and tuner** ([how](settings.md#flexradio-amp-and-tuner)). Click to open its panel: **Operate** and **Standby** for the amplifier, and **Operate**, **Standby**, **Bypass** and **In line** for the tuner, as in SmartSDR. The label shows what the radio reports. Costas switches them only when you click, never while a transmission is on the air or the tuner is tuning, and never transmits to do it |
+| **Tune** | Starts your radio's own antenna tuner, as its TUNE button would. If the radio has no tuner Costas can start (or its tuner is switched off), Costas sends a steady tone at your transmit offset for up to 10 seconds instead, for an external tuner. Becomes **Stop tune** for up to 10 seconds; click it to stop. Available only when nothing else is being sent; calling a station or CQ stops the tone |
+| **Tx 1650 Hz ▾** | Your transmit audio offset, with *manual* when you set it and *busy* when another station is on it (hover for the whole line). Click to choose **Automatic (picks a clear spot)**, the default, or type a fixed value (200 to 2900 Hz) and press **Use** |
+| **Auto-select** | Goes back to Automatic, which picks a clear spot in the passband for you each time |
+
+On a small window with no contact, the contact card folds to one line and has no room for the row: a single
+**Radio 50 W ▾** button there opens the same controls. They come back as a row as soon as a contact starts.
+If the controls are wider than the buttons above them (a FlexRadio's amp and tuner), the row wraps onto a second line
+rather than squeezing the call.
+
+![Transmit offset flyout](images/tx-offset.png)
+
+The strip along the bottom is a waterfall of the passband with a red line at your transmit offset: click anywhere
+between 200 and 2900 Hz to move your offset there.
+
 ## Bottom bar
 
 | Item | What it does |
 | --- | --- |
 | Status text | One line: *Not in a contact. Enter calls NT2A, the top of the line.*, *Transmitting to F5RXL.*, *Waiting for F5RXL.*, or a fault in red |
-| **Tx offset 1650 Hz · clear** | Your transmit audio offset. Click to choose **Automatic (picks a clear spot)**, the default, or type a fixed value (200 to 2900 Hz) and press **Use** |
-| **Call CQ** | Starts calling CQ in the next slot. Becomes **Stop CQ** while running. ++ctrl+q++ |
-| **50 W** | The radio's power setting, shown when the radio reports it over CAT. Click to type a new power and press **Use** (or ++enter++), or step it with **−5** and **+5**. Anything outside 1 W to the radio's maximum is refused; a radio with its own minimum (5 W on the FT-710) keeps it and Costas says so. Changes the setting only, never keys the radio, and not while a transmission is on the air. On the FT-710 it needs Hamlib 4.6 or newer, which the Windows installer includes. If the range is wrong for your radio (for example 1 to 200 W on a 100 W radio, so asking for 100 W gives 50 W), type the radio's top power in **Settings › Station › Radio's top power** |
-| **Amp: Standby  Tuner: Operate ▾** | FlexRadio only: shown when the radio reports a paired PowerGenius XL or TunerGenius XL, once its address is set in **Settings › Station › FlexRadio amp and tuner** ([how](settings.md#flexradio-amp-and-tuner)). Click to open its panel: **Operate** and **Standby** for the amplifier, and **Operate**, **Standby**, **Bypass** and **In line** for the tuner, as in SmartSDR. The label shows what the radio reports. Costas switches them only when you click, never while a transmission is on the air or the tuner is tuning, and never transmits to do it |
-| **Tune** | Starts your radio's own antenna tuner, as its TUNE button would. If the radio has no tuner Costas can start (or its tuner is switched off), Costas sends a steady tone at your transmit offset for up to 10 seconds instead, for an external tuner. Becomes **Stop tune** for up to 10 seconds; click it to stop. Available only when nothing else is being sent; calling a station or CQ stops the tone |
+| **Call CQ** | Starts calling CQ in the next slot. Becomes **Stop CQ** while running. ++ctrl+q++. Shown away from Operate, where the contact card has it |
+| Radio controls | Power, amp and tuner, **Tune**, transmit offset and **Auto-select**, as described in [Radio controls](#radio-controls). Shown away from Operate, where the contact card's Radio row has them |
 | **Halt Tx** | Always available. Drops PTT at once and stops sequencing. ++esc++ does the same |
 | Slot progress | *Receiving* or *Transmitting*, seconds to the next slot, and a bar. Shown away from Operate, where the contact card has it. Hidden with an instrument skin, whose faceplate shows it |
 | Meter warning | Appears after a transmission whose SWR or ALC was high, for example *SWR 3.4 · ALC 70%*. Hover for advice. The live meters are in the red **ON AIR** bar at the top |
 | Indicators | **Radio**, **Audio**, **QRZ**, **eQSL**, **PSK Reporter**, **RBN**, **POTA**: a dot and a word each. Click to open Diagnostics |
 
-![Transmit offset flyout](images/tx-offset.png)
-
-The strip along the bottom is a waterfall of the passband with a red line at your transmit offset: click anywhere
-between 200 and 2900 Hz to move your offset there. **Auto-select** goes back to Automatic, which picks a clear spot in the passband for you each time.
 
 ### A bigger waterfall
 

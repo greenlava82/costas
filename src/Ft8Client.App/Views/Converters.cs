@@ -183,6 +183,15 @@ public static class Converters
     /// <summary>True when an int equals the parameter.</summary>
     public static readonly IValueConverter IntEquals = new IntEqualsConverter();
 
+    /// <summary>The narrowest the contact card's Radio row is held to: power, Tune, the offset and Auto-select on one line.</summary>
+    public const double RadioRowMinWidth = 480;
+
+    /// <summary>
+    /// The contact card's Radio row width limit: as wide as the contact's buttons above it, but never under
+    /// <see cref="RadioRowMinWidth"/>, so PSK and RTTY (fewer buttons) do not fold the row onto three lines.
+    /// </summary>
+    public static readonly IValueConverter RadioRowWidth = new FuncValueConverter<double, double>(w => Math.Max(w, RadioRowMinWidth));
+
     /// <summary>True when a string is not empty.</summary>
     public static readonly IValueConverter NotEmpty = new FuncValueConverter<string?, bool>(s => !string.IsNullOrEmpty(s));
 

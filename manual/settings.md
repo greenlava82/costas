@@ -95,12 +95,12 @@ command on, exactly as when you click in SmartSDR.
 
     ![Settings: FlexRadio amp and tuner, connected](images/settings-flex-amp-tuner.png)
 
-5. The bottom bar now has a button that reads **Amp: Standby  Tuner: Operate ▾** (or whatever they are set to). Click it
+5. The contact card's Radio row (the bottom bar on other views) now has a button that reads **Amp: Standby  Tuner: Operate ▾** (or whatever they are set to). Click it
    to open the panel:
     - **Operate** and **Standby** for the amplifier.
     - **Operate**, **Standby**, **Bypass** and **In line** for the tuner.
 
-    ![The amplifier and tuner panel, opened from the bottom bar](images/flex-amp-tuner-panel.png)
+    ![The amplifier and tuner panel, opened from the Radio row](images/flex-amp-tuner-panel.png)
 
 It works however the radio itself is set up in Station setup: **Kenwood › TS-2000** through SmartSDR CAT, **FlexRadio ›
 6xxx**, or the **SmartSDR Slice** models. With a SmartSDR Slice model the box can stay empty: Costas uses the address
