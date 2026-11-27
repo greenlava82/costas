@@ -45,6 +45,7 @@ public sealed partial class Session
     private string? _lastBeaconMessage;
     private string? _beaconPowerNote;
     private bool _beaconTransmitRefused;
+    private bool _transmitFirst; // set by Start beacon; the first slot that can transmit does
     private bool _hopping;
     private DateTime _hopMovedUtc;
     private Task _beaconTask = Task.CompletedTask;
@@ -100,6 +101,7 @@ public sealed partial class Session
             _presence.Start(now);
             _beaconPlannedSlot = null;
             _beaconTransmitRefused = false;
+            _transmitFirst = true;
             _lastBeaconMessage = null;
             _beaconPowerNote = null;
             _fault = null;
@@ -253,7 +255,7 @@ public sealed partial class Session
             {
                 if (!_beaconOn) return;
                 options = WsprSettings();
-                var facts = new WsprSlotFacts(true, false, _receiveOnlySlot == slotStartUtc, _beaconTransmitRefused, options.TxPercent);
+                var facts = new WsprSlotFacts(true, false, _receiveOnlySlot == slotStartUtc, _beaconTransmitRefused, options.TxPercent, _transmitFirst);
                 var decision = _beaconScheduler.Decide(slotStartUtc, facts);
                 // Hopping to a band the guards do not allow is not a fault: the beacon receives there and says so, and carries on.
                 if (decision.Transmit && HoppingLocked(options)
@@ -261,6 +263,8 @@ public sealed partial class Session
                     decision = WsprSlotDecision.Rx($"Receive only on {BandPlan.Display(_config.Band)}: {why}");
                 _nextDecision = decision;
                 _nextDecisionSlot = slotStartUtc;
+                // Started by the operator: the first slot that can transmit does. A receive-only slot (after a hop, or a band the guards refuse) leaves it for the next.
+                if (decision.Transmit) _transmitFirst = false;
                 if (decision.Transmit) message = _cycle?.Next();
                 guard = new TxGuardInput(_config.Band, _dialHz, ClockEstimate.Offset(_sntpOffset, null), _config.ClockBlockSeconds,
                     _services[ServiceNames.Radio].Health == ServiceHealth.Down ? _services[ServiceNames.Radio].Message : null, true);

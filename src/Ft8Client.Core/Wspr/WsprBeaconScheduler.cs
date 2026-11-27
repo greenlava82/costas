@@ -26,7 +26,8 @@ public sealed record WsprSlotDecision(bool Transmit, string Reason)
 /// <param name="FirstSlotAfterHop">The radio changed band just before this slot, so it is receive only (owner decision 2026-11-26).</param>
 /// <param name="TransmitRefused">A guard refused the last plan; the beacon is stopped.</param>
 /// <param name="Percent">The Tx percentage, 1 to 100.</param>
-public readonly record struct WsprSlotFacts(bool BeaconOn, bool PresenceExpired, bool FirstSlotAfterHop, bool TransmitRefused, int Percent);
+/// <param name="TransmitFirst">The operator just started the beacon: the first slot that can transmit does, whatever the duty cycle says (owner decision 2026-11-26).</param>
+public readonly record struct WsprSlotFacts(bool BeaconOn, bool PresenceExpired, bool FirstSlotAfterHop, bool TransmitRefused, int Percent, bool TransmitFirst = false);
 
 /// <summary>
 /// Decides, before each slot, whether the beacon transmits or receives: the duty cycle (<see cref="WsprTxSchedule"/>, WSJT-X's
@@ -42,6 +43,7 @@ public sealed class WsprBeaconScheduler(WsprTxSchedule schedule)
         if (facts.PresenceExpired) return WsprSlotDecision.Rx("No operator input");
         if (facts.TransmitRefused) return WsprSlotDecision.Rx("A transmit guard refused");
         if (facts.FirstSlotAfterHop) return WsprSlotDecision.Rx("First slot after a band change");
+        if (facts.TransmitFirst) return WsprSlotDecision.Tx;
         return schedule.IsTx(slotStartUtc, facts.Percent) ? WsprSlotDecision.Tx : WsprSlotDecision.Rx("Receive slot");
     }
 }

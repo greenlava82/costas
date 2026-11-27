@@ -219,6 +219,25 @@ public class WsprBeaconLogicTests
         new WsprBeaconScheduler(new WsprTxSchedule(new Random(1))).Decide(Slot(4, 0), On).Should().Be(WsprSlotDecision.Tx);
 
     [Fact]
+    public void Scheduler_TransmitFirst_TransmitsEvenWhereTheDutyCycleReceives()
+    {
+        var s = new WsprBeaconScheduler(new WsprTxSchedule(new Random(1)));
+        var rx = Enumerable.Range(0, 60).Select(i => Slot(8, 2 * i)).First(t => !s.Decide(t, On with { Percent = 1 }).Transmit);
+
+        s.Decide(rx, On with { Percent = 1, TransmitFirst = true }).Should().Be(WsprSlotDecision.Tx);
+    }
+
+    [Fact]
+    public void Scheduler_TransmitFirst_StillReceivesWhenARuleThatAlwaysWinsApplies()
+    {
+        var s = new WsprBeaconScheduler(new WsprTxSchedule(new Random(1)));
+        s.Decide(Slot(4, 0), On with { TransmitFirst = true, FirstSlotAfterHop = true }).Transmit.Should().BeFalse();
+        s.Decide(Slot(4, 0), On with { TransmitFirst = true, PresenceExpired = true }).Transmit.Should().BeFalse();
+        s.Decide(Slot(4, 0), On with { TransmitFirst = true, TransmitRefused = true }).Transmit.Should().BeFalse();
+        s.Decide(Slot(4, 0), On with { TransmitFirst = true, BeaconOn = false }).Transmit.Should().BeFalse();
+    }
+
+    [Fact]
     public void Decide_FollowsTheTable()
     {
         var table = Block(new WsprTxSchedule(new Random(9)), 8, 20);

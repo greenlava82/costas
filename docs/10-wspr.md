@@ -120,6 +120,8 @@ Status (W1, 2026-11-26): receive is built. WSPR is in the Mode menu (`ModeInfo.O
 
 Decisions taken while building without the owner, to be confirmed or changed:
 
+- **Owner decision 2026-11-26 · Start beacon transmits the next slot.** The first slot after Start beacon transmits whatever the Tx percentage says; the duty cycle applies from the slot after. The rules that always win still apply first (receive after a band hop, no operator input, a guard refusal), and a receive-only slot leaves the first transmission for the next slot.
+
 - **W1 · A WSPR clock mark after a switch.** The clock changes mode at a slot boundary, so `Session` ignores a WSPR mark when the session is no longer in WSPR (and the reverse). Switching from WSPR to a keyboard mode moves the clock to FT8 timing, since WSPR's 2-minute marks make no sense for PSK or RTTY transmit.
 - **W1 · Unresolved hashed calls** (`<...>`) are kept as spots with the call `<...>`, so the count and the signal show; they are not uploaded in W2.
 - **W1 · Stored spots** are kept 30 days unless waiting for upload; nothing calls the prune yet.

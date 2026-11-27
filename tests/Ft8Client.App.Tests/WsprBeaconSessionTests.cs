@@ -215,6 +215,20 @@ public sealed class WsprBeaconSessionTests
     }
 
     [Fact]
+    public async Task Beacon_LowPercent_StillTransmitsTheFirstSlotAfterStart_ThenFollowsTheDutyCycle()
+    {
+        var r = new Rig();
+        r.Options.TxPercent = 1;
+        (await r.Session.StartBeaconAsync()).Should().BeNull();
+
+        await r.RunUntilAsync(Slot(0).AddSeconds(116));
+        r.KeyDowns.Should().ContainSingle("Start beacon means the next slot transmits");
+
+        await r.RunUntilAsync(Slot(4).AddSeconds(116));
+        r.KeyDowns.Should().HaveCountLessThan(5, "after the first slot the 1 percent duty cycle applies");
+    }
+
+    [Fact]
     public async Task Beacon_TransmitSlot_IsNotRecordedForDecoding()
     {
         var r = new Rig();
@@ -624,7 +638,8 @@ public sealed class WsprBeaconSessionTests
         await r.RunUntilAsync(Slot(30).AddSeconds(10), stepMs: 500, activityEvery: TimeSpan.FromMinutes(2));
 
         var expected = new WsprTxSchedule(new Random(3));
-        var slots = Enumerable.Range(0, 30).Where(i => expected.IsTx(Slot(i), 20)).Select(Slot).ToList();
+        // Start beacon means the first slot transmits; every slot after it follows the table.
+        var slots = Enumerable.Range(0, 30).Where(i => i == 0 || expected.IsTx(Slot(i), 20)).Select(Slot).ToList();
         slots.Should().NotBeEmpty();
         var actual = r.KeyDowns.Select(d => Slot((int)((d - T0).TotalMinutes / 2))).ToList();
         actual.Should().Equal(slots);
