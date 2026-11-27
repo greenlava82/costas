@@ -129,19 +129,6 @@ public class WsprHopSessionTests
         r.NotesSeen.Should().Contain(n => n.StartsWith("Receive only on 20 m", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public async Task Beacon_Hopping_HopsAreNotOperatorInput_PresenceStillStopsIt()
-    {
-        var o = new WsprOptions { TxPercent = 100, HopBands = ["20m", "40m"], HopDwellSlots = 1 };
-        var r = HoppingRig(o, watchdogMinutes: 2);
-        await r.Session.StartBeaconAsync();
-
-        await r.RunUntilAsync(Slot(5).AddSeconds(10), stepMs: 250);
-
-        r.Session.BeaconOn.Should().BeFalse();
-        r.Session.Snapshot.Fault.Should().Be("Beacon stopped: no operator input for 2 minutes (Tx watchdog).");
-        r.Hops.Should().HaveCountLessThan(4, "it stopped hopping when it stopped");
-    }
 
     [Fact]
     public async Task Beacon_HopFails_StopsWithTheReason()

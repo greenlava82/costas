@@ -139,7 +139,14 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
         _tx.Started += OnTxStarted;
         _tx.Ended += (_, _) =>
         {
-            lock (_gate) _txMetersLive = null;
+            bool oneShotDone;
+            lock (_gate)
+            {
+                _txMetersLive = null;
+                oneShotDone = _beaconOn && BeaconOneShot && _beaconTxPlanned;
+            }
+            // The beacon is one-shot: its transmission is over, so it stops (and puts the radio's power back) with nothing on the air.
+            if (oneShotDone) StopBeacon(null);
             Publish();
         };
         _tx.Fault += OnTxFault;

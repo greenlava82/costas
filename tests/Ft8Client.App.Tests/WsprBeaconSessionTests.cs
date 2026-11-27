@@ -60,6 +60,7 @@ public sealed class WsprBeaconSessionTests
             Session.WsprSettings = () => Options;
             Session.BeaconPower = Power;
             Session.SetWsprRandom(new Random(3));
+            Session.BeaconOneShot = false; // most of these tests run the continuous engine; the one-shot ones set it back
             _bandLog.Add((DateTime.MinValue, Session.Config.Band));
             Session.Changed += s =>
             {
@@ -226,6 +227,25 @@ public sealed class WsprBeaconSessionTests
 
         await r.RunUntilAsync(Slot(4).AddSeconds(116));
         r.KeyDowns.Should().HaveCountLessThan(5, "after the first slot the 1 percent duty cycle applies");
+    }
+
+    [Fact]
+    public async Task Beacon_OneShot_SendsOneTransmissionThenStopsAndRestoresThePower()
+    {
+        var r = new Rig();
+        r.Session.BeaconOneShot = true;
+        (await r.Session.StartBeaconAsync()).Should().BeNull();
+        r.Power.Applied.Should().Equal(5);
+
+        await r.RunUntilAsync(Slot(0).AddSeconds(116));
+
+        r.KeyDowns.Should().ContainSingle();
+        r.Session.BeaconOn.Should().BeFalse("the transmission it was started for is over");
+        r.Session.Snapshot.Fault.Should().BeNull("finishing is not a fault");
+        r.Power.Restored.Should().BeGreaterThan(0);
+
+        await r.RunUntilAsync(Slot(4).AddSeconds(116));
+        r.KeyDowns.Should().ContainSingle("nothing more goes out unless the operator starts it again");
     }
 
     [Fact]
@@ -531,35 +551,7 @@ public sealed class WsprBeaconSessionTests
 
     // --- operator presence
 
-    [Fact]
-    public async Task Presence_NoInputForSixMinutes_StopsAfterTheCurrentTransmission()
-    {
-        var r = new Rig(watchdogMinutes: 6);
-        await r.Session.StartBeaconAsync();
 
-        await r.RunUntilAsync(Slot(4).AddSeconds(10));
-
-        r.Session.BeaconOn.Should().BeFalse();
-        r.Session.Snapshot.Fault.Should().Be("Beacon stopped: no operator input for 6 minutes (Tx watchdog).");
-        r.KeyDowns.Should().HaveCount(3, "slots 0, 1 and 2 went out; the one at 6 minutes was not planned");
-        r.KeyUps.Should().HaveCount(3, "no transmission was cut off");
-        r.Radio.Ptt.Should().BeFalse();
-        r.Power.Restored.Should().Be(1);
-    }
-
-    [Fact]
-    public async Task Presence_ShortWatchdog_NeverLessThanTwoMinutes()
-    {
-        var r = new Rig(watchdogMinutes: 1);
-        await r.Session.StartBeaconAsync();
-
-        await r.RunUntilAsync(Slot(3).AddSeconds(10));
-
-        r.Session.BeaconOn.Should().BeFalse();
-        r.Session.Snapshot.Fault.Should().Be("Beacon stopped: no operator input for 2 minutes (Tx watchdog).");
-        r.KeyDowns.Should().HaveCount(1, "the first transmission finished, and the second slot was not planned");
-        r.KeyUps.Should().HaveCount(1);
-    }
 
     [Fact]
     public async Task Presence_ShortWatchdogLimit_IsOneSlotNotOneMinute()
@@ -572,61 +564,8 @@ public sealed class WsprBeaconSessionTests
         r.Session.BeaconOn.Should().BeTrue("100 seconds into the run is inside the 2 minute floor");
     }
 
-    [Fact]
-    public async Task Presence_OperatorKeepsGivingInput_KeepsItRunning()
-    {
-        var r = new Rig(watchdogMinutes: 6);
-        await r.Session.StartBeaconAsync();
 
-        await r.RunUntilAsync(Slot(14).AddSeconds(10), stepMs: 250, activityEvery: TimeSpan.FromMinutes(3));
 
-        r.Session.BeaconOn.Should().BeTrue();
-        r.KeyDowns.Should().HaveCount(15, "a transmission in every one of 15 slots at 100 %");
-    }
-
-    [Fact]
-    public async Task Presence_PhoneImHere_CountsAsInput()
-    {
-        var r = new Rig(watchdogMinutes: 6);
-        await r.Session.StartBeaconAsync();
-        for (var i = 0; i < 6; i++)
-        {
-            await r.RunUntilAsync(r.Clock.UtcNow + TimeSpan.FromMinutes(3), stepMs: 250);
-            r.Session.NoteWsprPresence();
-        }
-
-        r.Session.BeaconOn.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Presence_BeaconsOwnTransmissionsAndDecodes_DoNotCount()
-    {
-        var r = new Rig(watchdogMinutes: 2);
-        await r.Session.StartBeaconAsync();
-
-        await r.RunUntilAsync(Slot(3).AddSeconds(10), stepMs: 250);
-
-        r.Session.BeaconOn.Should().BeFalse("it transmitted and decoded all along and still stopped");
-    }
-
-    [Fact]
-    public async Task Presence_ExpiresBetweenPlanAndSlotStart_PendingTransmissionDroppedBeforePtt()
-    {
-        var r = new Rig(watchdogMinutes: 2);
-        await r.Session.StartBeaconAsync(); // 10 s before slot 0, so the 2 minute limit would end 110 s into it
-        await r.RunUntilAsync(Slot(0).AddSeconds(-4), stepMs: 250);
-        r.Session.Activity(); // input 4 s before slot 0: the limit now ends 116 s into it, after slot 1 is planned (114 s) and before it starts (120 s)
-
-        await r.RunUntilAsync(Slot(1).AddSeconds(5), stepMs: 250);
-
-        r.KeyDowns.Should().HaveCount(1, "only slot 0 went out");
-        r.Tx.Pending.Should().BeNull();
-        r.Session.BeaconOn.Should().BeFalse();
-        r.Session.Snapshot.Fault.Should().Be("Beacon stopped: no operator input for 2 minutes (Tx watchdog).");
-        r.Radio.Ptt.Should().BeFalse();
-    }
-
-    // --- the duty cycle in the session
 
     [Fact]
     public async Task Beacon_TwentyPercent_TransmitsInTheSlotsTheTableChooses()

@@ -617,7 +617,6 @@ function renderWspr(s) {
   // The beacon's controls. Starting is an operator action; the settings (Tx share, power) are shown and changed at the desk.
   const btns = el("div", "btns");
   btns.append(button(w.on ? "Stop beacon" : "Start beacon", w.on ? "" : "go", () => cmd(w.on ? "wsprStop" : "wsprStart")));
-  if (w.on) btns.append(button("I'm here", "", () => cmd("wsprHere")));
   box.append(btns);
 
   // What was heard, at a glance.

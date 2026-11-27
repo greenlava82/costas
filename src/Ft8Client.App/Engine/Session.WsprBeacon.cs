@@ -46,6 +46,13 @@ public sealed partial class Session
     private string? _beaconPowerNote;
     private bool _beaconTransmitRefused;
     private bool _transmitFirst; // set by Start beacon; the first slot that can transmit does
+    private bool _beaconTxPlanned; // a transmission is installed; the beacon ends when it does
+
+    /// <summary>
+    /// True (the default): the beacon ends after the transmission it was started for (owner decision 2026-11-26). The continuous
+    /// engine (duty cycle, hopping) stays behind this switch; nothing in the app turns it off, only tests.
+    /// </summary>
+    public bool BeaconOneShot { get; set; } = true;
     private bool _hopping;
     private DateTime _hopMovedUtc;
     private Task _beaconTask = Task.CompletedTask;
@@ -102,6 +109,7 @@ public sealed partial class Session
             _beaconPlannedSlot = null;
             _beaconTransmitRefused = false;
             _transmitFirst = true;
+            _beaconTxPlanned = false;
             _lastBeaconMessage = null;
             _beaconPowerNote = null;
             _fault = null;
@@ -199,8 +207,10 @@ public sealed partial class Session
     // The presence time: the Tx watchdog minutes, with a remote device's cap, never under one slot. Under _gate.
     private int PresenceMinutes => CappedContact().WatchdogMinutes;
 
+    // Owner decision 2026-11-26: the beacon is one-shot (it ends after one transmission), so there is no operator-presence timeout;
+    // a timeout that ran out between Start and the end of the transmission only cut the transmission off.
     // Under _gate: true when the beacon is on and the operator has been away too long.
-    private bool PresenceExpiredLocked(DateTime now) => _beaconOn && _presence.Expired(now, PresenceMinutes);
+    private bool PresenceExpiredLocked(DateTime now) => false;
 
     // At the start of a slot: the operator left since the slot was planned, so a pending transmission is dropped before PTT.
     private void CheckPresenceAtStart()
@@ -345,7 +355,11 @@ public sealed partial class Session
             StopBeacon(refusal is null ? "Beacon stopped: transmitting was halted." : $"Beacon stopped. {refusal}");
             return;
         }
-        lock (_gate) _lastBeaconMessage = message.Text;
+        lock (_gate)
+        {
+            _lastBeaconMessage = message.Text;
+            _beaconTxPlanned = true;
+        }
     }
 
     // The beacon's part of the WSPR screen, under _gate.
@@ -363,7 +377,7 @@ public sealed partial class Session
         else if (meter is { } m && Math.Abs(m - options.ReportedDbm) > 3)
             warning = $"The radio's meter reads about {WsprPower.Display(m)} dBm, but the message says {options.ReportedDbm} dBm.";
         return new WsprBeaconView(_beaconOn, nextTx, _nextDecisionSlot == nextSlot ? _nextDecision?.Reason ?? string.Empty : string.Empty,
-            _beaconOn && _presence.LastInputUtc is { } last ? last + WsprPresence.Limit(PresenceMinutes) : null,
+            null,
             _beaconPowerNote, _lastBeaconMessage, options.TxPercent, options.ReportedDbm, options.AttenuationDb,
             estimate is null ? null : WsprPower.Display(estimate.Value), meter is null ? null : WsprPower.Display(meter.Value), warning);
     }

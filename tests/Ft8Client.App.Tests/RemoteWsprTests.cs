@@ -204,6 +204,6 @@ public class RemoteWsprTests
 
         // The card sits in its own pane, which the phone's Operate tab lists; in the operate pane it was never shown on a phone.
         html.Should().Contain("data-pane=\"wspr\"").And.Contain("operate: [\"dash\", \"wspr\"]");
-        html.Should().Contain("id=\"wspr\"").And.Contain("\"wsprStart\"").And.Contain("\"wsprStop\"").And.Contain("\"wsprHere\"");
+        html.Should().Contain("id=\"wspr\"").And.Contain("\"wsprStart\"").And.Contain("\"wsprStop\"");
     }
 }

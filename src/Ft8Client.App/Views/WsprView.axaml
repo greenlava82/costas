@@ -11,10 +11,8 @@
       <StackPanel Spacing="10">
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-            <Button Content="I'm here" Command="{Binding ImHereCommand}" IsVisible="{Binding BeaconOn}"
-                    ToolTip.Tip="Tell the beacon you are at the radio. Any key or click does the same; the beacon stops if you give no input for the Tx watchdog time." />
             <Button Content="{Binding StartStopText}" Command="{Binding StartStopCommand}" MinWidth="130" FontWeight="SemiBold"
-                    ToolTip.Tip="Start or stop the WSPR beacon. It never starts by itself, and it stops if you leave." />
+                    ToolTip.Tip="Start or stop the WSPR beacon. It never starts by itself: it sends one transmission in the next slot and then stops." />
           </StackPanel>
           <StackPanel Spacing="2">
             <TextBlock Text="{Binding Status}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
