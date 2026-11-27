@@ -89,8 +89,10 @@ public sealed class RawLineViewModel
         Foreground = highlight?.Foreground;
         var d = l.Decode;
         var utc = DateTime.SpecifyKind(d.SlotStartUtc, DateTimeKind.Utc);
-        Utc = utc.ToString("HHmmss", CultureInfo.InvariantCulture);
-        Local = TimeZoneInfo.ConvertTimeFromUtc(utc, localZone ?? TimeZoneInfo.Local).ToString("HHmmss", CultureInfo.InvariantCulture);
+        // FT8 and FT4 show the slot as WSJT-X does (184615); PSK and RTTY lines have no slot, so a clock time (18:46:15).
+        var format = keyboard ? "HH:mm:ss" : "HHmmss";
+        Utc = utc.ToString(format, CultureInfo.InvariantCulture);
+        Local = TimeZoneInfo.ConvertTimeFromUtc(utc, localZone ?? TimeZoneInfo.Local).ToString(format, CultureInfo.InvariantCulture);
         Db = l.Transmitted ? "Tx" : d.Snr.ToString("+0;-0;0", CultureInfo.InvariantCulture);
         Dt = l.Transmitted || keyboard ? string.Empty : d.Dt.ToString("0.0", CultureInfo.InvariantCulture);
         Hz = d.OffsetHz.ToString(CultureInfo.InvariantCulture);

@@ -19,8 +19,13 @@ namespace Ft8Client.App.Engine;
 /// <param name="ToMe">Addressed to my call.</param>
 /// <param name="Transmitted">A line for my own transmission.</param>
 /// <param name="Mode">The mode it was heard or sent in; Raw decodes shows only the current mode's lines.</param>
-public sealed record RawDecodeLine(Decode Decode, ParsedMessage Message, string? Country, bool ToMe, bool Transmitted = false, Mode Mode = Mode.Ft8)
+/// <param name="TextCq">
+/// PSK and RTTY: the line calls CQ (or asks QRZ?) as free text reads it. Their text is not an FT8 message, so
+/// <see cref="ParsedMessage.Kind"/> never says CQ for it.
+/// </param>
+public sealed record RawDecodeLine(Decode Decode, ParsedMessage Message, string? Country, bool ToMe, bool Transmitted = false, Mode Mode = Mode.Ft8,
+    bool TextCq = false)
 {
     /// <summary>True for CQ.</summary>
-    public bool IsCq => Message.Kind == MessageKind.Cq;
+    public bool IsCq => Message.Kind == MessageKind.Cq || TextCq;
 }

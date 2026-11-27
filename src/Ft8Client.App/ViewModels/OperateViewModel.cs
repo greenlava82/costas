@@ -244,8 +244,14 @@ public sealed partial class OperateViewModel : ObservableObject
     /// <summary>True when the contact card folds to one line: compact layout, no contact.</summary>
     public bool FoldIdleCard => Compact && Panel.IsIdle;
 
-    /// <summary>True when the full band summary card shows under the idle contact card: roomy layout, no contact.</summary>
-    public bool ShowSummaryCard => !Compact && !InContact;
+    /// <summary>
+    /// True when the full band summary card shows under the idle contact card: roomy layout, no contact, FT8 or FT4. In
+    /// PSK and RTTY it folds to the one-line strip, so the conversation box and the station text have the room.
+    /// </summary>
+    public bool ShowSummaryCard => !Compact && !InContact && !Keyboard.Visible;
+
+    /// <summary>The Doing now column's heading: in PSK and RTTY it holds what each station is sending.</summary>
+    public string DoingNowHeader => Keyboard.Visible ? "Sending now" : "Doing now";
 
     /// <summary>True when the side column shows as one card with tabs: compact layout, not folded.</summary>
     public bool ShowSideTabs => Compact && !SideCollapsed;
@@ -267,10 +273,11 @@ public sealed partial class OperateViewModel : ObservableObject
     public partial bool SideCollapsed { get; set; }
 
     /// <summary>
-    /// True when the one-line band strip shows under the idle contact card: compact layout, no contact, and the full
-    /// band summary is not already on screen in the side column's Band tab (nothing is shown twice).
+    /// True when the one-line band strip shows under the idle contact card, with no contact: in the compact layout when
+    /// the full band summary is not already on screen in the side column's Band tab (nothing is shown twice), and in the
+    /// roomy layout in PSK and RTTY, where it takes the place of the summary card.
     /// </summary>
-    public bool ShowStrip => Compact && !InContact && Summary is not null && (SideCollapsed || SideTab != BandTab);
+    public bool ShowStrip => !InContact && Summary is not null && (Compact ? SideCollapsed || SideTab != BandTab : Keyboard.Visible);
 
     /// <summary>The block link in a station's details: "Block on 20 m".</summary>
     [ObservableProperty]
@@ -483,6 +490,13 @@ public sealed partial class OperateViewModel : ObservableObject
     [ObservableProperty]
     public partial string SlotLabel { get; set; } = "Receiving";
 
+    /// <summary>
+    /// True when the slot readout on the contact card shows: always in FT8 and FT4; in PSK and RTTY only while sending
+    /// or with text typed ahead (see <see cref="KeyboardPanelViewModel.ReadoutShown"/>).
+    /// </summary>
+    [ObservableProperty]
+    public partial bool SlotReadoutShown { get; set; } = true;
+
     /// <summary>Seconds left in this slot: "9 s".</summary>
     [ObservableProperty]
     public partial string SlotLeft { get; set; } = string.Empty;
@@ -628,6 +642,7 @@ public sealed partial class OperateViewModel : ObservableObject
         OnPropertyChanged(nameof(InContact));
         OnPropertyChanged(nameof(ShowStrip));
         OnPropertyChanged(nameof(ShowSummaryCard));
+        OnPropertyChanged(nameof(DoingNowHeader));
         OnPropertyChanged(nameof(FoldIdleCard));
         RailBand = s.Summary is null ? "Band" : $"{BandPlan.Display(s.Summary.Band)} · {s.Summary.YouNeed} you need";
         BlockText = $"Block on {BandPlan.Display(s.Band)}";
@@ -689,8 +704,10 @@ public sealed partial class OperateViewModel : ObservableObject
             SlotLeft = Keyboard.ReadoutCount;
             SlotLabel = Keyboard.ReadoutLabel;
             SlotUnit = Keyboard.ReadoutUnit;
+            SlotReadoutShown = Keyboard.ReadoutShown;
             return;
         }
+        SlotReadoutShown = true;
         SlotUnit = "left";
         // Count down to the slot boundary, and call the whole slot a transmission went out in the transmit slot.
         var len = ModeInfo.SlotLength(mode);

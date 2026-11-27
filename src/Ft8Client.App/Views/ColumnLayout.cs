@@ -134,6 +134,23 @@ public sealed class ColumnLayout
         _widths[column] = Math.Round(shown[column]);
     }
 
+    private int[] _hidden = [];
+
+    /// <summary>The columns hidden whatever the window width (PSK and RTTY hide the FT8-only ones).</summary>
+    public IReadOnlyList<int> Hidden => _hidden;
+
+    /// <summary>
+    /// Hides <paramref name="columns"/> (width 0 in <see cref="Fit"/>) until called again; an empty list shows them all.
+    /// Their stored widths are kept, so they come back as they were, and the room they free goes to the star column.
+    /// </summary>
+    public void Hide(IReadOnlyList<int> columns)
+    {
+        int[] hidden = [.. columns.Where(c => c >= 0 && c < _widths.Length).Distinct().Order()];
+        if (hidden.SequenceEqual(_hidden)) return;
+        _hidden = hidden;
+        Changed?.Invoke();
+    }
+
     private (int Column, double Min)[] _shrink = [];
     private int[] _drop = [];
 
@@ -158,6 +175,8 @@ public sealed class ColumnLayout
     public double[] Fit(double tableWidth)
     {
         double[] w = [.. _widths];
+        foreach (var column in _hidden)
+            if (IsFixed(column)) w[column] = 0;
         if (tableWidth <= 0) return w;
         double Need() => w.Where(x => !double.IsNaN(x)).Sum();
         var narrowed = false;
@@ -165,7 +184,7 @@ public sealed class ColumnLayout
         {
             if (Need() - tableWidth <= 0) break;
             narrowed = true;
-            if (IsFixed(column)) w[column] = Math.Max(Math.Min(min, w[column]), w[column] - Math.Ceiling(Need() - tableWidth));
+            if (IsFixed(column) && !_hidden.Contains(column)) w[column] = Math.Max(Math.Min(min, w[column]), w[column] - Math.Ceiling(Need() - tableWidth));
         }
         if (!narrowed) return Grow(w, tableWidth);
         foreach (var column in _drop)
@@ -178,7 +197,7 @@ public sealed class ColumnLayout
         {
             var spare = Math.Floor(tableWidth - Need());
             if (spare <= 0) break;
-            if (IsFixed(column)) w[column] = Math.Min(_widths[column], w[column] + spare);
+            if (IsFixed(column) && !_hidden.Contains(column)) w[column] = Math.Min(_widths[column], w[column] + spare);
         }
         return w;
     }
@@ -211,7 +230,7 @@ public sealed class ColumnLayout
     public void MoveEdge(int left, double delta, double tableWidth = double.PositiveInfinity)
     {
         var right = left + 1;
-        if (right >= _widths.Length) return;
+        if (right >= _widths.Length || _hidden.Contains(left) || _hidden.Contains(right)) return;
         var leftFixed = IsFixed(left);
         var rightFixed = IsFixed(right);
         if (leftFixed && rightFixed)

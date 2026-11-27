@@ -325,4 +325,35 @@ public class DatabaseAndSettingsTests
         store.Load().Window.WaterfallCallsigns.Should().BeFalse();
         store.Load().Window.WaterfallHeight.Should().Be(200);
     }
+
+    [Fact]
+    public void SettingsStore_OldFileWithoutKeyboardWaterfall_PskStartsTallFt8Kept()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");
+        File.WriteAllText(path, """{ "schema": 2, "profiles": [ { "id": "home", "callsign": "W7LIT" } ], "window": { "waterfallHeight": 120 } }""");
+        var store = new SettingsStore(path);
+
+        var s = store.Load();
+
+        s.Window.WaterfallHeightFor(keyboard: false).Should().Be(120);
+        s.Window.WaterfallHeightFor(keyboard: true).Should().Be(WindowOptions.DefaultKeyboardWaterfallHeight);
+    }
+
+    [Fact]
+    public void WindowOptions_SetWaterfallHeight_EachKindKeepsItsOwn()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("ft8set").FullName, "settings.json");
+        var store = new SettingsStore(path);
+        var s = store.Load();
+
+        s.Window.SetWaterfallHeight(keyboard: true, 300);
+        s.Window.SetWaterfallHeight(keyboard: false, 90);
+        store.Save(s);
+
+        var back = store.Load().Window;
+        back.KeyboardWaterfallHeight.Should().Be(300);
+        back.WaterfallHeight.Should().Be(90);
+        back.WaterfallHeightFor(keyboard: true).Should().Be(300);
+        back.WaterfallHeightFor(keyboard: false).Should().Be(90);
+    }
 }

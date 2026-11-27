@@ -98,6 +98,9 @@ public sealed partial class RawDecodesViewModel(Action<string> call) : Observabl
     private bool _keyboard;
     private string? _band;
 
+    /// <summary>The DT column's heading: empty in PSK and RTTY, whose lines have no time offset.</summary>
+    public string DtHeader => _keyboard ? string.Empty : "DT";
+
     /// <summary>Applies new decodes.</summary>
     /// <param name="lines">Every raw line, oldest first.</param>
     /// <param name="rank">The station list, for each sender's need and distance.</param>
@@ -109,7 +112,11 @@ public sealed partial class RawDecodesViewModel(Action<string> call) : Observabl
         var partnerChanged = !string.Equals(partner, _partner, StringComparison.Ordinal);
         _band = band;
         if (!partnerChanged && keyboard == _keyboard && lines.Count == _all.Count && (lines.Count == 0 || ReferenceEquals(lines[^1], _all[^1]))) return;
-        _keyboard = keyboard;
+        if (keyboard != _keyboard)
+        {
+            _keyboard = keyboard;
+            OnPropertyChanged(nameof(DtHeader));
+        }
         _all = lines;
         PruneCleared();
         if (rank is not null) _stations = ByCall(rank);

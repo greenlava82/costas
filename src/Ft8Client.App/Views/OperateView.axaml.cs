@@ -60,6 +60,7 @@ public partial class OperateView : UserControl
             };
             FollowWindowSize();
             Relayout(Bounds.Width);
+            HideFt8Columns();
             // Follow new text only while the operator is at the end; scrolled back to read, the box stays put.
             vm.Keyboard.Conversation.CollectionChanged += (_, _) =>
             {
@@ -69,6 +70,7 @@ public partial class OperateView : UserControl
             vm.Keyboard.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(KeyboardPanelViewModel.BlockedMacro)) ShowBlocked(vm.Keyboard.BlockedMacro);
+                if (e.PropertyName == nameof(KeyboardPanelViewModel.Visible)) HideFt8Columns();
                 // The arriving line grows character by character: keep it in view the same way.
                 if (e.PropertyName == nameof(KeyboardPanelViewModel.LiveText))
                 {
@@ -247,7 +249,23 @@ public partial class OperateView : UserControl
         // Watching the same way: Where and Why widen into Doing now's spare room.
         if (name == "Watching") layout.AutoSize(star: 5, grow: [1, 3]);
         _columns[name] = layout;
+        HideFt8Columns();
         return layout;
+    }
+
+    /// <summary>Next in line and Repeats in PSK and RTTY: Signal and Chance hide (FT8 slots and PSK Reporter).</summary>
+    internal static readonly int[] KeyboardHiddenCalls = [8, 9];
+
+    /// <summary>Watching in PSK and RTTY: Signal hides.</summary>
+    internal static readonly int[] KeyboardHiddenWatching = [4];
+
+    // PSK and RTTY: Signal (a per-slot history) and Chance (from PSK Reporter reports of FT8) say nothing there; hiding
+    // them gives Doing now, the station's own text, their room. FT8 and FT4 show them again with their widths as before.
+    private void HideFt8Columns()
+    {
+        var keyboard = Vm?.Keyboard.Visible == true;
+        if (_columns.TryGetValue("Calls", out var calls)) calls.Hide(keyboard ? KeyboardHiddenCalls : []);
+        if (_columns.TryGetValue("Watching", out var watching)) watching.Hide(keyboard ? KeyboardHiddenWatching : []);
     }
 
     internal void SaveColumns(string name)
@@ -412,6 +430,7 @@ public partial class OperateView : UserControl
         var calling = CallingYou.IsVisible ? CallingYou.Bounds.Height + CallingYou.Margin.Bottom : 0;
         var room = Math.Max(120, LeftPane.Bounds.Height - calling - listRoom);
         PinnedScroll.MaxHeight = room;
+        FitConversation(room);
 
         // Hidden (a contact, or the compact layout): leave it where it is until it shows again and has a size to judge by.
         if (!SummaryCard.IsVisible || SummaryCard.Bounds.Height <= 0) return;
@@ -427,6 +446,26 @@ public partial class OperateView : UserControl
             PinnedStack.Children.Remove(SummaryCard);
             ListStack.Children.Insert(0, SummaryCard);
         }
+    }
+
+    /// <summary>The PSK and RTTY conversation box's height: never less than it used to be, never more than this.</summary>
+    internal const double ConversationMin = 120, ConversationMax = 260;
+
+    /// <summary>
+    /// The conversation box's height given the room for the pinned cards and what the rest of the contact card takes:
+    /// it grows into spare room, up to <see cref="ConversationMax"/>, so the macro keys under it stay in view.
+    /// </summary>
+    internal static double ConversationHeight(double room, double rest) =>
+        Math.Round(Math.Clamp(room - rest, ConversationMin, ConversationMax));
+
+    // PSK and RTTY: the conversation box takes the room the pinned area has spare (owner pick 2026-11-27). What the rest
+    // of the card takes does not depend on the box, so a resize settles at once.
+    private void FitConversation(double room)
+    {
+        if (Vm?.Keyboard.Visible != true || ContactCard.Bounds.Height <= 0 || !ConversationScroll.IsEffectivelyVisible) return;
+        var rest = ContactCard.Bounds.Height - ConversationScroll.Bounds.Height + PinnedStack.Margin.Bottom;
+        var height = ConversationHeight(room, rest);
+        if (Math.Abs(ConversationScroll.Height - height) >= 1) ConversationScroll.Height = height;
     }
 
     // On a narrow card the three summary columns are too tight (continent names collide, the log column wraps

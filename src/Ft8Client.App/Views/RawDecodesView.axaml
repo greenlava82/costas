@@ -40,7 +40,7 @@
           <TextBlock Text="UTC" Classes="colhead" />
           <TextBlock Grid.Column="1" Text="Local" Classes="colhead" />
           <TextBlock Grid.Column="2" Text="dB" Classes="colhead" TextAlignment="Right" Margin="0,0,6,0" />
-          <TextBlock Grid.Column="4" Text="DT" Classes="colhead" TextAlignment="Right" Margin="0,0,8,0" />
+          <TextBlock Grid.Column="4" Text="{Binding DtHeader}" Classes="colhead" TextAlignment="Right" Margin="0,0,8,0" />
           <TextBlock Grid.Column="5" Text="Hz" Classes="colhead" TextAlignment="Right" />
           <TextBlock Grid.Column="7" Text="Message" Classes="colhead" />
           <TextBlock Grid.Column="8" Text="Country" Classes="colhead" />
