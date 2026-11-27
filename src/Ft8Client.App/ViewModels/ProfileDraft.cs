@@ -121,6 +121,9 @@ public sealed partial class ProfileDraft : ObservableObject
     /// <summary>Sign and upload each contact through TQSL when it is logged.</summary>
     public bool LotwUpload { get; set; }
 
+    /// <summary>Send the signals this profile hears to WSPRnet under its callsign (the profile's WSPR upload setting).</summary>
+    public bool WsprUpload { get; set; }
+
     /// <summary>The Club Log Application Password as stored when the window opened, to notice a new one on save.</summary>
     public string ClubLogPasswordSaved { get; init; } = string.Empty;
 

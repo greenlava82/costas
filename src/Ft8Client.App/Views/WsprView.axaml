@@ -81,6 +81,7 @@
     </Border>
 
     <Border Grid.Row="1" Grid.Column="1" Classes="card" Padding="14,10" VerticalAlignment="Top">
+      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="8">
         <TextBlock Text="Beacon" FontSize="16" FontWeight="SemiBold" />
         <TextBlock Text="Settings can be changed while the beacon is stopped." Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding BeaconOn}" />
@@ -112,9 +113,9 @@
                     ToolTip.Tip="The band for each 2-minute slot is the one WSJT-X's schedule names, for the bands in your list, so hopping stations meet. Every slot is then a hop, so the beacon only receives." />
         </StackPanel>
         <Separator />
-        <CheckBox Content="Report what I hear to WSPRnet" IsChecked="{Binding UploadEnabled}"
-                  ToolTip.Tip="Uploads the signals heard to wsprnet.org under your callsign and locator. Off until you turn it on." />
+        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Reporting what you hear to WSPRnet is set in Settings, under PSK Reporter and RBN." />
       </StackPanel>
+      </ScrollViewer>
     </Border>
   </Grid>
 </UserControl>

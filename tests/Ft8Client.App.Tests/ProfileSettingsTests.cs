@@ -143,4 +143,17 @@ public class ProfileSettingsTests
         SettingsViewModel.NewProfileName(["Home"]).Should().Be("Portable");
         SettingsViewModel.NewProfileName(["Home", "portable", "Portable 2"]).Should().Be("Portable 3");
     }
+
+    [Fact]
+    public void ApplyProfiles_WsprUpload_SavesToTheProfileAndKeepsTheBeaconSettings()
+    {
+        var s = Home();
+        s.Profile.Wspr.TxPercent = 35;
+        var d = new ProfileDraft { Id = s.Profile.Id, Name = s.Profile.Name, Callsign = "N0CALL", Grid = "DN40", Power = "50", WsprUpload = true };
+
+        SettingsViewModel.ApplyProfiles(s, [d], s.Profile.Id);
+
+        s.Profile.Wspr.UploadEnabled.Should().BeTrue();
+        s.Profile.Wspr.TxPercent.Should().Be(35, "the beacon settings are changed on the WSPR screen, not here");
+    }
 }

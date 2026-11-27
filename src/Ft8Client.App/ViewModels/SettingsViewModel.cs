@@ -59,6 +59,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 LotwEnabled = p.Lotw.Enabled, LotwUser = p.Lotw.Username ?? string.Empty,
                 LotwPassword = host.Secrets.Get(SecretNames.LotwPassword(p.Id)) ?? string.Empty,
                 LotwStationLocation = p.Lotw.StationLocation ?? string.Empty, LotwUpload = p.Lotw.UploadOnComplete,
+                WsprUpload = p.Wspr.UploadEnabled,
             });
         }
         _loadedProfile = s.Profile.Id;
@@ -286,6 +287,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Id = "p" + Guid.NewGuid().ToString("N")[..8], CopyOf = from.Id, Name = NewProfileName(Profiles.Select(p => p.Name)),
             Callsign = from.Callsign, Grid = from.Grid, Licence = from.Licence, Power = from.Power, MaxPower = from.MaxPower, FlexAddress = from.FlexAddress,
             OperatorName = from.OperatorName, Qth = from.Qth, RigDescription = from.RigDescription, Antenna = from.Antenna,
+            WsprUpload = from.WsprUpload,
         };
         Profiles.Add(draft);
         SelectedProfile = draft;
@@ -432,6 +434,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             p.Lotw.Username = string.IsNullOrWhiteSpace(d.LotwUser) ? null : d.LotwUser.Trim();
             p.Lotw.StationLocation = string.IsNullOrWhiteSpace(d.LotwStationLocation) ? null : d.LotwStationLocation.Trim();
             p.Lotw.UploadOnComplete = d.LotwUpload;
+            p.Wspr.UploadEnabled = d.WsprUpload;
             result.Add(p);
         }
         s.Profiles = result;

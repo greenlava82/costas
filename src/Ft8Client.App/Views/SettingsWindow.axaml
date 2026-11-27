@@ -845,6 +845,13 @@
               </StackPanel>
             </Grid>
             <Grid Classes="field" ColumnDefinitions="210,*">
+              <TextBlock Classes="label" Text="WSPRnet" />
+              <StackPanel Grid.Column="1">
+                <CheckBox Content="Report the WSPR signals I hear to WSPRnet" IsChecked="{Binding SelectedProfile.WsprUpload}" />
+                <TextBlock Classes="help" Text="Sent to wsprnet.org under the callsign and grid of the profile shown on the Station page, a few at a time after each 2-minute slot. Off until you turn it on, and never in simulation. The beacon's own settings are on the WSPR screen." TextWrapping="Wrap" />
+              </StackPanel>
+            </Grid>
+            <Grid Classes="field" ColumnDefinitions="210,*">
               <TextBlock Classes="label" Text="Reverse Beacon Network" />
               <StackPanel Grid.Column="1">
                 <CheckBox Content="Also show skimmers that spot my signal" IsChecked="{Binding RbnEnabled}" />
