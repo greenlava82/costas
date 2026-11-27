@@ -18,8 +18,12 @@ passband at once (up to 20).
 
 - **Next in line, Repeats and Watching** work as they do for FT8. Costas finds each station's call in its text
   ("CQ CQ DE KP4JRS KP4JRS K", "W7LIT DE EA8TL") and ranks it by what you need. A station is listed as calling CQ
-  for two minutes after its CQ, and the list refreshes every few seconds.
-- **The waterfall** labels each signal with its station's call, "?" until Costas has read a call, and the station you
+  for two minutes after its CQ, and the list refreshes every few seconds. The **Sending now** column shows what each
+  station is sending. The FT8 **Signal** and **Chance** columns are hidden in these modes (they come from FT8 time
+  slots and PSK Reporter reports of FT8), so the text gets their room; they come back when you switch to FT8 or FT4.
+- **The waterfall** starts taller than in FT8, since clicking signals on it is how you read stations. PSK and RTTY
+  remember their own waterfall height, separate from FT8's: drag the grip and each kind of mode keeps the size you gave
+  it. It labels each signal with its station's call, "?" until Costas has read a call, and the station you
   are in contact with in red. Click a signal to read it, even before Costas has noticed it; it stays read while that
   station is quiet. When a reply comes back a little off that frequency, the same channel moves onto it. For RTTY, click either of its two tones or between them. **Calls** at the top right of the waterfall hides or shows the labels.
 - **Reading a signal.** When you are not in a contact, the box under the contact card (the conversation box) shows the
@@ -27,15 +31,19 @@ passband at once (up to 20).
   on top. Clicking a station in Next in line reads its signal the same way. Click another signal to switch. It is how
   you listen to a station before you call it; Raw decodes still shows every signal at once.
 - **Signals without a callsign yet** are counted in a line under Next in line, with their audio frequencies.
-- **Band activity** (right column) and the band summary count the stations read every three minutes, as there are no
-  slots to count.
+- **The band summary** folds to one line under the contact card (stations heard, countries, CQ, you need, heard
+  from and your log), so the conversation box and the station list have the room. **Band activity** (right column) and
+  the summary count the stations read every three minutes, as there are no slots to count.
+- **The conversation box** grows into whatever room the window has spare, up to about twice its old height, while
+  keeping the macro keys under it in view.
 - **Raw decodes** shows the text, a line per over or per line typed, with the audio frequency and signal strength. The
-  DT column is empty: these modes have no time offset. Only the current mode's lines are shown, so FT8 lines
+  DT column is empty and unlabelled: these modes have no time offset. Times read as a clock (18:46:05) rather than an
+  FT8 slot, and **CQs** counts and shows the lines calling CQ (or asking QRZ?). Only the current mode's lines are shown, so FT8 lines
   never mix with PSK or RTTY text.
 - **dB** is measured in a 2,500 Hz bandwidth, the same scale as FT8, so −10 dB means the same in both.
 
 There are no slots, so where FT8 shows the slot countdown the contact card shows how many characters you have typed
-ahead, or how many are still to go while sending.
+ahead, or how many are still to go while sending. With nothing typed and nothing on the air, that space stays empty.
 
 ## Making a contact
 

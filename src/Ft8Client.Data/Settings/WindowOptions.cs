@@ -32,6 +32,25 @@ public sealed class WindowOptions
     /// <summary>Height of the waterfall strip in the main window, in pixels; 52 is the compact strip.</summary>
     public double WaterfallHeight { get; set; } = 52;
 
+    /// <summary>
+    /// Height of the waterfall strip in PSK, PSK63 and RTTY, kept apart from FT8's: in those modes clicking a signal on
+    /// the waterfall is how a station is read, so it starts taller.
+    /// </summary>
+    public double KeyboardWaterfallHeight { get; set; } = DefaultKeyboardWaterfallHeight;
+
+    /// <summary>The PSK and RTTY waterfall height before the operator changes it.</summary>
+    public const double DefaultKeyboardWaterfallHeight = 230;
+
+    /// <summary>The saved waterfall height for FT8 and FT4, or for PSK and RTTY when <paramref name="keyboard"/>.</summary>
+    public double WaterfallHeightFor(bool keyboard) => keyboard ? KeyboardWaterfallHeight : WaterfallHeight;
+
+    /// <summary>Saves the waterfall height for FT8 and FT4, or for PSK and RTTY when <paramref name="keyboard"/>.</summary>
+    public void SetWaterfallHeight(bool keyboard, double height)
+    {
+        if (keyboard) KeyboardWaterfallHeight = height;
+        else WaterfallHeight = height;
+    }
+
     /// <summary>True when the waterfall is popped out into its own window.</summary>
     public bool WaterfallOut { get; set; }
 

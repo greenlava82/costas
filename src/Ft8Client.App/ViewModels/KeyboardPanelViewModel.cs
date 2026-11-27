@@ -146,6 +146,12 @@ public sealed partial class KeyboardPanelViewModel : ObservableObject
     [ObservableProperty]
     public partial string RadioNote { get; set; } = string.Empty;
 
+    /// <summary>
+    /// True when the on-air panel's readout has something to count: an over on the air, or text typed ahead. Idle with
+    /// nothing typed, "0 characters ready" says nothing, so the readout hides.
+    /// </summary>
+    public bool ReadoutShown => OnAir || Typed.Length > 0;
+
     /// <summary>"Typed ahead" or "Sending", for the on-air panel.</summary>
     public string ReadoutLabel => OnAir ? "Sending" : "Typed ahead";
 
@@ -287,6 +293,7 @@ public sealed partial class KeyboardPanelViewModel : ObservableObject
 
     private void Readout()
     {
+        OnPropertyChanged(nameof(ReadoutShown));
         OnPropertyChanged(nameof(ReadoutLabel));
         OnPropertyChanged(nameof(ReadoutCount));
         OnPropertyChanged(nameof(ReadoutUnit));

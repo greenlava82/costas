@@ -216,14 +216,15 @@
                       </StackPanel>
                     </StackPanel>
                     <StackPanel x:Name="CardSlot" Grid.Column="2" AutomationProperties.LiveSetting="Polite" IsVisible="{DynamicResource StandardSkin}">
-                      <TextBlock Text="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).SlotLabel}" Classes="secondary" />
-                      <StackPanel Orientation="Horizontal" Spacing="4">
+                      <!-- PSK and RTTY: shown only while sending or with text typed ahead (owner pick 2026-11-27). -->
+                      <TextBlock Text="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).SlotLabel}" Classes="secondary" IsVisible="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).SlotReadoutShown}" />
+                      <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).SlotReadoutShown}">
                         <TextBlock Text="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).SlotLeft}" Classes="num reportValue"
                                    Foreground="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).Transmitting, Converter={x:Static v:Converters.TransmittingText}}" />
                         <TextBlock Text="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).SlotUnit}" Classes="secondary reportUnit" VerticalAlignment="Bottom"
                                    IsVisible="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).SlotLeft, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                       </StackPanel>
-                      <ProgressBar x:Name="SlotBar" Value="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).SlotProgress}" Maximum="1" Height="4" MinHeight="4"
+                      <ProgressBar x:Name="SlotBar" IsVisible="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).SlotReadoutShown}" Value="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).SlotProgress}" Maximum="1" Height="4" MinHeight="4"
                                    Foreground="{Binding $parent[UserControl].((vm:OperateViewModel)DataContext).Transmitting, Converter={x:Static v:Converters.ProgressBrush}}" />
                     </StackPanel>
                   </Grid>
@@ -292,7 +293,8 @@
               </StackPanel>
             </DockPanel>
             <!-- Idle: the band in one line (owner decision 2026-11-14). The full summary is the side column's Band tab; More opens it.
-                 Hidden while that tab is already showing, so nothing is on screen twice. -->
+                 Hidden while that tab is already showing, so nothing is on screen twice. PSK and RTTY show it in the roomy layout
+                 too, in place of the summary card (owner pick 2026-11-27). -->
             <Border x:Name="BandStrip" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource RowDividerBrush}" Padding="0,6,0,0" Margin="0,4,0,0"
                     IsVisible="{Binding $parent[v:OperateView].((vm:OperateViewModel)DataContext).ShowStrip}" AutomationProperties.Name="Band strip">
               <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="16"
@@ -318,7 +320,9 @@
                 <TextBlock Grid.Column="2" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding LogTip}">
                   <Run Text="Log  " Foreground="{DynamicResource TextSecondaryBrush}" /><Run Text="{Binding LogLine}" />
                 </TextBlock>
+                <!-- The roomy layout (the strip in PSK and RTTY) has no Band tab to open. -->
                 <Button Grid.Column="3" Classes="link" VerticalAlignment="Center" AutomationProperties.Name="More about the band"
+                        IsVisible="{Binding $parent[v:OperateView].((vm:OperateViewModel)DataContext).Compact}"
                         Command="{Binding $parent[v:OperateView].((vm:OperateViewModel)DataContext).ShowSideCommand}" CommandParameter="0"
                         ToolTip.Tip="Open the Band tab at the side: the full counts, Heard from and your log on this band.">
                   <TextBlock Text="More ▾" />
@@ -592,7 +596,7 @@
                 <TextBlock Grid.Column="2" Text="Where" Classes="secondary" />
                 <TextBlock Grid.Column="3" Text="Distance" Classes="secondary" HorizontalAlignment="Right" Margin="0,0,12,0" />
                 <TextBlock Grid.Column="4" Text="Why" Classes="secondary" />
-                <TextBlock Grid.Column="5" Text="Doing now" Classes="secondary" />
+                <TextBlock Grid.Column="5" Text="{Binding DoingNowHeader}" Classes="secondary" />
                 <TextBlock Grid.Column="6" Text="Last heard" Classes="secondary" />
                 <TextBlock Grid.Column="7" Text="dB" Classes="secondary" HorizontalAlignment="Right" Margin="0,0,8,0" />
                 <TextBlock Grid.Column="8" Text="Signal" Classes="secondary" />
@@ -702,7 +706,7 @@
               <TextBlock Grid.Column="2" Text="Where" Classes="secondary" />
               <TextBlock Grid.Column="3" Text="Distance" Classes="secondary" HorizontalAlignment="Right" Margin="0,0,12,0" />
               <TextBlock Grid.Column="4" Text="Why" Classes="secondary" />
-              <TextBlock Grid.Column="5" Text="Doing now" Classes="secondary" />
+              <TextBlock Grid.Column="5" Text="{Binding DoingNowHeader}" Classes="secondary" />
               <TextBlock Grid.Column="6" Text="Last heard" Classes="secondary" />
               <TextBlock Grid.Column="7" Text="dB" Classes="secondary" HorizontalAlignment="Right" Margin="0,0,8,0" />
               <TextBlock Grid.Column="8" Text="Signal" Classes="secondary" />
@@ -789,7 +793,7 @@
               <TextBlock Grid.Column="2" Text="Distance" Classes="secondary" HorizontalAlignment="Right" Margin="0,0,12,0" />
               <TextBlock Grid.Column="3" Text="Why" Classes="secondary" />
               <TextBlock Grid.Column="4" Text="Signal" Classes="secondary" />
-              <TextBlock Grid.Column="5" Text="Doing now" Classes="secondary" />
+              <TextBlock Grid.Column="5" Text="{Binding DoingNowHeader}" Classes="secondary" />
             </Grid>
             <ItemsControl ItemsSource="{Binding Watching}" IsVisible="{Binding !WatchingFolded}">
               <ItemsControl.ItemTemplate>

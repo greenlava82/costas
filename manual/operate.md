@@ -386,7 +386,8 @@ between 200 and 2900 Hz to move your offset there. **Auto-select** goes back to 
 
 ### A bigger waterfall
 
-The waterfall starts as a thin strip showing the last few seconds. To make it bigger:
+The waterfall starts as a thin strip showing the last few seconds (in PSK and RTTY it starts taller, and those modes
+remember their own height: see [PSK and RTTY](keyboard-modes.md#what-you-see)). To make it bigger:
 
 - **Drag the grip** (the short bar on the strip's top edge) upwards. The waterfall can grow to half the window; the
   panels above it get shorter and scroll. Double-click the grip to go back to the thin strip. With the grip focused,

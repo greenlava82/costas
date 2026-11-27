@@ -232,6 +232,14 @@ parsing still use finished lines.
 
 **Waterfall.** The same control. Each channel has a callsign tag above it ("?" until a callsign is found). The channel in contact is tagged in red. A click starts reading that signal and makes it the CQ offset. The waterfall's Calls switch (`Window.WaterfallCallsigns`) hides these tags with the FT8/FT4 ones.
 
+As built (focus clean-up, owner pick 2026-11-27, D-PSK-focus): in keyboard modes
+- Next in line, Repeats and Watching hide Signal and Chance (Watching: Signal) through `ColumnLayout.Hide`, keeping the stored widths for FT8; the Doing now heading reads "Sending now" and the column takes the freed room.
+- The band summary card folds to the one-line band strip in the roomy layout too (the strip's More link shows only in the compact layout, which has a Band tab).
+- The on-air readout (Typed ahead / Sending) shows only while an over is on the air or text is typed ahead.
+- The conversation box takes the pinned area's spare room, between 120 and 260 px, computed from what the rest of the contact card needs, so the macro keys stay in view.
+- The waterfall strip keeps its own height, `Window.KeyboardWaterfallHeight` (default 230 px), separate from `Window.WaterfallHeight`; a mode switch between the two kinds restores that kind's height.
+- Raw decodes: the DT heading is empty, times read HH:mm:ss, and a line counts as CQ when `OverReader` finds a CQ or QRZ? in its text (`RawDecodeLine.TextCq`).
+
 **Right column.**
 - *Heard here* and *Your signal* filter to the current band and mode.
 - *Band activity* counts signals per three minutes instead of decodes per slot.

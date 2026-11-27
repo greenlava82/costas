@@ -34,6 +34,9 @@ public partial class MainWindow : Window
     private readonly Dictionary<int, PanelWindow> _panels = [];
     private const double CompactWaterfall = 52;
 
+    // True while the waterfall strip has the PSK and RTTY height (a keyboard mode is selected).
+    private bool _keyboardWaterfall;
+
     /// <summary>Creates the window.</summary>
     public MainWindow()
     {
@@ -83,7 +86,8 @@ public partial class MainWindow : Window
         Width = Math.Max(MinWidth, w.Width);
         Height = Math.Max(MinHeight, w.Height);
         if (w.X is { } x && w.Y is { } y) Position = new Avalonia.PixelPoint(x, y);
-        SetWaterfallHeight(w.WaterfallHeight, save: false);
+        _keyboardWaterfall = !Core.ModeInfo.IsSlotted(vm.Host.Session.Config.Mode);
+        SetWaterfallHeight(w.WaterfallHeightFor(_keyboardWaterfall), save: false);
         ApplyLevels(new Core.Spectrum.WaterfallLevels(w.WaterfallFloorDb, w.WaterfallRangeDb), w.WaterfallPalette, save: false);
         ShowCallTags(w.WaterfallCallsigns, save: false);
         CallsButton.IsCheckedChanged += (_, _) => ShowCallTags(CallsButton.IsChecked == true, save: true);
@@ -133,6 +137,14 @@ public partial class MainWindow : Window
                 _waterfallBand = $"{snapshot.Band}/{snapshot.Mode}";
                 _waterfallPump = pump;
                 if (_waterfallWindow is { } ww) ww.Title = $"Costas waterfall · {snapshot.Band} {snapshot.Mode.ToString().ToUpperInvariant()}";
+                // PSK and RTTY keep a waterfall height of their own (owner pick 2026-11-27): switching between them and
+                // FT8 or FT4 brings back that kind's height.
+                var keyboard = !Core.ModeInfo.IsSlotted(snapshot.Mode);
+                if (keyboard != _keyboardWaterfall)
+                {
+                    _keyboardWaterfall = keyboard;
+                    SetWaterfallHeight(vm.Host.Settings.Current.Window.WaterfallHeightFor(keyboard), save: false);
+                }
             }
             var row = snapshot.Transmitting ? null : pump?.Spectrum.TakeLatest();
             // Marks the first row of each receive slot, so a tall waterfall can draw the slot boundaries. PSK and RTTY
@@ -223,7 +235,8 @@ public partial class MainWindow : Window
         height = Math.Round(Math.Clamp(height, CompactWaterfall, max));
         if (_waterfallWindow is null && height != WaterfallHeight) BottomGrid.RowDefinitions[2].Height = new GridLength(height);
         if (!save || Vm is not { } vm) return;
-        vm.Host.Settings.Update(s => s.Window.WaterfallHeight = height);
+        var keyboard = _keyboardWaterfall;
+        vm.Host.Settings.Update(s => s.Window.SetWaterfallHeight(keyboard, height));
     }
 
     // A choice in the callsign menu closes it; the command itself switches the profile or opens Settings.
@@ -332,7 +345,7 @@ public partial class MainWindow : Window
     {
         WaterfallStrip.IsVisible = show;
         WaterfallGrip.IsVisible = show;
-        BottomGrid.RowDefinitions[2].Height = new GridLength(show ? Math.Max(CompactWaterfall, Vm?.Host.Settings.Current.Window.WaterfallHeight ?? CompactWaterfall) : 0);
+        BottomGrid.RowDefinitions[2].Height = new GridLength(show ? Math.Max(CompactWaterfall, Vm?.Host.Settings.Current.Window.WaterfallHeightFor(_keyboardWaterfall) ?? CompactWaterfall) : 0);
         if (show) SetWaterfallHeight(WaterfallHeight, save: false);
     }
 

@@ -582,4 +582,21 @@ public class KeyboardContactSessionTests : IDisposable
         _session.Snapshot.CqListening.Should().BeFalse();
         _session.Snapshot.Reading!.Call.Should().Be(Partner);
     }
+
+    [Fact]
+    public void ApplyText_CqLine_RawLineCountsAsCq()
+    {
+        Hear("CQ CQ CQ DE KP4JRS KP4JRS KP4JRS PSE K\n");
+
+        _session.Snapshot.RawDecodes.Should().Contain(l => l.Decode.Text.Contains("KP4JRS", StringComparison.Ordinal))
+            .And.OnlyContain(l => l.IsCq, "PSK text is not an FT8 message, so the CQ is read from the text");
+    }
+
+    [Fact]
+    public void ApplyText_ExchangeLine_RawLineNotCq()
+    {
+        Hear("EA8TL DE KP4JRS GE OM UR 579 579 K\n");
+
+        _session.Snapshot.RawDecodes.Should().NotBeEmpty().And.OnlyContain(l => !l.IsCq);
+    }
 }

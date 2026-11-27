@@ -686,7 +686,8 @@ public sealed partial class Session : Ft8Client.App.Remote.IRemoteTarget
                 ApplyKeyboardLine(l);
                 var decode = new Decode(l.Utc, l.Snr, 0, l.OffsetHz, l.Text, LowConfidence: false);
                 _raw.Add(new RawDecodeLine(decode, MessageParser.Parse(l.Text), l.Sender is null ? null : _countries.Lookup(l.Sender)?.Entity.Name,
-                    l.To is not null && Callsign.EqualsCall(l.To, _config.MyCall), Mode: mode));
+                    l.To is not null && Callsign.EqualsCall(l.To, _config.MyCall), Mode: mode,
+                    TextCq: OverReader.Read(l.Text.ToUpperInvariant() + " ").Cq));
             }
             TrimRaw();
         }
